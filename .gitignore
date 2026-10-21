@@ -1,0 +1,8 @@
+.codegraph/
+.atl/
+.gradle/
+build/
+.idea/
+local.properties
+*.keystore
+.env

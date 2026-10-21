@@ -21,3 +21,17 @@
 
 ## Commits
 - Mensajes convencionales (feat:, fix:, chore:, test:).
+
+## Agent skills
+
+### Issue tracker
+
+Los issues viven en GitHub Issues del repo (CLI `gh`). Ver `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Se usan los cinco labels canónicos por defecto (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). Ver `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Repo single-context: `GLOSSARY.md` en la raíz + `docs/adr/`. Ver `docs/agents/domain.md`.

@@ -7,19 +7,19 @@ Glosario del proyecto: reproductor y administrador de contenido IPTV para Androi
 ### Fuentes y catálogo
 
 **Fuente**:
-Origen desde el cual se obtiene el contenido, por URL o archivo seleccionado. No presupone un proveedor comercial ni un número fijo de Listas: una Fuente puede contener una sola Lista o varias, y también puede ser un archivo local sin proveedor detrás.
+Agrupación lógica de una o varias Listas que comparten configuración (por ejemplo, actualización y excepciones de retención). No es la ubicación de importación: cada Lista conserva la suya. No presupone un proveedor comercial ni un número fijo de Listas; una Lista puede ser un archivo local sin proveedor detrás. Queda pendiente decidir si una Fuente puede agrupar Listas de orígenes distintos.
 _Avoid_: proveedor, servidor, provider, origen
 
 **Lista**:
-Documento M3U/M3U8 importado y administrado por la aplicación. Es una entidad de la aplicación, no la Fuente que la contiene.
+Documento M3U/M3U8 importado y administrado por la aplicación. Conserva su propia ubicación de importación: URL HTTP/HTTPS o URI SAF `content://`. Es una entidad de la aplicación, no la Fuente que la contiene.
 _Avoid_: playlist, M3U (como nombre de la entidad de dominio), fuente
 
 **Canal**:
-Recurso reproducible declarado por una Lista. Una URL de stream es un dato del Canal, no el Canal.
+Recurso reproducible declarado por una Lista. Su nombre es opcional: `NULL` significa que la entrada importada no declaró nombre. «Sin nombre» es solo una etiqueta de presentación; nunca se persiste como nombre ni se usa como identidad. Una URL de stream es un dato del Canal, no el Canal.
 _Avoid_: stream, playlist entry
 
 **Clave de Canal**:
-Identificador determinista que representa a un Canal dentro del ámbito de una Fuente. Deriva de `tvg-id` cuando la Lista lo trae y resulta único en ese ámbito; si no, de una clave canónica documentada construida a partir del nombre normalizado y la URL del stream. La clave es lógica: no es la clave primaria interna de persistencia.
+Identificador determinista que representa a un Canal dentro del ámbito de una Fuente. Deriva de `tvg-id` cuando la Lista lo trae y resulta único en ese ámbito; si no, de una clave canónica documentada construida a partir del nombre normalizado y la URL del stream. La clave es lógica: no es la clave primaria interna de persistencia. Cuando la entrada no declara nombre, la derivación de la clave canónica queda explícitamente pendiente, incluida la desambiguación de colisiones entre entradas sin nombre; no se usa «Sin nombre» como insumo.
 _Avoid_: ID, hash (como término de dominio), UUID
 
 **Grupo**:

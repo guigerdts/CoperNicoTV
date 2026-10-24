@@ -9,7 +9,7 @@ El MVP completo (7 entregas) incluye múltiples Listas, catálogos de decenas de
 ## Decisión
 
 - **Room** (desde el día 1, en `:app`) sostiene todas las **entidades de persistencia**: Fuente, Lista, Canal, Apariencia (pertenencia Lista↔Canal), Grupo, Favoritos, Ocultaciones, Historial, Colecciones, Programación de EPG y Asociaciones, con índices sobre las claves de búsqueda (identidad, nombre, grupo) y **integridad referencial** (foreign keys) entre relaciones persistidas.
-- **DataStore** (preferencias) sostiene la configuración **global** del usuario (tema, ajustes de reproducción, valores por defecto de retención de EPG). La configuración **por Fuente** (intervalo de actualización individual, excepciones de retención) se persiste en Room junto a la Fuente, ver "Preferencias: global vs. por Fuente".
+- **DataStore** (preferencias) sostiene la configuración **global** del usuario (tema, ajustes de reproducción, valores por defecto de retención de EPG y límites del parser M3U: longitud máxima de línea y máximo de atributos por entrada). La configuración **por Fuente** (intervalo de actualización individual, excepciones de retención) se persiste en Room junto a la Fuente, ver "Preferencias: global vs. por Fuente".
 - **Paging** conecta Room con las UIs de catálogo y guía para recorrer catálogos largos sin cargarlos completos en memoria.
 
 ### Separaciones obligatorias
@@ -21,6 +21,7 @@ El MVP completo (7 entregas) incluye múltiples Listas, catálogos de decenas de
 ### Relaciones del esquema v1
 
 - `Fuente` 1—n `Lista` 1—n **`Apariencia`**. **La pertenencia de un Canal a una Lista es la tabla de unión `Apariencia` (Lista↔Canal)**, y conserva los metadatos propios de cada aparición: **el orden dentro de la Lista**, y **el Grupo asignado por esa Lista** a ese canal.
+- **La ubicación de importación pertenece a `Lista`**: cada Lista conserva su propia `ubicacion` (URL HTTP/HTTPS o URI SAF `content://`), y `Fuente` no duplica esa URL. Queda pendiente decidir si una Fuente puede agrupar Listas de orígenes distintos.
 - **El Grupo es una entidad con ámbito de Lista, no una relación directa Canal↔Grupo**: el mismo nombre de grupo en dos Listas distintas **no** implica que sea el mismo Grupo, y ocultar un grupo en una Lista no afecta a la otra Lista. La relación `Apariencia` referencia el Grupo (con ámbito de su Lista); no existe FK directa Canal↔Grupo fuera de ese contexto.
 - **La Ocultación de Grupo es una entidad propia que referencia el Grupo concreto mediante su FK** (hacia la fila de Grupo con ámbito de su Lista). Como el Grupo tiene ámbito de Lista, **la ocultación no afecta a grupos homónimos de otras Listas**. `Apariencia → Grupo` representa únicamente **la asignación de grupo a una aparición del Canal** (los metadatos con que la Lista contiene al canal); **no sustituye ni implementa la relación de ocultación**: son dos relaciones independientes, cada una con su FK.
 - `Favorito`, `Ocultación de Canal` e `Historial` referencian `Canal` por su FK interna; su semántica de usuario se ancla a la identidad lógica (ADR-0004), que la reconciliación redirige de forma controlada. La `Ocultación de Grupo` es la entidad propia descrita arriba, con FK hacia el Grupo concreto de su Lista.
@@ -35,7 +36,7 @@ El MVP completo (7 entregas) incluye múltiples Listas, catálogos de decenas de
 
 ### Preferencias: global vs. por Fuente
 
-- **Global** (DataStore): tema, ajustes de reproducción, organización del Catálogo, y **valores por defecto de retención de EPG** (ventana temporal, máximo por canal, presupuesto total).
+- **Global** (DataStore): tema, ajustes de reproducción, organización del Catálogo, **valores por defecto de retención de EPG** (ventana temporal, máximo por canal, presupuesto total) y **límites del parser M3U** (longitud máxima de línea y máximo de atributos por entrada; ADR-0006:21–24).
 - **Por Fuente** (Room, en la tabla `Fuente` como columnas distinguibles): **intervalo de actualización individual** (configurable por Fuente, con valor que puede diferir entre fuentes) y **excepciones de retención de EPG** para esa fuente.
 - **Representación de la mezcla**: las columnas por Fuente almacenan el valor configurado o un marcador explícito "usar global" (representado como columna separada con bandera de existencia, no como valor mágico); la resolución en ejecución es: valor explícito de la Fuente si existe, si no el global de DataStore. Así el cambio del valor global no corrompe valores por fuente configurados, y se ve siempre cuáles fuentes tienen excepciones.
 

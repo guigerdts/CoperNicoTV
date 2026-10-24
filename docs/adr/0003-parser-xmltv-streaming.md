@@ -30,15 +30,18 @@ El parsing XMLTV es **incremental (streaming) con XmlPullParser (kxml2)**, dispo
 
 ### 3. Retención temporal
 
-Tres límites configurables (vía DataStore, ADR-0002), con valores por defecto documentados:
+Tres límites configurables (valores globales por defecto en DataStore; excepciones por Fuente en Room, ADR-0002:38–40), con **valores iniciales de especificación** documentados. Son valores normativos iniciales del MVP, pendientes de calibración con datos reales; **no están implementados ni validados experimentalmente**.
 
-- **Ventana temporal**: descarta la Programación fuera de un intervalo relativo al momento de importación (p. ej., pasado reciente + futuro próximo).
-- **Límite por canal**: cantidad máxima de Programación conservada por Canal.
-- **Presupuesto total**: volumen máximo que la EPG puede ocupar; al excederlo se evicta la Programación más antigua primero.
+- **Ventana temporal**: se conserva la Programación que se solape con un intervalo relativo al momento de importación de cada FuenteGuia: **1 día de pasado y 7 días de futuro**. Un programa se conserva si su fin es posterior al inicio de la ventana y su inicio es anterior al fin de la ventana. La retención se aplica durante la importación, antes de la publicación atómica; esta decisión no introduce una purga periódica automática.
+- **Límite por canal**: máximo de **500 programas por `(fuente_guia_id, channel_id_texto)`** en la generación publicada. Al superarlo, se descarta primero la Programación más antigua dentro de esa asociación. Es un límite de diseño pendiente de calibración con datos reales, especialmente para guías con intervalos de 15 minutos.
+- **Presupuesto total**: máximo de **200 MB por FuenteGuia** para la generación publicada. Al superarlo, se evicta primero la Programación más antigua dentro de esa fuente. No es un límite global del dispositivo ni garantiza que todas las fuentes puedan consumir 200 MB simultáneamente. El staging de una importación puede aproximar el tamaño de la generación nueva mientras la publicada sigue vigente; ese coste temporal (espacio adicional y tiempo de importación) se documenta aparte y requiere espacio libre en el dispositivo, pero no se computa contra el presupuesto de la generación publicada.
+
+La resolución de cada límite es: valor explícito de la Fuente si existe; si no, el global de DataStore. Cambiar el global no corrompe las excepciones por Fuente (ADR-0002:38–40).
 
 ## Consecuencias
 
 - Las pruebas cubren: XML malformado, datos incompletos, cancelación a mitad de parseo, archivos grandes sintéticos y consumo de memoria razonable; nunca dependen de archivos reales de terceros ni de contenido cuya distribución no esté autorizada.
+- Las pruebas de retención cubren los tres límites, la resolución global/por Fuente y la evicción oldest-first; los valores iniciales no se consideran validados hasta calibrarlos con datos reales.
 - Las pruebas de publicación cubren: importación que falla a mitad de camino conserva la guía publicada anterior íntegra; importación exitosa publica la nueva generación atómicamente y la anterior queda fuera del puntero (y es candidata a recolección).
 - El consumo desde `:app` es incremental (Flow perezoso), nunca listas completas.
 - Agregar un segundo formato de guía (futuro) no obliga a reescribir el pipeline: solo un parser nuevo que emita los mismos eventos.

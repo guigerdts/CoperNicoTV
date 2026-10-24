@@ -18,16 +18,18 @@ El parser M3U (en `:core`, Kotlin puro, ADR-0001) es **streaming y tolerante a f
 
 **Límites defensivos** (protegen la memoria; ninguno depende del *número de canales*, así que una lista grande y válida nunca se rechaza por tamaño del catálogo):
 
-- **Longitud de línea**: una línea que excede el límite configurable (por defecto, suficientemente grande para URIs legítimas, p. ej. 4 KiB) se descarta con error tipado por línea; evita que una sola línea corrupta o maliciosa agote la memoria. La lista continúa.
-- **Atributos por entrada**: por arriba del máximo configurable (por defecto 64) los atributos no se incorporan y se registran como informativo no-fatal; la entrada conserva los atributos ya parseados.
+- **Longitud de línea**: una línea física que excede el límite configurable (valor inicial de especificación: 64 KiB; configurable en preferencias globales) invalida y descarta la **entrada en curso**, registra un error tipado con su ubicación y el parser se resincroniza en el siguiente `#EXTINF` válido; la lista continúa. Una URL huérfana no se asocia a una entrada incompleta. No existe un límite separado por atributo: todos los atributos del `EXTINF` comparten la línea y el límite de línea acota su tamaño total.
+- **Atributos por entrada**: máximo configurable de 64 pares clave-valor por entrada (valor inicial de especificación). Se considera reconocido todo par clave-valor sintácticamente válido del `EXTINF`, incluidas las claves sin columna dedicada (se conservan en `atributos_extra`). El conteo es por aparición de par clave-valor reconocido, incluidas las claves repetidas; la primera aparición de una clave fija el valor y las posteriores cuentan para el límite pero no reemplazan el valor ya fijado. Se conservan los primeros 64 pares aceptados; los posteriores no se incorporan y generan un diagnóstico informativo no-fatal agregado por código. La entrada no se descarta por este desbordamiento.
+- **Sin límite de entrada ni de documento en el parser**: el procesamiento es streaming y el límite de línea es la cota de memoria por entrada. Un límite de descarga o de red, si se define, pertenece a la capa de importación y no se fija en este ADR.
 - **Acumulación de errores**: los errores tipados se **agregan por código de error** (cada tipo lleva su conteo total y una muestra acotada de ubicaciones, no una lista ilimitada). Un resultado nunca contiene errores que crezcan al ritmo del tamaño de la lista: si 10.000 entradas traen 10.000 problemas, el resultado reporta el conteo por tipo y las primeras N ubicaciones de cada tipo.
-- Todos los límites son configurables (preferencias globales, ADR-0002) y sus valores por defecto quedan documentados y probados; ninguno actúa como techo de canales.
+- Todos los límites son configurables como preferencias globales (ADR-0002) y sus valores iniciales de especificación quedan documentados; **no están implementados ni validados experimentalmente** y quedan pendientes de validación técnica. Ninguno actúa como techo de canales.
 
 **Nota de costo**: la complejidad asintótica **O(canales) es propiedad del catálogo resultante** (lo que se persiste en Room, ADR-0002), no una garantía de memoria del parsing, que opera por entrada y con un buffer de salida acotado por el lote.
 
 ## Consecuencias
 
 - Las pruebas basadas en tablas cubren: M3U mínimo sin atributos, casos con atributos extendidos, listas con líneas basura intercaladas, entradas sin EXTINF, BOM, CRLF/LF mixtos, archivos grandes sintéticos (mínimo 10.000 entradas) y un caso de entrada corrupta en posición arbitraria que no debe impedir recuperar el resto.
+- Las pruebas de límites cubren: línea que excede el máximo (entrada descartada, error tipado y resincronización en el siguiente `#EXTINF`), desborde de atributos (se conservan los primeros 64 y el resto se reporta como informativo agregado) y conteo determinista de claves repetidas.
 - El caso de importación vía URL comparte parser: no hay un segundo parser para "M3U de red" y otro para "M3U de archivo".
 
 ## Opciones consideradas

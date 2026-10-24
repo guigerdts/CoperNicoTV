@@ -1,4 +1,6 @@
-# Manifiesto de evidencia — U0
+# Manifiesto de evidencia histórica — U0 (`17199b9`)
+
+Este manifiesto es una **instantánea histórica** de la versión de U0 introducida en el commit `17199b9`, no de la versión vigente ni de la versión resultante de la corrección L25. Conserva el hash, los bytes y las líneas de esa publicación; no se regenera en esta ronda.
 
 Fecha de preparación: 2026-10-24 (UTC)
 Rama de publicación: `main`
@@ -16,7 +18,7 @@ HEAD previo al commit: `c538046239d03d3d1d42685d1640c3bf5068628c`
 - Newline final: sí
 - Bytes NUL: 0
 
-El SHA-256, los bytes y las líneas se recalcularon sobre el archivo antes de crear este manifiesto y antes del commit de publicación. El documento U0 no se modificó para insertar su propio hash.
+El SHA-256, los bytes y las líneas se recalcularon sobre el archivo antes de crear este manifiesto y antes del commit de publicación. Corresponden a la versión de U0 de `17199b9`, no a la versión vigente. El documento U0 no se modificó para insertar su propio hash.
 
 ## Estado de Git anterior al commit
 
@@ -37,7 +39,7 @@ El SHA-256, los bytes y las líneas se recalcularon sobre el archivo antes de cr
 
 ## Baseline histórico
 
-No existe baseline histórico de U0 ni diff anterior verificable. `odd/tasks/mvp-copernicotv.md` estaba sin trackear antes de esta publicación, por lo que no hay una versión previa en Git contra la cual comparar el documento. Este manifiesto registra el estado observado, no una reconciliación con una versión histórica inexistente.
+No existe un baseline histórico anterior a la publicación de U0 ni un diff previo verificable. `odd/tasks/mvp-copernicotv.md` estaba sin trackear antes de esa publicación, por lo que no hay una versión anterior en Git contra la cual comparar el documento. Este manifiesto es la evidencia histórica de la publicación de `17199b9`; no es un baseline de la versión vigente ni una reconciliación con una versión anterior inexistente.
 
 ## Alcance y estado del proyecto
 
@@ -63,4 +65,8 @@ La publicación de este manifiesto y del documento U0 no aprueba U0, no inicia E
 
 ## Nota sobre este manifiesto
 
-Este archivo se crea antes del commit de publicación. No incluye su propio SHA-256 porque hacerlo exigiría modificarlo después de calcularlo y volvería a invalidar el valor. El hash de referencia exigido es el del documento U0.
+Este archivo se creó antes del commit de publicación. No incluye su propio SHA-256 porque hacerlo exigiría modificarlo después de calcularlo y volvería a invalidar el valor. El hash de referencia de esta instantánea es el del documento U0 en `17199b9`.
+
+## Vigencia
+
+Este manifiesto **no identifica ni verifica la versión vigente de U0**. La versión vigente tiene otro conteo de líneas, otros bytes y otro SHA-256; el hash de la versión resultante de L25 se registra en `docs/evidence/u0-integrity.sha256`, archivo externo al documento U0, no como aprobación ni como evidencia de validación funcional. Para la versión vigente, la fuente de verdad es el archivo `odd/tasks/mvp-copernicotv.md` y el estado Git observado en la sesión, no este manifiesto.

@@ -14,6 +14,10 @@ _Avoid_: proveedor, servidor, provider, origen
 Documento M3U/M3U8 importado y administrado por la aplicación. Conserva su propia ubicación de importación: URL HTTP/HTTPS o URI SAF `content://`. Es una entidad de la aplicación, no la Fuente que la contiene.
 _Avoid_: playlist, M3U (como nombre de la entidad de dominio), fuente
 
+**Perfil**:
+Agrupación con nombre de Listas M3U. No es la Lista activa renombrada y no posee preferencias de reproducción: esas preferencias son globales. Su representación y cardinalidad exactas quedan pendientes.
+_Avoid_: perfil de usuario, cuenta
+
 **Canal**:
 Recurso reproducible declarado por una Lista. Su nombre es opcional: `NULL` significa que la entrada importada no declaró nombre. «Sin nombre» es solo una etiqueta de presentación; nunca se persiste como nombre ni se usa como identidad. Una URL de stream es un dato del Canal, no el Canal.
 _Avoid_: stream, playlist entry
@@ -41,7 +45,7 @@ Decisión del usuario de excluir del Catálogo un Canal o un Grupo sin borrar el
 _Avoid_: bloqueo, filtro
 
 **Historial**:
-Registro de reproducciones pasadas que habilita el acceso rápido a los últimos canales.
+Estado de la aplicación que conserva, por Canal, la fecha de su última reproducción para habilitar el acceso rápido a los últimos canales. No es un registro de cada reproducción: hay una fila por Canal, garantizada por `UNIQUE(canal_id)`. Al fusionar dos Canales que pasan a representar la misma identidad canónica, se conserva `max(fecha)` y no se duplican filas. La consulta de últimos N usa el orden determinista `fecha DESC, canal_id DESC`; ese orden no es el de la organización del Catálogo.
 
 **Actualización**:
 Reimportación de una Fuente (manual o programada) cuyo resultado reconcilia canales contra claves ya conocidas, preservando Favoritos, Historial y Ocultaciones cuando es posible.
@@ -54,6 +58,9 @@ Resultado de la última Actualización de una Fuente (satisfactoria, fallida, en
 
 **Disponibilidad de Reproducción**:
 Capacidad de un Canal de reproducir su stream en un momento dado. Es independiente del Estado de Actualización: una Actualización fallida no implica que los streams dejaron de responder, y al contrario.
+
+**Caché de transporte**:
+Copia local del contenido descargado (M3U o XMLTV) para evitar descargas repetidas y para servir una copia marcada `stale` cuando la actualización falla o la copia venció. No es la fuente de verdad del catálogo ni de la guía: los metadatos viven en Room y el contenido en archivos privados de la aplicación con nombres opacos. La frescura de la caché es independiente del Estado de Actualización y de la Disponibilidad de Reproducción.
 
 ### Reproducción
 

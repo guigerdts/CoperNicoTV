@@ -1,6 +1,6 @@
 PROVIDER="opencode"
 FILE_PATTERNS="*.kt,*.kts"
-EXCLUDE_PATTERNS="*Test.kt,build,.gradle,.idea"
+EXCLUDE_PATTERNS="build,.gradle,*.generated.kt"
 RULES_FILE="AGENTS.md"
 STRICT_MODE="true"
 TIMEOUT="300"

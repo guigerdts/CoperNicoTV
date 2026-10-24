@@ -146,7 +146,7 @@ Los criterios S14a–S14c y la trazabilidad S14d se detallan en la fila S14 de l
 Distinciones obligatorias:
 
 - El orden visual del catálogo es una vista o consulta: no sobrescribe `Apariencia.orden` (ADR-0002:23) ni `ColeccionCanal.posicion` (ADR-0002:27).
-- La posición no es identidad del Canal (ADR-0004:21, :55). Ordenar no cambia PK, clave canónica, `clave_unicidad`, FKs, Historial ni relaciones.
+- La posición no es identidad del Canal (ADR-0004:21, :56). Ordenar no cambia PK, clave canónica, `clave_unicidad`, FKs, Historial ni relaciones.
 - La preferencia de modo y dirección es por `Lista` M3U y se persiste en DataStore con la PK interna de `Lista` como clave; no se añade columna ni restricción en Room. E3-T7 es la tarea dueña de esa persistencia; E7-T5 consume la preferencia. Si el propietario decide persistirla en Room, será una decisión de esquema separada, no implícita en S14.
 - Desempate técnico: después de la clave del modo, se aplica la clave secundaria de acentos de §2.1 y, si persiste el empate, la PK interna de la fila de catálogo (`Apariencia`) ascendente. No usa la posición en la Lista ni define identidad.
 
@@ -244,7 +244,7 @@ La etapa es **provisional** hasta que se resuelvan los detalles pendientes de D1
 | K6 | Room | README.md, «Stack tecnológico»; ADR-0002 | E1-U3/U4 | Esquema, DAO, índices y Paging | Robolectric |
 | K7 | DataStore | README.md, «Stack tecnológico»; ADR-0002 | E3-T7 (dueña), E7-T5 (consumidora) | Preferencias globales y por Lista (ordenación) persistentes; E3-T7 implementa la preferencia por Lista, E7-T5 la consume | Robolectric, I-M |
 | K8 | Coroutines y Flow | README.md, «Stack tecnológico»; ADR-0001 | E1-U1, E2-T1, E2-T3, E5-T1 | Procesamiento asíncrono y cancelación cooperativa | JVM |
-| K9 | Hilt | README.md, «Stack tecnológico»; ADR-0001:14; ADR-0002:56 | E1-U1 | `@HiltAndroidApp`, inyección en una pantalla y test de componente | JVM, I-M |
+| K9 | Hilt | README.md, «Stack tecnológico»; ADR-0001:14 | E1-U1 | `@HiltAndroidApp`, inyección en una pantalla y test de componente | JVM, I-M |
 | K10 | Gradle Kotlin DSL + Version Catalog | README.md, «Stack tecnológico» | E1-U1 | `libs.versions.toml`; sin versiones hardcodeadas en módulos | JVM |
 | K11 | JUnit + pruebas de componentes + pruebas de interfaz + Robolectric | README.md, «Stack tecnológico»; ADR-0002:48 | E1-U4 | Tests JVM, componentes e interfaz; DAO/migración con Robolectric | JVM, Robolectric, I-M |
 | K12 | ktlint + detekt | README.md, «Stack tecnológico»; ADR-0005:23 | E1-U5 | Job `static-analysis` con ambas herramientas | JVM |
@@ -272,11 +272,11 @@ D1, D2, D3, D4 y D5 tienen decisiones aprobadas: **D1(a)**, **D2(a)**, **D3**, *
 ### D1 — Asociación EPG independiente de las generaciones de importación (D1(a) aprobada)
 
 - **Estado:** **D1(a) aprobada; detalles de estabilidad/reconfirmación pendientes.** D2(a), D3, D4 y D5 (base) están aprobadas; sus detalles e implementación/verificación siguen pendientes.
-- **Contexto:** ADR-0002:32 fija que el `channel id` de XMLTV tiene ámbito del import del que proviene; ADR-0002:34 define la Asociación como estado de la app, propuesto por heurística y confirmado por el usuario, editable y removible. Una Asociación que apunte a una fila de generación se rompe en cada actualización de guía.
+- **Contexto:** ADR-0002:42 fija que el `channel id` de XMLTV tiene ámbito del import del que proviene; ADR-0002:44 define la Asociación como estado de la app, propuesto por heurística y confirmado por el usuario, editable y removible. Una Asociación que apunte a una fila de generación se rompe en cada actualización de guía.
 - **Decisión aprobada:** asociación EPG por `(fuente_guia_id, channel_id_texto)`, resuelta contra la generación publicada. **No se crea la entidad `CanalXmltv`.**
 - **Reglas aprobadas:** (1) conservar las Asociaciones confirmadas ante ausencias temporales; (2) no reasignar programas automáticamente ante indicios de reutilización del `channel id`; (3) exigir reconfirmación cuando exista ambigüedad.
 - **Pendiente:** definición exacta de la huella de identidad, las señales relevantes y los criterios de reconfirmación. No se fijan umbrales ni reglas adicionales.
-- **Opciones no adoptadas:** (b) entidad estable de canal XMLTV por fuente de guía, con los programas por generación; (c) re-vincular asociaciones en cada publicación sin confirmación del usuario, que contradice ADR-0002:34 y solo sería admisible con reconfirmación explícita y sin pérdida.
+- **Opciones no adoptadas:** (b) entidad estable de canal XMLTV por fuente de guía, con los programas por generación; (c) re-vincular asociaciones en cada publicación sin confirmación del usuario, que contradice ADR-0002:44 y solo sería admisible con reconfirmación explícita y sin pérdida.
 - **Impacto:** esquema v1 (`Asociacion`; **sin `CanalXmltv`**), tareas E5 y cierre de S25–S29.
 - **Bloquea:** E1-U3 en la parte de Asociación mientras no se definan la huella, las señales y los criterios de reconfirmación; S27 para cierre end-to-end; S25, S26, S28 y S29 para cierre end-to-end. **No bloquea la representación de la tabla `Asociacion`**, ni S24 (parser), ni las generaciones/publicación de E5-T2, ni la retención de E5-T3.
 - **No bloquea:** el parser XMLTV, la importación por lotes ni la retención.

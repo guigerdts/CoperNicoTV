@@ -1,6 +1,6 @@
 # ADR-0004 — Identidad de Canal con ámbito de Fuente
 
-Status: accepted
+Status: accepted — ver «Enmienda L26» al final, que prevalece en los puntos que enumera.
 
 ## Contexto
 
@@ -66,3 +66,13 @@ Favoritos, Historial, Ocultaciones y Colecciones deben sobrevivir a las Actualiz
 - **Posición de la Lista como identidad**: descartado — las Actualizaciones reordenan listas.
 - **Desambiguar colisiones de clave canónica con un sufijo por orden de aparición** (primera/segunda aparición): descartado — la posición no es estable entre versiones de la Lista; el sufijo rotaría entre declaraciones en cada Actualización y reasignaría Favoritos, Historial y Ocultaciones a canales equivocados.
 - **Fusionar canales con mismo nombre sin `tvg-id`**: descartado — riesgo de fusionar canales realmente distintos; la desambiguación quedará al usuario.
+
+## Enmienda L26 (2026-10-24)
+
+Esta enmienda prevalece sobre el texto original en los puntos que enumera. Los estados A/B/C y la prohibición de fusión automática ambigua se conservan.
+
+- **Canal sin nombre (DC-01):** si la entrada no declara nombre, `Canal.nombre = NULL` y `clave_canonica = NULL`. Si además no hay un `tvg-id` válido y único en la Fuente, `clave_derivable = 0` y `clave_unicidad = NULL`; si hay `tvg-id` válido y único, `clave_derivable = 1` y `clave_unicidad = "tvg:v1:" + tvg_id` en estado A. No se usa la URL normalizada como identidad canónica sola ni «Sin nombre» como insumo. Queda superada la frase «la derivación ... queda explícitamente pendiente»: la decisión se fija en DC-01; la implementación y las pruebas siguen pendientes.
+- **Invariante de unicidad (DC-01):** `clave_unicidad IS NULL ⇔ (estado ∈ {B,C} ∨ clave_derivable = 0)`. El índice único incondicional `(fuente_id, clave_unicidad)` se conserva; `clave_derivable` es INTEGER NOT NULL y `clave_canonica` es NULL cuando no hay nombre. Los estados A/B/C no cambian.
+- **Deduplicación de Observaciones (DC-01):** las Observaciones pendientes se deduplican por `clave_deduplicacion` única por `(fuente_id, clave_deduplicacion)`, no por `(Fuente, clave canónica)`, porque una declaración sin nombre puede no tener clave canónica. La huella de la declaración (`huella_declaracion`) y la clave de deduplicación son obligatorias.
+- **Apariencias (DC-05):** la misma identidad con `(group_title, tvg_name)` distinto produce varias Apariencias; el duplicado exacto se rechaza por `clave_presentacion` NOT NULL e índice único `(lista_id, canal_id, clave_presentacion)`; `NULL ≠ ""`; el orden no forma parte de la clave. Queda superada la ausencia de una regla de unicidad de presentación.
+- **Asociación EPG (DC-06):** la huella versionada, los estados `propuesta`/`confirmada`/`sospechosa`/`ausente`/`revocada`, la reconfirmación y la no reasignación por reutilización contradictoria se fijan en DC-06. Queda superada la frase «la huella ... quedan pendientes».

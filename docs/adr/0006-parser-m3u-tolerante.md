@@ -1,6 +1,6 @@
 # ADR-0006 — Parser M3U streaming y tolerante a fallos
 
-Status: accepted
+Status: accepted — ver «Enmienda L26» al final, que prevalece en los puntos que enumera.
 
 ## Contexto
 
@@ -36,3 +36,13 @@ El parser M3U (en `:core`, Kotlin puro, ADR-0001) es **streaming y tolerante a f
 
 - **Parser estricto (fail-fast)**: descartado — invalida listas reales del ecosistema por una sola línea; los datos de mercado no satisfacen la especificación nominal completa.
 - **Parser con regex global sobre todo el archivo**: descartado — no escala a archivos grandes y dificulta los errores de ubicación tipados por entrada.
+
+## Enmienda L26 (2026-10-24)
+
+Esta enmienda aclara la frontera entre el parser y la deduplicación; no cambia el parser.
+
+- **El parser no deduplica (DC-05):** el parser emite cada declaración `#EXTINF` con sus atributos, su orden y su URL. No colapsa declaraciones idénticas, no crea Apariencias y no aplica la clave de presentación. La deduplicación exacta y la separación de Apariencias con `(group_title, tvg_name)` distinto pertenecen a la capa de importación/dominio (DC-05).
+- **Ausencia y vacío:** el parser distingue un atributo ausente (`NULL`) de una cadena vacía; no normaliza `""` a `NULL` ni al contrario. La capa de deduplicación aplica trim exterior y mantiene `NULL ≠ ""`.
+- **`tvg-id` duplicado:** el parser conserva los valores; la invalidación de `tvg-id` duplicado como clave y la no fusión de los canales implicados se rigen por ADR-0004, no por el parser.
+- **URL:** el parser conserva la URL tal como aparece, incluidos los parámetros de consulta. La normalización de esquema/host y la decisión de identidad pertenecen a ADR-0004; el parser no elimina parámetros ni credenciales.
+- **Límites y rendimiento:** los límites de línea/atributos y su valor inicial no cambian. La medición P1 de 10 000 entradas y su procedimiento están en DC-10; no se declaran ejecutados.

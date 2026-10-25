@@ -1,6 +1,6 @@
 # ADR-0002 — Persistencia: Room + DataStore
 
-Status: accepted
+Status: accepted — ver «Enmienda L26» al final, que prevalece en los puntos que enumera.
 
 ## Contexto
 
@@ -67,3 +67,18 @@ Se define en E1 una **base de datos** que soporta las entregas posteriores (tabl
 - **Room desde el día cero con Hilt ya integrado**: adoptado — evita la migración posterior y sostiene las 6 entregas subsiguientes sin reescribir la persistencia.
 - **Relación directa Canal↔Grupo** (sin `Apariencia`): descartado — pierde el contexto de Lista, fuerza scopes de grupo globales y hace que ocultar/renombrar un grupo sea ambiguo entre listas.
 - **Pertenencia embebida en la entidad Canal** (columna lista_id en Canal): descartado — duplica canales que aparecen en varias Listas, contradiciendo la separación 2.
+
+## Enmienda L26 (2026-10-24)
+
+Esta enmienda prevalece sobre el texto original en los puntos que enumera y se apoya en U0 §6.2/§6.3.
+
+- **Perfil n—n (DC-02):** se añaden `Perfil` y la tabla de unión `PerfilLista` (`perfil_id`, `lista_id`, PK compuesta, FK reales con `ON DELETE CASCADE` en ambas, índice por `lista_id`). Un Perfil puede estar vacío; una Lista puede no pertenecer a ningún Perfil; el nombre es único global sin distinguir mayúsculas; borrar Perfil o Lista elimina solo pertenencias; no hay preferencias por Perfil ni duplicación de Perfiles en el MVP. `Perfil` no es un renombre de `Lista`.
+- **Fuente y orígenes mixtos (DC-03):** `Fuente` es un grupo lógico sin ubicación de importación. Una Fuente puede agrupar Listas con orígenes HTTP/HTTPS y SAF `content://`; no se supone contenido compartido ni una sola ubicación. Cada Lista se actualiza de forma independiente; el estado de la Lista es canónico y el agregado de Fuente es derivado. Queda superada la frase «Queda pendiente decidir si una Fuente puede agrupar Listas de orígenes distintos».
+- **Retención por `FuenteGuia` (DC-03):** las excepciones de retención de EPG viven en `FuenteGuia`, no en `Fuente`. `Fuente` conserva el intervalo de actualización y su bandera «usar global»; las columnas de retención se leen/escriben en `FuenteGuia` con bandera de existencia. Quedan superadas las referencias a «excepciones de retención por Fuente» en la configuración global/por Fuente y en la tabla `Fuente`.
+- **Cifrado y HMAC (DC-04):** todas las columnas URL se cifran en reposo por uniformidad, sin afirmar que todas sean credenciales: `Lista.ubicacion_cifrada`/`ubicacion_hmac`, `Canal.url_stream_cifrada`/`url_stream_hmac`, `logo_url_cifrada`/`logo_url_hmac`, `ObservacionPendienteImportacion.url_cifrada`/`url_hmac`, `FuenteGuia.url_cifrada`/`url_hmac`, `CacheM3U.url_cifrada`/`url_hmac` y `CacheXmltv.url_cifrada`/`url_hmac`. AES-256-GCM con clave de Android Keystore; HMAC-SHA-256 para igualdad/búsqueda; invalidación de clave marca `credenciales_no_disponibles`; el backup automático excluye Room/caché; sin rotación automática en el MVP. Las claves de unicidad de caché usan `url_hmac`, no la URL en claro. Queda superada la afirmación de que el inventario, la gestión de claves, el backup y el borrado seguían pendientes.
+- **Apariencia deduplicada (DC-05):** `Apariencia` incorpora `clave_presentacion` NOT NULL e índice único `(lista_id, canal_id, clave_presentacion)`. Duplicado exacto = misma identidad de Canal + misma tupla `(group_title, tvg_name)` tras trim exterior; `NULL ≠ ""`; el orden no forma parte de la clave; la primera aparición conserva el orden; el upsert es idempotente. Queda superada la ausencia de una regla de unicidad de presentación.
+- **Asociación EPG (DC-06):** la Asociación conserva la representación `(fuente_guia_id, channel_id_texto)` y añade huella versionada, estados `propuesta`, `confirmada`, `sospechosa`, `ausente`, `revocada`, reconfirmación y reglas de reutilización. La edición/borrado manual persisten; el borrado es `revocada` y la heurística no la recrea. Queda superada la afirmación de que la huella, las señales y la reconfirmación seguían pendientes.
+- **Actualización programada (DC-07):** WorkManager periódico con default 720 min, mínimo 15, máximo 10080; `NetworkType.CONNECTED`; batería no baja; backoff 30 s inicial, tope 1 h, máximo 3 reintentos; un work único por Fuente; manual/automático coalescen sin concurrencia.
+- **Limpieza de la preferencia de orden (DC-08):** al borrar una Lista se elimina primero Room y luego la preferencia en DataStore; barrido de huérfanas al inicio; PK de Lista sin reutilización (`AUTOINCREMENT`); sin transacción distribuida; idempotente y recuperable. Queda superada la frase «La limpieza ... queda pendiente de definición».
+- **Presupuesto de caché (DC-09):** `CacheM3U` total 64 MiB, por Lista/archivo 16 MiB; `CacheXmltv` total 256 MiB, por `FuenteGuia`/archivo 96 MiB; global 320 MiB; reserva libre 100 MiB; evicción primero inválidas/stale y luego `fetched_at` más antiguo; archivos en uso protegidos; temp + rename atómico; conservar la última copia válida; barrido de huérfanos; separado de la retención Q4. La comprobación de espacio libre incluye el presupuesto aplicable de caché.
+- **P1/P2 (DC-10/DC-11):** los límites de rendimiento y el procedimiento p95 están en DC-10; los umbrales y la aceptación visual de TV en DC-11. No son mediciones ejecutadas.

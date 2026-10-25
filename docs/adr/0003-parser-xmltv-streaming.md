@@ -1,6 +1,6 @@
 # ADR-0003 — Parser XMLTV streaming con XmlPullParser (kxml2) en `:core`
 
-Status: accepted
+Status: accepted — ver «Enmienda L26» al final, que prevalece en los puntos que enumera.
 
 ## Contexto
 
@@ -60,3 +60,11 @@ La resolución de cada límite es: valor explícito de la Fuente si existe; si n
 - **StAX**: descartado — estándar de JVM pero ausente en Android; exigiría mantener dos parsers o uno no portable.
 - **DOM**: descartado — memoria O(tamaño del archivo), inviable con XMLTV reales.
 - **Parser hand-rolled propio**: descartado — complejidad innecesaria para un formato estándar ya cubierto por XmlPullParser.
+
+## Enmienda L26 (2026-10-24)
+
+Esta enmienda prevalece sobre el texto original en los puntos que enumera.
+
+- **Retención por `FuenteGuia` (DC-03):** las excepciones de retención de EPG se persisten en `FuenteGuia`, no en `Fuente`. La resolución de cada límite es: valor explícito de `FuenteGuia` si existe; si no, el global de DataStore. Cambiar el global no corrompe las excepciones por `FuenteGuia`. Quedan superadas las referencias a «excepciones por Fuente» y «valor explícito de la Fuente» en la retención.
+- **Presupuesto de caché XMLTV (DC-09):** `CacheXmltv` tiene 256 MiB totales y 96 MiB por `FuenteGuia` y por archivo, dentro de un presupuesto global de 320 MiB con 100 MiB de reserva libre. La evicción elimina primero entradas inválidas o `stale` y luego las de `fetched_at` más antiguo; los archivos en uso están protegidos; la escritura es temp + rename atómico; se conserva la última copia válida; el barrido de huérfanos es independiente de la retención Q4. Queda superada la frase «su valor numérico queda pendiente» y la comprobación de espacio libre incluye este presupuesto.
+- **Cifrado y unicidad (DC-04):** la caché se rige por DC-04. Las URLs, el contenido, los temporales, los logs y los errores pueden contener credenciales; las columnas URL se cifran con AES-256-GCM y se indexan por HMAC-SHA-256; la invalidación de clave marca `credenciales_no_disponibles`; el backup automático excluye Room/caché. La unicidad de caché usa `url_hmac`, no la URL en claro. Queda superada la frase «cifrado, claves, backup y borrado seguro siguen pendientes».

@@ -1,6 +1,6 @@
 # ADR-0004 — Identidad de Canal con ámbito de Fuente
 
-Status: accepted — ver «Enmienda L26» al final, que prevalece en los puntos que enumera.
+Status: accepted — ver «Enmiendas L26/L27» al final, que prevalecen en los puntos que enumeran.
 
 ## Contexto
 
@@ -76,3 +76,10 @@ Esta enmienda prevalece sobre el texto original en los puntos que enumera. Los e
 - **Deduplicación de Observaciones (DC-01):** las Observaciones pendientes se deduplican por `clave_deduplicacion` única por `(fuente_id, clave_deduplicacion)`, no por `(Fuente, clave canónica)`, porque una declaración sin nombre puede no tener clave canónica. La huella de la declaración (`huella_declaracion`) y la clave de deduplicación son obligatorias.
 - **Apariencias (DC-05):** la misma identidad con `(group_title, tvg_name)` distinto produce varias Apariencias; el duplicado exacto se rechaza por `clave_presentacion` NOT NULL e índice único `(lista_id, canal_id, clave_presentacion)`; `NULL ≠ ""`; el orden no forma parte de la clave. Queda superada la ausencia de una regla de unicidad de presentación.
 - **Asociación EPG (DC-06):** la huella versionada, los estados `propuesta`/`confirmada`/`sospechosa`/`ausente`/`revocada`, la reconfirmación y la no reasignación por reutilización contradictoria se fijan en DC-06. Queda superada la frase «la huella ... quedan pendientes».
+
+## Enmienda L27 (2026-10-25)
+
+Esta enmienda cierra documentalmente los hallazgos DC-02, DC-04 y DC-05 de la revisión independiente de U0. Prevalece sobre L26 en los puntos que enumera; la implementación y la validación siguen pendientes.
+
+- **Clave de presentación v2 (DC-05).** `clave_presentacion = "presentacion:v2:" + lowercase_hex(SHA-256(ENTRADA))`, con serialización binaria versionada: dominio con terminador, versión `0x02`, IDs de campo, etiquetas `N`/`E`/`T` y longitudes UTF-8 big-endian. `NULL ≠ ""`; vacío y solo espacios comparten `E` por el recorte exterior aprobado; `U+001F` dentro de un valor no separa campos. La migración desde la fórmula v1 recalcula desde los campos persistidos y no depende de una reimportación completa; solo actualiza `clave_presentacion` en grupos sin conflicto, no fusiona y no borra. Las filas en conflicto se conservan y se registran en `AparienciaClavePendiente`; el upsert de la tupla se rechaza con `apariencia_migracion_pendiente` hasta resolución explícita. Queda superada la fórmula v1 sin longitudes descrita en L26.
+- **Recuperación HMAC (DC-04).** La identidad de Canal que usa igualdad por URL se apoya en el HMAC del índice. Mientras `EstadoIndiceHmac` no esté en `operativo`, las operaciones de reconciliación y deduplicación que dependan de igualdad HMAC se rechazan con `indice_hmac_no_operativo`; no se comparan generaciones, no se fusionan Canales y no se borran filas automáticamente. Las filas no reconstruibles se conservan y se registran en `HmacPendiente`; la recuperación es explícita, idempotente y debe completarse de forma coherente antes de reactivar esas operaciones. La pérdida de AES se trata por separado como `credenciales_no_disponibles` y no cambia la identidad lógica del Canal.

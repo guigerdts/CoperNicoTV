@@ -2,7 +2,7 @@
 
 Glosario del proyecto: reproductor y administrador de contenido IPTV para Android y Android TV. El usuario aporta las Fuentes; la aplicación importa, organiza y reproduce. Este documento solo define vocabulario de dominio; Las decisiones técnicas viven en `docs/adr/`.
 
-Vigencia L26 (2026-10-24): las definiciones de Fuente, Lista, Perfil, FuenteGuia, Canal, Clave de Canal, Apariencia, Asociación, Caché de transporte y Retención de EPG se actualizaron conforme a DC-01–DC-11; el resto del glosario se conserva.
+Vigencia L26 (2026-10-24): las definiciones de Fuente, Lista, Perfil, FuenteGuia, Canal, Clave de Canal, Apariencia, Asociación, Caché de transporte y Retención de EPG se actualizaron conforme a DC-01–DC-11; el resto del glosario se conserva. Actualización L27 (2026-10-25): Perfil precisa la normalización canónica, Apariencia precisa la clave v2 y se añade Índice HMAC; ver «Enmienda L27».
 
 ## Language
 
@@ -21,7 +21,7 @@ Documento XMLTV que actúa como fuente de guía. Su `channel id` tiene ámbito d
 _Avoid_: fuente XMLTV genérica, guía global
 
 **Perfil**:
-Agrupación con nombre de Listas M3U mediante la relación n—n `PerfilLista`. El nombre es único global sin distinguir mayúsculas; un Perfil puede estar vacío y una Lista puede no pertenecer a ningún Perfil. No es la Lista activa renombrada y no posee preferencias de reproducción: esas preferencias son globales. Borrar un Perfil o una Lista elimina solo sus pertenencias; no se duplican Perfiles en el MVP (DC-02).
+Agrupación con nombre de Listas M3U mediante la relación n—n `PerfilLista`. El nombre visible se guarda en NFC con recorte exterior; la unicidad global se calcula sobre `nombre_normalizado = NFC(casefold_completo(NFC(trim_ext_unicode(NFC(nombre)))))`, con case folding completo independiente del locale, índice binario y sin `NOCASE`. `José` y `Jose` son nombres distintos; `TRABAJO`, `Trabajo` y `trabajo` son el mismo nombre normalizado. Un nombre vacío o solo con espacios se rechaza; un duplicado se rechaza con `nombre_perfil_duplicado`. Un Perfil puede estar vacío y una Lista puede no pertenecer a ningún Perfil. No es la Lista activa renombrada y no posee preferencias de reproducción: esas preferencias son globales. Borrar un Perfil o una Lista elimina solo sus pertenencias; no se duplican Perfiles en el MVP (DC-02).
 _Avoid_: perfil de usuario, cuenta
 
 **Canal**:
@@ -37,8 +37,12 @@ Categoría que la Lista asigna a canales (`group-title` / `EXTGRP`). Los Grupos 
 _Avoid_: categoría, folder
 
 **Apariencia**:
-Aparición de un Canal en una Lista; conserva el orden dentro de la Lista y el Grupo asignado por esa Lista. La misma identidad de Canal con una tupla `(group_title, tvg_name)` distinta produce varias Apariencias. El duplicado exacto se colapsa por `clave_presentacion` (identidad + tupla tras trim exterior; `NULL ≠ ""`), con índice único `(lista_id, canal_id, clave_presentacion)`; el orden no forma parte de la clave y la primera aparición conserva el orden (DC-05).
+Aparición de un Canal en una Lista; conserva el orden dentro de la Lista y el Grupo asignado por esa Lista. La misma identidad de Canal con una tupla `(group_title, tvg_name)` distinta produce varias Apariencias. El duplicado exacto se colapsa por `clave_presentacion = "presentacion:v2:" + lowercase_hex(SHA-256(ENTRADA))`, con serialización binaria versionada, IDs de campo, etiquetas `N`/`E`/`T` y longitudes UTF-8 big-endian; `NULL ≠ ""`, vacío y solo espacios comparten `E` por el recorte exterior, y `U+001F` dentro de un valor no separa campos. Índice único `(lista_id, canal_id, clave_presentacion)`; el orden no forma parte de la clave y la primera aparición conserva el orden. La migración desde la fórmula v1 solo actualiza la clave en grupos sin conflicto y no fusiona ni borra; las filas en conflicto se conservan en `AparienciaClavePendiente` (DC-05).
 _Avoid_: ocurrencia duplicada, canal repetido
+
+**Índice HMAC**:
+Índice de igualdad sobre valores cifrados, calculado con una clave HMAC independiente de la clave AES. Cada valor persistido lleva el prefijo `hmac:vN:`, que identifica su generación. Su estado se registra en `EstadoIndiceHmac`; si la clave HMAC se pierde, el índice queda en recuperación y las operaciones que dependen de igualdad HMAC se bloquean con `indice_hmac_no_operativo` hasta completar una reconstrucción explícita, idempotente y coherente. Las filas no reconstruibles se conservan en `HmacPendiente`; no se comparan generaciones, no se fusiona y no se borra automáticamente (DC-04).
+_Avoid_: hash de URL, caché de URL, clave AES
 
 **Catálogo**:
 Conjunto de canales visibles para el usuario en un momento dado, producto de las Listas importadas y de las selecciones del usuario (Favoritos, Ocultaciones, Colecciones, orden).
@@ -118,3 +122,7 @@ Verificación física requerida y aún no ejecutada por falta de dispositivo. Es
 ## Enmienda L26 (2026-10-24)
 
 Actualizadas las definiciones de Fuente, Lista, Perfil, FuenteGuia, Canal, Clave de Canal, Apariencia, Asociación, Caché de transporte y Retención de EPG conforme a DC-01–DC-11 y U0 §6.2/§6.3. El resto del glosario se conserva. No se modificó `docs/evidence/u0-manifest.md`.
+
+## Enmienda L27 (2026-10-25)
+
+Actualizadas las definiciones de Perfil y Apariencia y añadida la de Índice HMAC para cerrar documentalmente DC-02, DC-04 y DC-05 de la revisión independiente de U0. Perfil precisa la normalización canónica y la unicidad binaria; Apariencia precisa la clave `presentacion:v2:` y su migración sin fusión; Índice HMAC distingue AES de HMAC y define el estado de recuperación. No se declara implementación ni validación funcional. No se modificó `docs/evidence/u0-manifest.md`.

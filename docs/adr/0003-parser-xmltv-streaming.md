@@ -1,6 +1,6 @@
 # ADR-0003 — Parser XMLTV streaming con XmlPullParser (kxml2) en `:core`
 
-Status: accepted — ver «Enmienda L26» al final, que prevalece en los puntos que enumera.
+Status: accepted — ver «Enmiendas L26/L27» al final, que prevalecen en los puntos que enumeran.
 
 ## Contexto
 
@@ -68,3 +68,7 @@ Esta enmienda prevalece sobre el texto original en los puntos que enumera.
 - **Retención por `FuenteGuia` (DC-03):** las excepciones de retención de EPG se persisten en `FuenteGuia`, no en `Fuente`. La resolución de cada límite es: valor explícito de `FuenteGuia` si existe; si no, el global de DataStore. Cambiar el global no corrompe las excepciones por `FuenteGuia`. Quedan superadas las referencias a «excepciones por Fuente» y «valor explícito de la Fuente» en la retención.
 - **Presupuesto de caché XMLTV (DC-09):** `CacheXmltv` tiene 256 MiB totales y 96 MiB por `FuenteGuia` y por archivo, dentro de un presupuesto global de 320 MiB con 100 MiB de reserva libre. La evicción elimina primero entradas inválidas o `stale` y luego las de `fetched_at` más antiguo; los archivos en uso están protegidos; la escritura es temp + rename atómico; se conserva la última copia válida; el barrido de huérfanos es independiente de la retención Q4. Queda superada la frase «su valor numérico queda pendiente» y la comprobación de espacio libre incluye este presupuesto.
 - **Cifrado y unicidad (DC-04):** la caché se rige por DC-04. Las URLs, el contenido, los temporales, los logs y los errores pueden contener credenciales; las columnas URL se cifran con AES-256-GCM y se indexan por HMAC-SHA-256; la invalidación de clave marca `credenciales_no_disponibles`; el backup automático excluye Room/caché. La unicidad de caché usa `url_hmac`, no la URL en claro. Queda superada la frase «cifrado, claves, backup y borrado seguro siguen pendientes».
+
+## Enmienda L27 (2026-10-25)
+
+- **Recuperación HMAC de la caché (DC-04).** La pérdida de la clave HMAC no se trata como una invalidación AES: `EstadoIndiceHmac` pasa a recuperación y las búsquedas/creaciones de `CacheM3U` y `CacheXmltv` por `url_hmac` se bloquean con `indice_hmac_no_operativo`. No se comparan generaciones, no se borran entradas y no se declara la caché operativa hasta completar una reconstrucción explícita, idempotente y coherente. Las entradas no reconstruibles se conservan y se registran en `HmacPendiente`; la pérdida de AES se sigue tratando por separado como `credenciales_no_disponibles`. La implementación y la validación siguen pendientes.

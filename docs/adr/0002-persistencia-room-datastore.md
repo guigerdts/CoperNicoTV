@@ -99,3 +99,13 @@ Esta enmienda resuelve H-02–H-08 en lo que afecta a este ADR y prevalece sobre
 - **`tvg-id` (H-05):** un `tvg-id` solo es clave si, tras recorte exterior `White_Space`, no está vacío, no contiene `Cc`/`Cf` y tiene ≤512 code points. El límite es de seguridad del MVP, no universal de XMLTV; no se impone alfabeto adicional. El valor válido se persiste recortado; un valor inválido no se persiste en `tvg_id` ni se usa como clave.
 - **Caché y preferencias (H-07):** `CacheM3U`/`CacheXmltv` guardan `url_cifrada` y `url_hmac`; no existe `url_normalizada`. La retención de EPG vive en `FuenteGuia`; `Fuente` conserva solo el intervalo. La limpieza de la preferencia de orden por Lista está fijada por DC-08.
 - **EPG (H-11):** `Asociacion` usa `huella_version = 2` y `huella:v2`; `senales_fuertes` guarda nombres normalizados y HMAC de iconos, no URLs completas. Una huella no fusiona Canales ni Asociaciones. La migración desde v1 no es automática: v1 conserva HMAC de iconos y no permite recalcular `H_icono` v2; toda Asociación confirmada con `huella_version = 1` pasa a `sospechosa` y exige reconfirmación manual.
+
+## Enmienda L31 (2026-10-26)
+
+Esta enmienda resuelve el bloqueo residual de PD-4 en lo que afecta a este ADR y prevalece sobre L27/L28 en los puntos que enumera. No implementa ni declara validación.
+
+- **Sobre HMAC versionado (DC-04).** El HMAC se persiste como `hmac:vN:cvM:<base64>`: `vN` es la generación de clave y `cvM` la versión de canonicalización; `cv1` es la actual y se asocia a `canon:v2`. No se añade una columna `hmac_version` ni una columna `cv` por fila. `EstadoIndiceHmac.version_activa`/`version_objetivo` registran solo la generación de clave.
+- **Reconstrucción y `HmacPendiente`.** La recuperación por pérdida de clave conserva el `cvM` de cada valor y solo cambia `vN`; no asume la versión vigente. `HmacPendiente.version_origen` es `cvM` o `desconocida`, no `vN`. Un valor legacy `hmac:vN:` sin `cvM` no se asume `cv1`; se registra con `version_canonica_desconocida` y requiere reimportación o migración explícita. Un `cvM` no soportado se registra con `version_canonica_no_soportada`; un sobre malformado, con `hmac_formato_invalido`.
+- **Comparación y migración.** No se comparan valores con `cvM` distinto ni un legacy sin `cvM` con un valor versionado. La migración de canonicalización es un proceso explícito distinto de la recuperación de clave; si altera `url_canonica`, exige nueva versión de identidad y migración.
+
+Referencias: DC-04.13, U0 §6.3.1/§6.3.2, U0 L31 y GLOSSARY «Versión de canonicalización URL».

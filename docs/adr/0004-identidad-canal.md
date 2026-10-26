@@ -118,3 +118,15 @@ La revisión detectó que la formulación anterior de este ADR —presente en `1
 - **Canonicalización de URL.** Las reglas de URL de DC-04 forman parte del contrato de identidad: un cambio que altere `url_canonica` exige nueva versión de identidad y migración. La URL original cifrada se conserva para reproducción y edición; la URL canónica se deriva y no la sustituye. RTSP y RTMP tienen canonicalización propia y clases HMAC `0x03` y `0x04`.
 
 Referencias: DC-01.6, DC-04, U0 §6.3.2, U0 L30 y GLOSSARY «Clave de Canal».
+
+## Enmienda L31 (2026-10-26)
+
+Esta enmienda resuelve el bloqueo residual de PD-4 (versión de canonicalización por valor). Prevalece sobre L28/L29/L30 en lo que enumera; no implementa, no mide y no valida. U0 sigue no aprobada.
+
+- **Sobre HMAC versionado.** El HMAC persistido pasa a `hmac:vN:cvM:<base64>`, donde `vN` es la generación de la clave HMAC (`v1`, `v2`, ...) y `cvM` es la versión del contrato de canonicalización de URL y de la serialización de `ENTRADA_HMAC` (`cv1`, `cv2`, ...). `cv1` es la versión actual, inmutable, y corresponde a las reglas de DC-04 y a `canon:v2`; `cv2+` serán versiones futuras inmutables. El formato histórico `hmac:vN:` sin `cvM` es legacy y no se interpreta como `cv1`.
+- **Independencia de versiones.** `vN` y `cvM` son independientes: `vN` nunca identifica canonicalización y `cvM` nunca identifica generación de clave. `EstadoIndiceHmac.version_activa`/`version_objetivo` siguen registrando solo la generación de clave. No se añade una columna `cv` ni una tabla de versiones por fila; `cvM` viaja en el sobre, que ya es obligatorio.
+- **Identidad.** `canon:v2` se asocia explícitamente a `cv1`. Si un cambio de `cvM` altera `url_canonica` para un valor, ese valor exige una nueva versión de identidad `canon` y migración explícita; si solo cambia la serialización de `ENTRADA_HMAC` sin alterar `url_canonica`, `canon` puede conservarse, pero el HMAC cambia y exige reconstrucción explícita.
+- **Reconstrucción y legacy.** La recuperación por pérdida de clave lee el `cvM` de cada sobre, aplica exactamente sus reglas y conserva el mismo `cvM`; solo cambia `vN`. No se asume la versión vigente. Un valor sin `cvM` se registra en `HmacPendiente` con `version_origen = 'desconocida'` y motivo `version_canonica_desconocida`; un `cvM` no soportado, con `version_canonica_no_soportada`; un sobre malformado, con `hmac_formato_invalido`; una canonicalización fallida, con `canonicalizacion_fallida`. `version_origen` es `cvM` o `desconocida`; no registra `vN`. La migración de canonicalización es un proceso explícito distinto de la recuperación de clave.
+- **Iconos EPG.** `H_icono` no usa el sobre HMAC de URL; su versión va con `huella:v2`/`huella_version=2`. Un cambio de canonicalización de iconos exige `huella:v3` y migración explícita.
+
+Referencias: DC-04.13, U0 §6.3.2/§6.3.3, U0 L31 y GLOSSARY «Versión de canonicalización URL».

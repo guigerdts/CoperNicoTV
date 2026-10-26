@@ -80,3 +80,13 @@ Esta enmienda resuelve H-08 y H-11 en lo que afecta a este ADR. Prevalece sobre 
 - **Caché y retención:** se confirman el presupuesto de DC-09, el cifrado/HMAC de DC-04 y la retención por `FuenteGuia` de DC-03. `CacheXmltv` usa `url_cifrada` + `url_hmac` sobre la URL canónica; no existe `url_normalizada`. La resolución de retención es `FuenteGuia` explícita, luego global.
 - **Huella EPG:** las Asociaciones nuevas usan `huella_version = 2` y `huella:v2`, con normalización de nombres y HMAC de iconos de DC-06. Las filas v1 migradas conservan `huella_version = 1`. La huella no crea ni fusiona Asociaciones. La migración desde v1 no es automática: v1 conserva HMAC de iconos y no permite recalcular `H_icono` v2; una Asociación confirmada con `huella_version = 1` pasa a `sospechosa` y exige reconfirmación manual.
 - **Límites:** los valores de retención y caché son criterios de aceptación, no mediciones ejecutadas. La calibración con datos reales, la implementación y las pruebas siguen pendientes.
+
+## Enmienda L31 (2026-10-26)
+
+Esta enmienda resuelve el bloqueo residual de PD-4 en lo que afecta a la caché y prevalece sobre L27/L28 en los puntos que enumera. No implementa ni declara validación.
+
+- **Caché HMAC y `cvM`.** `CacheM3U.url_hmac` y `CacheXmltv.url_hmac` usan el sobre `hmac:vN:cvM:<base64>` de DC-04: `vN` es la generación de clave y `cvM` la versión de canonicalización; `cv1` es la actual. No se añade una columna `cv` por fila; `cvM` viaja en el sobre. `EstadoIndiceHmac.version_activa`/`version_objetivo` registran solo la generación de clave.
+- **Reconstrucción y legacy.** La recuperación por pérdida de clave conserva el `cvM` de cada valor y solo cambia `vN`; no asume la versión vigente. `HmacPendiente.version_origen` es `cvM` o `desconocida`, no `vN`. Un valor legacy `hmac:vN:` sin `cvM` no se asume `cv1`; se registra con `version_canonica_desconocida` y requiere reimportación o migración explícita. Un `cvM` no soportado se registra con `version_canonica_no_soportada`; un sobre malformado, con `hmac_formato_invalido`.
+- **Comparación y EPG.** No se comparan entradas de caché con `cvM` distinto ni un legacy sin `cvM` con un valor versionado. `H_icono` no usa este sobre; su versión va con `huella:v2`/`huella_version=2`.
+
+Referencias: DC-04.13, U0 §6.3.1/§6.3.2, U0 L31 y GLOSSARY «Versión de canonicalización URL».

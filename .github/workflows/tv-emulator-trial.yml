@@ -1,6 +1,13 @@
 name: TV emulator trial
 
 on:
+  # El disparador `push` existe porque GitHub solo expone `workflow_dispatch`
+  # desde la rama por defecto. Se limita a la rama de E1 para que no se ejecute
+  # en `main` ni en otras ramas. `workflow_dispatch` se conserva para
+  # ejecuciones manuales.
+  push:
+    branches:
+      - feat/e1-bootstrap
   workflow_dispatch:
 
 permissions:

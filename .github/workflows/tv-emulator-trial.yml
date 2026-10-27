@@ -40,7 +40,10 @@ jobs:
           profile: tv_1080p
           disable-animations: true
           script: |
-            set -euo pipefail
+            # La action ejecuta este bloque con `/usr/bin/sh` (dash), donde
+            # `set -o pipefail` no existe. `set -eu` conserva el aborto ante
+            # cualquier comando que falle.
+            set -eu
             adb wait-for-device
             echo "== características =="
             adb shell getprop ro.build.characteristics

@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.printToString
+import androidx.compose.ui.test.requestFocus
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_IMPORTAR
@@ -56,6 +57,12 @@ class CanarioTvTest {
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertTextEquals("Canario Uno")
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).assertTextEquals("Canario Dos")
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 2).assertTextEquals("Canario Tres")
+
+        // Tras importar, el botón deja de estar enfocado: se recupera el foco
+        // para recorrer el catálogo solo con D-pad, sin toque.
+        composeRule.onNodeWithTag(TAG_IMPORTAR).requestFocus()
+        composeRule.onNodeWithTag(TAG_IMPORTAR).performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertIsFocused()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).assertIsFocused()

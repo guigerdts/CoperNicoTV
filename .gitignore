@@ -1,8 +1,31 @@
-.codegraph/
-.atl/
+# Gradle
 .gradle/
 build/
-.idea/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android
 local.properties
-*.keystore
-.env
+*.apk
+*.aab
+captures/
+.cxx/
+
+# Kotlin
+.kotlin/
+
+# Local tooling
+.atl/
+.codegraph/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+
+# Temporary files
+*.log
+*.hprof

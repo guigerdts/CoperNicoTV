@@ -7,8 +7,10 @@ import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.printToString
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_IMPORTAR
@@ -49,9 +51,7 @@ class CanarioTvTest {
         composeRule.onNodeWithTag(TAG_IMPORTAR).assertIsFocused()
         composeRule.onNodeWithTag(TAG_IMPORTAR).performKeyInput { pressKey(Key.DirectionCenter) }
 
-        composeRule.waitUntil(TIEMPO_ESPERA) {
-            composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 2).fetchSemanticsNodes().isNotEmpty()
-        }
+        esperarCanales()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertTextEquals("Canario Uno")
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).assertTextEquals("Canario Dos")
@@ -61,6 +61,30 @@ class CanarioTvTest {
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).assertIsFocused()
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 2).assertIsFocused()
+    }
+
+    /**
+     * Espera a que el catálogo tenga tres canales.
+     *
+     * Si el tiempo se agota, el fallo incluye el árbol de semántica completo
+     * para distinguir un fallo de importación de un fallo de observación.
+     */
+    private fun esperarCanales() {
+        val fallo =
+            runCatching {
+                composeRule.waitUntil(TIEMPO_ESPERA) {
+                    composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 2).fetchSemanticsNodes().isNotEmpty()
+                }
+            }.exceptionOrNull()
+        if (fallo != null) {
+            val arbol =
+                runCatching { composeRule.onRoot().printToString() }
+                    .getOrElse { "no disponible: ${it::class.simpleName}" }
+            throw AssertionError(
+                "No aparecieron los tres canales tras importar.\nÁrbol de semántica:\n$arbol",
+                fallo,
+            )
+        }
     }
 
     private companion object {

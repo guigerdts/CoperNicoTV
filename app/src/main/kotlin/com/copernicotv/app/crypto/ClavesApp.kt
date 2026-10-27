@@ -27,6 +27,14 @@ interface ClavesApp {
  * futura crea `v2` y el sobre HMAC registra `vN`, de modo que las filas viejas
  * siguen siendo verificables con la generación que las produjo.
  *
+ * El IV de AES-GCM lo genera `CifradoAes` (12 bytes de `SecureRandom` por
+ * valor) porque el sobre `0x01 + IV + ciphertext + tag` es contrato de `:core`
+ * y debe funcionar también con una `SecretKeySpec` de JVM. Por eso la clave de
+ * Keystore se crea con `setRandomizedEncryptionRequired(false)`: sin eso,
+ * Keystore rechaza el IV del llamador con `InvalidAlgorithmParameterException`
+ * y la importación falla. La unicidad del IV la garantiza el generador
+ * aleatorio, no Keystore.
+ *
  * La anotación del constructor primario sigue la convención oficial de Kotlin
  * (`class Foo @Inject constructor()`). ktlint 1.0.1 exige la anotación en una
  * línea propia, así que se suprime esa única regla en esta clase.
@@ -57,6 +65,10 @@ class ClavesKeystore @Inject constructor() : ClavesApp {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
+                // CifradoAes es dueño del IV: 12 bytes aleatorios por valor,
+                // antepuestos al sobre. Keystore solo acepta IV del llamador si
+                // se desactiva esta protección (activada por defecto).
+                .setRandomizedEncryptionRequired(false)
                 .build(),
         )
         return generador.generateKey()

@@ -21,4 +21,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // La prueba de conformidad Unicode lee los datos oficiales vendorizados.
+    systemProperty("repoRoot", rootProject.projectDir.absolutePath)
 }

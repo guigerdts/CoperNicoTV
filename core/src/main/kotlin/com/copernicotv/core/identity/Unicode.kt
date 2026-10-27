@@ -46,7 +46,21 @@ fun trimExtUnicode(valor: String): String {
     return valor.substring(inicio, fin)
 }
 
-/** NFC según [Normalizer]. */
+/**
+ * NFC según [Normalizer], es decir la versión Unicode de la plataforma.
+ *
+ * En JDK 17 eso es Unicode 13.0, que **no** equivale a 15.1 en entradas con
+ * marcas combinatorias asignadas después de 13.0: hay 10 code points con
+ * `ccc != 0` de edad ≥ 14.0 (U+10EFD..U+10EFF, U+11F41, U+11F42, U+1E08F,
+ * U+1E4EC..U+1E4EF) y ninguna descomposición canónica nueva. La plataforma los
+ * trata como starters (ccc 0) y por eso compone y ordena distinto. Caso real
+ * medido en JDK 17: la entrada `0061 0301 10EFD` produce `00E1 10EFD`, mientras
+ * 15.1 espera `0061 10EFD 0301`.
+ *
+ * Mientras [UnicodePlataforma.soporta151] devuelva `false`, el NFC de esta
+ * función no es conforme a [VERSION_UNICODE_NORMATIVA]. El case folding sí es
+ * conforme vía [CaseFolderCompleto]; la brecha pendiente es solo la NFC.
+ */
 fun nfc(valor: String): String = Normalizer.normalize(valor, Normalizer.Form.NFC)
 
 /** Minúsculas con [Locale.ROOT]. */
@@ -75,7 +89,13 @@ fun validarSurrogates(valor: String) {
     }
 }
 
-/** Estrategia de case folding completo, inyectada por el consumidor. */
+/**
+ * Estrategia de case folding completo, inyectada por el consumidor.
+ *
+ * La implementación conforme a [VERSION_UNICODE_NORMATIVA] es
+ * [CaseFolderCompleto]. La inyección se mantiene obligatoria para que ningún
+ * consumidor use por accidente `String.lowercase` o la versión del dispositivo.
+ */
 fun interface CaseFolder {
     /** Case folding completo sin locale (estados C y F de Unicode). */
     fun fold(valor: String): String
@@ -86,18 +106,23 @@ fun interface CaseFolder {
  *
  * `NFC(casefold_completo(NFC(trim_ext_unicode(NFC(nombre)))))`.
  *
- * El case folding completo debe provenir de [VERSION_UNICODE_NORMATIVA]. Esta
- * clase no incluye una implementación por defecto: la tabla o dependencia que
- * la provee requiere autorización previa (DC-01, C-01/H-02). Sin un
- * [CaseFolder] conforme no se persiste ningún nombre normalizado, en lugar de
- * persistir un valor de una versión distinta.
+ * El case folding completo debe provenir de [VERSION_UNICODE_NORMATIVA]; la
+ * implementación conforme es [CaseFolderCompleto] (tabla generada desde
+ * `CaseFolding.txt` 15.1.0, sin depender de la plataforma). Esta clase no elige
+ * una implementación por defecto: la inyección es obligatoria para que ningún
+ * consumidor herede el case folding del dispositivo. Sin un [CaseFolder]
+ * conforme no se persiste ningún nombre normalizado, en lugar de persistir un
+ * valor de una versión distinta.
+ *
+ * Los pasos NFC usan [nfc] y por lo tanto la versión Unicode de la plataforma;
+ * ver la nota de [nfc] sobre la brecha 13.0/15.1 que sigue abierta.
  */
 object PerfilNormalizacion {
     /** Se lanza cuando no hay [CaseFolder] conforme disponible. */
     class CaseFoldNoDisponibleException :
         IllegalStateException(
             "case folding Unicode $VERSION_UNICODE_NORMATIVA no disponible: " +
-                "la tabla o dependencia requiere autorización previa",
+                "inyecte CaseFolderCompleto",
         )
 
     /**

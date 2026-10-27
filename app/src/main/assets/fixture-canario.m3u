@@ -1,0 +1,7 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="canario-1" tvg-name="Canario Uno" group-title="Noticias",Canario Uno
+https://example.invalid/canario/uno.m3u8
+#EXTINF:-1 tvg-id="canario-2" tvg-name="Canario Dos" group-title="Deportes",Canario Dos
+https://example.invalid/canario/dos.m3u8
+#EXTINF:-1 group-title="Noticias",Canario Tres
+https://example.invalid/canario/tres.m3u8

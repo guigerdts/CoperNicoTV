@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CoperNicoTV</string>
+    <string name="catalogo_titulo">Catálogo</string>
+    <string name="catalogo_importar">Importar lista de prueba</string>
+    <string name="catalogo_vacio">Todavía no hay canales en esta lista.</string>
+    <string name="catalogo_error">No se pudo importar: %1$s</string>
+</resources>

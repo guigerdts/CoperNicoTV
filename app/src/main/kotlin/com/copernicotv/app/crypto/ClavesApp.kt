@@ -26,8 +26,13 @@ interface ClavesApp {
  * Alias versionados: `copernicotv.aes.v1` y `copernicotv.hmac.v1`. La rotación
  * futura crea `v2` y el sobre HMAC registra `vN`, de modo que las filas viejas
  * siguen siendo verificables con la generación que las produjo.
+ *
+ * La anotación del constructor primario sigue la convención oficial de Kotlin
+ * (`class Foo @Inject constructor()`). ktlint 1.0.1 exige la anotación en una
+ * línea propia, así que se suprime esa única regla en esta clase.
  */
 @Singleton
+@Suppress("ktlint:standard:annotation")
 class ClavesKeystore @Inject constructor() : ClavesApp {
     override val claveAes: SecretKey
         get() = clave(ALIAS_AES) { generadorAes(it) }

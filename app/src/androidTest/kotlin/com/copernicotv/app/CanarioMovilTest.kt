@@ -1,6 +1,7 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -8,6 +9,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
@@ -26,6 +28,7 @@ import javax.inject.Inject
  * La importación pasa por el camino real (parser canario → identidad → HMAC →
  * cifrado → Room) y el catálogo se lee del `Flow` de la base, no de memoria.
  */
+@OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
 class CanarioMovilTest {
     @get:Rule(order = 0)

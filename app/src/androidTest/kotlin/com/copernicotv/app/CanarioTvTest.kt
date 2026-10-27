@@ -1,12 +1,14 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_IMPORTAR
@@ -24,6 +26,7 @@ import javax.inject.Inject
  * con DPAD_CENTER y el catálogo se recorre con DPAD_DOWN. Si el foco no existe
  * o no se mueve, la prueba falla.
  */
+@OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
 class CanarioTvTest {
     @get:Rule(order = 0)

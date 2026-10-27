@@ -125,7 +125,7 @@ class CatalogoRepositorioTest {
     }
 
     private fun descifrar(
-        clave: java.security.SecretKey,
+        clave: javax.crypto.SecretKey,
         aad: String,
         sobre: ByteArray,
     ): String {

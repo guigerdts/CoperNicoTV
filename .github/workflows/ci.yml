@@ -128,7 +128,10 @@ jobs:
         with:
           api-level: 34
           target: android-tv
-          arch: x86_64
+          # Android TV solo publica system-images x86 y arm64-v8a para API 34
+          # (no existe android-34;android-tv;x86_64). El host del runner es x86_64
+          # con KVM, así que la imagen x86 arranca acelerada.
+          arch: x86
           profile: tv_1080p
           disable-animations: true
           script: >-

@@ -55,121 +55,141 @@ class IntegridadRoomTest {
 
     @Test
     fun `canal exige una fuente existente`() {
-        assertFalla {
-            db.canalDao().insertar(canal(fuenteId = 999))
+        runBlocking {
+            assertFalla {
+                db.canalDao().insertar(canal(fuenteId = 999))
+            }
         }
     }
 
     @Test
     fun `clave de unicidad duplicada en la misma fuente se rechaza`() {
-        val fuenteId = fuente()
-        db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
-        assertFalla {
+        runBlocking {
+            val fuenteId = fuente()
             db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            assertFalla {
+                db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            }
         }
     }
 
     @Test
     fun `la misma clave de unicidad en fuentes distintas se permite`() {
-        val primera = fuente("Fuente A")
-        val segunda = fuente("Fuente B")
-        db.canalDao().insertar(canal(primera, clave = "canon:v2:uno"))
-        db.canalDao().insertar(canal(segunda, clave = "canon:v2:uno"))
-        assertEquals(2, db.canalDao().contar())
+        runBlocking {
+            val primera = fuente("Fuente A")
+            val segunda = fuente("Fuente B")
+            db.canalDao().insertar(canal(primera, clave = "canon:v2:uno"))
+            db.canalDao().insertar(canal(segunda, clave = "canon:v2:uno"))
+            assertEquals(2, db.canalDao().contar())
+        }
     }
 
     @Test
     fun `claves de unicidad nulas no colisionan`() {
-        val fuenteId = fuente()
-        db.canalDao().insertar(canal(fuenteId, clave = null))
-        db.canalDao().insertar(canal(fuenteId, clave = null))
-        assertEquals(2, db.canalDao().contar())
+        runBlocking {
+            val fuenteId = fuente()
+            db.canalDao().insertar(canal(fuenteId, clave = null))
+            db.canalDao().insertar(canal(fuenteId, clave = null))
+            assertEquals(2, db.canalDao().contar())
+        }
     }
 
     @Test
     fun `historial admite una sola fila por canal`() {
-        val fuenteId = fuente()
-        val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
-        db.historialDao().insertar(HistorialEntity(canalId = canalId, fecha = AHORA))
-        assertFalla {
-            db.historialDao().insertar(HistorialEntity(canalId = canalId, fecha = AHORA.plusSeconds(60)))
+        runBlocking {
+            val fuenteId = fuente()
+            val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            db.historialDao().insertar(HistorialEntity(canalId = canalId, fecha = AHORA))
+            assertFalla {
+                db.historialDao().insertar(HistorialEntity(canalId = canalId, fecha = AHORA.plusSeconds(60)))
+            }
         }
     }
 
     @Test
     fun `coleccion admite membresia duplicada y dos posiciones`() {
-        val fuenteId = fuente()
-        val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
-        val coleccionId =
-            db.coleccionDao().insertar(
-                ColeccionEntity(nombre = "Mixta", creadoEn = AHORA, actualizadoEn = AHORA),
-            )
-        db.coleccionCanalDao().insertar(ColeccionCanalEntity(coleccionId = coleccionId, canalId = canalId, posicion = 0))
-        db.coleccionCanalDao().insertar(ColeccionCanalEntity(coleccionId = coleccionId, canalId = canalId, posicion = 0))
-        db.coleccionCanalDao().insertar(ColeccionCanalEntity(coleccionId = coleccionId, canalId = canalId, posicion = 1))
-        assertEquals(3, db.coleccionCanalDao().contar())
+        runBlocking {
+            val fuenteId = fuente()
+            val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            val coleccionId =
+                db.coleccionDao().insertar(
+                    ColeccionEntity(nombre = "Mixta", creadoEn = AHORA, actualizadoEn = AHORA),
+                )
+            db.coleccionCanalDao().insertar(ColeccionCanalEntity(coleccionId = coleccionId, canalId = canalId, posicion = 0))
+            db.coleccionCanalDao().insertar(ColeccionCanalEntity(coleccionId = coleccionId, canalId = canalId, posicion = 0))
+            db.coleccionCanalDao().insertar(ColeccionCanalEntity(coleccionId = coleccionId, canalId = canalId, posicion = 1))
+            assertEquals(3, db.coleccionCanalDao().contar())
+        }
     }
 
     @Test
     fun `apariencia es unica por lista canal y clave de presentacion`() {
-        val fuenteId = fuente()
-        val listaId = lista(fuenteId)
-        val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
-        db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a"))
-        assertFalla {
+        runBlocking {
+            val fuenteId = fuente()
+            val listaId = lista(fuenteId)
+            val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
             db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a"))
+            assertFalla {
+                db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a"))
+            }
+            db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:b"))
+            assertEquals(2, db.aparienciaDao().contar(listaId))
         }
-        db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:b"))
-        assertEquals(2, db.aparienciaDao().contar(listaId))
     }
 
     @Test
     fun `borrar la fuente arrastra listas canales y apariencias`() {
-        val fuenteId = fuente()
-        val listaId = lista(fuenteId)
-        val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
-        db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a"))
+        runBlocking {
+            val fuenteId = fuente()
+            val listaId = lista(fuenteId)
+            val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a"))
 
-        db.fuenteDao().eliminar(fuenteId)
+            db.fuenteDao().eliminar(fuenteId)
 
-        assertEquals(0, db.fuenteDao().contar())
-        assertEquals(0, db.listaDao().contar())
-        assertEquals(0, db.canalDao().contar())
-        assertEquals(0, db.aparienciaDao().porLista(listaId).size)
+            assertEquals(0, db.fuenteDao().contar())
+            assertEquals(0, db.listaDao().contar())
+            assertEquals(0, db.canalDao().contar())
+            assertEquals(0, db.aparienciaDao().porLista(listaId).size)
+        }
     }
 
     @Test
     fun `borrar el grupo deja la apariencia sin grupo`() {
-        val fuenteId = fuente()
-        val listaId = lista(fuenteId)
-        val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
-        val grupoId = db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = "Noticias"))
-        db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a", grupoId = grupoId))
+        runBlocking {
+            val fuenteId = fuente()
+            val listaId = lista(fuenteId)
+            val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            val grupoId = db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = "Noticias"))
+            db.aparienciaDao().insertar(apariencia(listaId, canalId, clave = "presentacion:v2:a", grupoId = grupoId))
 
-        db.grupoDao().eliminar(grupoId)
+            db.grupoDao().eliminar(grupoId)
 
-        assertNull(db.aparienciaDao().porLista(listaId).single().grupoId)
+            assertNull(db.aparienciaDao().porLista(listaId).single().grupoId)
+        }
     }
 
     @Test
     fun `borrar el perfil arrastra sus asociaciones de lista`() {
-        val fuenteId = fuente()
-        val listaId = lista(fuenteId)
-        val perfilId =
-            db.perfilDao().insertar(
-                PerfilEntity(
-                    nombre = "Ana",
-                    nombreNormalizado = "ana",
-                    creadoEn = AHORA,
-                    actualizadoEn = AHORA,
-                ),
-            )
-        db.perfilDao().asociarLista(PerfilListaEntity(perfilId = perfilId, listaId = listaId))
-        assertEquals(1, db.perfilDao().contarAsociaciones())
+        runBlocking {
+            val fuenteId = fuente()
+            val listaId = lista(fuenteId)
+            val perfilId =
+                db.perfilDao().insertar(
+                    PerfilEntity(
+                        nombre = "Ana",
+                        nombreNormalizado = "ana",
+                        creadoEn = AHORA,
+                        actualizadoEn = AHORA,
+                    ),
+                )
+            db.perfilDao().asociarLista(PerfilListaEntity(perfilId = perfilId, listaId = listaId))
+            assertEquals(1, db.perfilDao().contarAsociaciones())
 
-        db.perfilDao().eliminar(perfilId)
+            db.perfilDao().eliminar(perfilId)
 
-        assertEquals(0, db.perfilDao().contarAsociaciones())
+            assertEquals(0, db.perfilDao().contarAsociaciones())
+        }
     }
 
     private fun assertFalla(bloque: suspend () -> Unit): SQLiteConstraintException =

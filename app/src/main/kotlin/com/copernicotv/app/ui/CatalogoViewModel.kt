@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copernicotv.app.data.CatalogoRepositorio
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,6 +40,7 @@ class CatalogoViewModel
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
+        private var observacion: Job? = null
 
         fun importarFixture() {
             if (_estado.value.importando) return
@@ -46,11 +48,11 @@ class CatalogoViewModel
             viewModelScope.launch {
                 val resumen =
                     runCatching { repositorio.importarFixture() }
-                        .getOrElse { error ->
+                        .getOrElse {
                             _estado.value =
                                 _estado.value.copy(
                                     importando = false,
-                                    mensaje = error.message ?: CODIGO_FALLO,
+                                    mensaje = CODIGO_FALLO,
                                 )
                             return@launch
                         }
@@ -69,11 +71,13 @@ class CatalogoViewModel
         }
 
         private fun observar(listaId: Long) {
-            viewModelScope.launch {
-                repositorio.canalesDeLista(listaId).collectLatest { nombres ->
-                    _estado.value = _estado.value.copy(canales = nombres.mapNotNull { it })
+            observacion?.cancel()
+            observacion =
+                viewModelScope.launch {
+                    repositorio.canalesDeLista(listaId).collectLatest { nombres ->
+                        _estado.value = _estado.value.copy(canales = nombres.mapNotNull { it })
+                    }
                 }
-            }
         }
 
         private companion object {

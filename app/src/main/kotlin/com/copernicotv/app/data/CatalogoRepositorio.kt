@@ -76,12 +76,13 @@ class CatalogoRepositorio
                         as? ResultadoCanonizacion.Ok
                         ?: return@withContext ResumenImportacion(null, 0, 0, "ubicacion_invalida")
                 val importado = ImportadorCanario.importar(texto, claves.claveHmac)
-                if (importado.error != null) {
+                val errorImportacion = importado.error
+                if (errorImportacion != null) {
                     return@withContext ResumenImportacion(
                         null,
                         0,
                         importado.rechazadas.size,
-                        importado.error.codigo,
+                        errorImportacion.codigo,
                     )
                 }
                 val ahora = Instant.now()

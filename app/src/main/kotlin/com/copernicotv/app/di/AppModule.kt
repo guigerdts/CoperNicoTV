@@ -11,9 +11,11 @@ import com.copernicotv.app.data.db.dao.AparienciaDao
 import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
+import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
 import com.copernicotv.app.data.db.dao.FuenteDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
+import com.copernicotv.app.data.db.dao.HmacPendienteDao
 import com.copernicotv.app.data.db.dao.ListaDao
 import com.copernicotv.app.data.db.dao.PerfilDao
 import com.copernicotv.core.identity.CaseFolder
@@ -63,6 +65,12 @@ object AppModule {
 
     @Provides
     fun perfilDao(db: AppDatabase): PerfilDao = db.perfilDao()
+
+    @Provides
+    fun estadoIndiceHmacDao(db: AppDatabase): EstadoIndiceHmacDao = db.estadoIndiceHmacDao()
+
+    @Provides
+    fun hmacPendienteDao(db: AppDatabase): HmacPendienteDao = db.hmacPendienteDao()
 
     /** Case folding completo conforme a Unicode 15.1.0 para la identidad. */
     @Provides

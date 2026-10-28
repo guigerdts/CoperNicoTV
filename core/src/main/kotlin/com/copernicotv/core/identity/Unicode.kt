@@ -1,6 +1,5 @@
 package com.copernicotv.core.identity
 
-import java.text.Normalizer
 import java.util.Locale
 
 /**
@@ -47,21 +46,19 @@ fun trimExtUnicode(valor: String): String {
 }
 
 /**
- * NFC según [Normalizer], es decir la versión Unicode de la plataforma.
+ * NFC según Unicode 15.1.0, la versión fijada por [VERSION_UNICODE_NORMATIVA].
  *
- * En JDK 17 eso es Unicode 13.0, que **no** equivale a 15.1 en entradas con
- * marcas combinatorias asignadas después de 13.0: hay 10 code points con
- * `ccc != 0` de edad ≥ 14.0 (U+10EFD..U+10EFF, U+11F41, U+11F42, U+1E08F,
- * U+1E4EC..U+1E4EF) y ninguna descomposición canónica nueva. La plataforma los
- * trata como starters (ccc 0) y por eso compone y ordena distinto. Caso real
- * medido en JDK 17: la entrada `0061 0301 10EFD` produce `00E1 10EFD`, mientras
- * 15.1 espera `0061 10EFD 0301`.
+ * Delega en [Nfc151], que usa tablas generadas desde el UCD 15.1.0 y viaja con
+ * el binario. No usa `java.text.Normalizer` ni hereda la versión Unicode de la
+ * plataforma: en JDK 17 la plataforma implementa Unicode 13.0 y trata las
+ * marcas asignadas después como starters (ccc 0), de modo que la entrada
+ * `0061 10EFD 0301` queda igual, mientras 15.1 la compone en `00E1 10EFD`.
  *
- * Mientras [UnicodePlataforma.soporta151] devuelva `false`, el NFC de esta
- * función no es conforme a [VERSION_UNICODE_NORMATIVA]. El case folding sí es
- * conforme vía [CaseFolderCompleto]; la brecha pendiente es solo la NFC.
+ * Esta función es el único punto de normalización canónica de las rutas de
+ * identidad: [ClaveCanal], [ClavePresentacion] y [PerfilNormalizacion] la usan
+ * y no deben llamar a `java.text.Normalizer` por su cuenta.
  */
-fun nfc(valor: String): String = Normalizer.normalize(valor, Normalizer.Form.NFC)
+fun nfc(valor: String): String = Nfc151.normalizar(valor)
 
 /** Minúsculas con [Locale.ROOT]. */
 fun lowerRoot(valor: String): String = valor.lowercase(Locale.ROOT)
@@ -114,8 +111,9 @@ fun interface CaseFolder {
  * conforme no se persiste ningún nombre normalizado, en lugar de persistir un
  * valor de una versión distinta.
  *
- * Los pasos NFC usan [nfc] y por lo tanto la versión Unicode de la plataforma;
- * ver la nota de [nfc] sobre la brecha 13.0/15.1 que sigue abierta.
+ * Los pasos NFC usan [nfc], conforme a Unicode 15.1.0 vía [Nfc151]; el case
+ * folding completo usa [CaseFolderCompleto]. Ninguno de los dos depende de la
+ * versión Unicode de la plataforma.
  */
 object PerfilNormalizacion {
     /** Se lanza cuando no hay [CaseFolder] conforme disponible. */

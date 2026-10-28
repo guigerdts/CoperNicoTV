@@ -29,3 +29,7 @@ captures/
 # Temporary files
 *.log
 *.hprof
+
+# Python
+__pycache__/
+*.pyc

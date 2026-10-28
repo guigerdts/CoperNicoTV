@@ -48,12 +48,15 @@ class DetalleTecnicoTest {
 
     @Test
     fun `no se cuelga con una causa circular`() {
-        val fallo = IllegalStateException("circular")
-        fallo.initCause(fallo)
+        val primero = IllegalStateException("primero")
+        val segundo = IllegalArgumentException("segundo")
+        primero.initCause(segundo)
+        segundo.initCause(primero)
 
-        val detalle = detalleTecnico(fallo)
+        val detalle = detalleTecnico(primero)
 
         assertTrue(detalle, detalle.contains(IllegalStateException::class.java.name))
+        assertTrue(detalle, detalle.contains(IllegalArgumentException::class.java.name))
     }
 
     private fun falloConPila(): Throwable = IllegalStateException("con pila")

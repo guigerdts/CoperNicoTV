@@ -66,7 +66,7 @@ class ClavesKeystoreTest {
     }
 
     @Test
-    fun `la clave heredada rechaza el IV del llamador`() {
+    fun laClaveHeredadaRechazaElIvDelLlamador() {
         val heredada = crearClaveHeredada()
 
         val fallo = runCatching { CifradoAes.cifrar(heredada, AAD_SONDA, byteArrayOf(1)) }.exceptionOrNull()
@@ -78,7 +78,7 @@ class ClavesKeystoreTest {
     }
 
     @Test
-    fun `una clave heredada no impide importar el fixture`() {
+    fun unaClaveHeredadaNoImpideImportarElFixture() {
         crearClaveHeredada()
 
         val resumen = runBlocking { repositorio.importarFixture() }
@@ -92,7 +92,7 @@ class ClavesKeystoreTest {
     }
 
     @Test
-    fun `la clave regenerada cifra y descifra con el sobre propio`() {
+    fun laClaveRegeneradaCifraYDescifraConElSobrePropio() {
         crearClaveHeredada()
 
         val sobre = CifradoAes.cifrar(claves.claveAes, AAD_SONDA, byteArrayOf(7))

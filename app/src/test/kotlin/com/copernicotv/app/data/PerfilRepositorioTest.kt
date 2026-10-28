@@ -7,6 +7,10 @@ import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.PerfilEntity
 import com.copernicotv.core.identity.CaseFolderCompleto
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -19,6 +23,8 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.TimeUnit
 
 /**
  * Persistencia de Perfiles con identidad lógica separada de la representación.
@@ -140,6 +146,131 @@ class PerfilRepositorioTest {
             runBlocking { db.perfilDao().insertar(entidad("Jose\u0301", "jos\u00E9")) }
         }
         runBlocking { assertNotNull(db.perfilDao().porNombreNormalizado("jos\u00E9")) }
+    }
+
+    @Test
+    fun `crear rechaza un nombre vacio o solo espacios con nombre_perfil_vacio`() {
+        runBlocking {
+            val vacio = repositorio.crear("", ahora)
+            val espacios = repositorio.crear("   \t\n ", ahora)
+
+            assertEquals(ResultadoAltaPerfil.Rechazado(), vacio)
+            assertEquals(ResultadoAltaPerfil.Rechazado(), espacios)
+            assertEquals("nombre_perfil_vacio", (vacio as ResultadoAltaPerfil.Rechazado).codigo)
+            assertEquals("nombre_perfil_vacio", (espacios as ResultadoAltaPerfil.Rechazado).codigo)
+            assertEquals(0, db.perfilDao().contar())
+        }
+    }
+
+    @Test
+    fun `renombrar rechaza un nombre vacio con nombre_perfil_vacio y deja la fila intacta`() {
+        runBlocking {
+            val perfil = (repositorio.crear("Trabajo", ahora) as ResultadoAltaPerfil.Creado).perfil
+
+            val resultado = repositorio.renombrar(perfil.id, "  ", ahora.plusSeconds(60))
+
+            assertEquals(ResultadoRenombrado.Rechazado(), resultado)
+            assertEquals("nombre_perfil_vacio", (resultado as ResultadoRenombrado.Rechazado).codigo)
+            assertEquals("Trabajo", db.perfilDao().porId(perfil.id)?.nombre)
+            assertEquals("trabajo", db.perfilDao().porId(perfil.id)?.nombreNormalizado)
+        }
+    }
+
+    @Test
+    fun `un conflicto de creacion informa nombre_perfil_duplicado`() {
+        runBlocking {
+            val primero = (repositorio.crear("Jos\u00E9", ahora) as ResultadoAltaPerfil.Creado).perfil
+
+            val segundo = repositorio.crear("Jose\u0301", ahora)
+
+            assertEquals("nombre_perfil_duplicado", (segundo as ResultadoAltaPerfil.Conflicto).codigo)
+            assertEquals(primero.id, segundo.existente.id)
+        }
+    }
+
+    @Test
+    fun `un conflicto de renombrado informa nombre_perfil_duplicado`() {
+        runBlocking {
+            repositorio.crear("Jos\u00E9", ahora)
+            val otro = (repositorio.crear("Trabajo", ahora) as ResultadoAltaPerfil.Creado).perfil
+
+            val resultado = repositorio.renombrar(otro.id, "Jose\u0301", ahora)
+
+            assertEquals("nombre_perfil_duplicado", (resultado as ResultadoRenombrado.Conflicto).codigo)
+            assertEquals("Trabajo", db.perfilDao().porId(otro.id)?.nombre)
+        }
+    }
+
+    @Test
+    fun `la caja no depende del locale y tres formas del mismo nombre son la misma identidad`() {
+        runBlocking {
+            val primero = repositorio.crear("TRABAJO", ahora)
+
+            val segundo = repositorio.crear("Trabajo", ahora)
+            val tercero = repositorio.crear("trabajo", ahora)
+
+            assertTrue(primero is ResultadoAltaPerfil.Creado)
+            assertTrue(segundo is ResultadoAltaPerfil.Conflicto)
+            assertTrue(tercero is ResultadoAltaPerfil.Conflicto)
+            assertEquals("trabajo", (segundo as ResultadoAltaPerfil.Conflicto).normalizado)
+            assertEquals("trabajo", (tercero as ResultadoAltaPerfil.Conflicto).normalizado)
+            assertEquals(1, db.perfilDao().contar())
+            assertEquals("TRABAJO", db.perfilDao().porId(primero.perfil.id)?.nombre)
+        }
+    }
+
+    @Test
+    fun `dos creaciones concurrentes dejan una sola fila ganadora`() {
+        val barrera = CyclicBarrier(2)
+        val resultados =
+            runBlocking {
+                coroutineScope {
+                    (1..2)
+                        .map {
+                            async(Dispatchers.IO) {
+                                barrera.await(10, TimeUnit.SECONDS)
+                                repositorio.crear("Trabajo", ahora)
+                            }
+                        }.awaitAll()
+                }
+            }
+
+        val creados = resultados.filterIsInstance<ResultadoAltaPerfil.Creado>()
+        val conflictos = resultados.filterIsInstance<ResultadoAltaPerfil.Conflicto>()
+        assertEquals(1, creados.size)
+        assertEquals(1, conflictos.size)
+        assertEquals("nombre_perfil_duplicado", conflictos.single().codigo)
+        assertEquals(creados.single().perfil.id, conflictos.single().existente.id)
+        assertEquals(1, db.perfilDao().contar())
+        val persistido = db.perfilDao().porId(creados.single().perfil.id)
+        assertNotNull(persistido)
+        assertEquals("Trabajo", persistido?.nombre)
+        assertEquals("trabajo", persistido?.nombreNormalizado)
+    }
+
+    @Test
+    fun `dos inserciones directas concurrentes chocan con el indice unico`() {
+        val barrera = CyclicBarrier(2)
+        val resultados =
+            runBlocking {
+                coroutineScope {
+                    (1..2)
+                        .map { indice ->
+                            async(Dispatchers.IO) {
+                                barrera.await(10, TimeUnit.SECONDS)
+                                runCatching {
+                                    db.perfilDao().insertar(
+                                        entidad(if (indice == 1) "Jos\u00E9" else "Jose\u0301", "jos\u00E9"),
+                                    )
+                                }
+                            }
+                        }.awaitAll()
+                }
+            }
+
+        assertEquals(1, resultados.count { it.isSuccess })
+        assertEquals(1, resultados.count { it.exceptionOrNull() is SQLiteConstraintException })
+        assertEquals(1, db.perfilDao().contar())
     }
 
     private fun entidad(

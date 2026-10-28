@@ -99,10 +99,14 @@ class IntegridadRoomTest {
         runBlocking {
             val fuenteId = fuente()
             val canalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:uno"))
+            val otroCanalId = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:dos"))
             db.historialDao().insertar(HistorialEntity(canalId = canalId, fecha = AHORA))
+            db.historialDao().insertar(HistorialEntity(canalId = otroCanalId, fecha = AHORA))
+            assertEquals(2, db.historialDao().contar())
             assertFalla {
                 db.historialDao().insertar(HistorialEntity(canalId = canalId, fecha = AHORA.plusSeconds(60)))
             }
+            assertEquals(2, db.historialDao().contar())
         }
     }
 
@@ -192,6 +196,53 @@ class IntegridadRoomTest {
         }
     }
 
+    @Test
+    fun `canal acepta nombre nulo y no lo rellena`() {
+        runBlocking {
+            val fuenteId = fuente()
+            val canalId = db.canalDao().insertar(canal(fuenteId, nombre = null))
+
+            assertNull(db.canalDao().porId(canalId)?.nombre)
+        }
+    }
+
+    @Test
+    fun `perfil vacio y lista sin perfil son validos`() {
+        runBlocking {
+            val fuenteId = fuente()
+            val listaId = lista(fuenteId)
+            val perfilId =
+                db.perfilDao().insertar(
+                    PerfilEntity(
+                        nombre = "Ana",
+                        nombreNormalizado = "ana",
+                        creadoEn = AHORA,
+                        actualizadoEn = AHORA,
+                    ),
+                )
+            val otroPerfilId =
+                db.perfilDao().insertar(
+                    PerfilEntity(
+                        nombre = "Beto",
+                        nombreNormalizado = "beto",
+                        creadoEn = AHORA,
+                        actualizadoEn = AHORA,
+                    ),
+                )
+
+            assertEquals(1, db.listaDao().contar())
+            assertEquals(0, db.perfilDao().contarAsociaciones())
+            assertEquals(0, db.perfilDao().listasDePerfil(perfilId).size)
+
+            db.perfilDao().asociarLista(PerfilListaEntity(perfilId = perfilId, listaId = listaId))
+            db.perfilDao().asociarLista(PerfilListaEntity(perfilId = otroPerfilId, listaId = listaId))
+
+            assertEquals(listOf(listaId), db.perfilDao().listasDePerfil(perfilId))
+            assertEquals(listOf(listaId), db.perfilDao().listasDePerfil(otroPerfilId))
+            assertEquals(2, db.perfilDao().contarAsociaciones())
+        }
+    }
+
     private fun assertFalla(bloque: suspend () -> Unit): SQLiteConstraintException =
         assertThrows(SQLiteConstraintException::class.java) { runBlocking { bloque() } }
 
@@ -224,10 +275,11 @@ class IntegridadRoomTest {
     private fun canal(
         fuenteId: Long,
         clave: String? = "canon:v2:uno",
+        nombre: String? = "Canal",
     ): CanalEntity =
         CanalEntity(
             fuenteId = fuenteId,
-            nombre = "Canal",
+            nombre = nombre,
             urlStreamCifrada = byteArrayOf(0x01),
             urlStreamHmac = byteArrayOf(0x02),
             claveCanonica = clave,

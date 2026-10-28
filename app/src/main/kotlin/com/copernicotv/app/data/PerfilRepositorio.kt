@@ -20,6 +20,12 @@ sealed interface ResultadoAltaPerfil {
     data class Conflicto(
         val normalizado: String,
         val existente: PerfilEntity,
+        val codigo: String = PerfilRepositorio.NOMBRE_PERFIL_DUPLICADO,
+    ) : ResultadoAltaPerfil
+
+    /** El nombre queda vacío tras NFC y recorte exterior; no se insertó nada. */
+    data class Rechazado(
+        val codigo: String = PerfilRepositorio.NOMBRE_PERFIL_VACIO,
     ) : ResultadoAltaPerfil
 }
 
@@ -32,6 +38,12 @@ sealed interface ResultadoRenombrado {
     data class Conflicto(
         val normalizado: String,
         val existente: PerfilEntity,
+        val codigo: String = PerfilRepositorio.NOMBRE_PERFIL_DUPLICADO,
+    ) : ResultadoRenombrado
+
+    /** El nombre queda vacío tras NFC y recorte exterior; no se modificó nada. */
+    data class Rechazado(
+        val codigo: String = PerfilRepositorio.NOMBRE_PERFIL_VACIO,
     ) : ResultadoRenombrado
 
     /** No existe un Perfil con ese id. */
@@ -66,6 +78,7 @@ class PerfilRepositorio
         ): ResultadoAltaPerfil =
             withContext(Dispatchers.IO) {
                 val normalizado = PerfilNormalizacion.normalizar(nombre, caseFolder)
+                if (normalizado.isEmpty()) return@withContext ResultadoAltaPerfil.Rechazado()
                 val existente = dao.porNombreNormalizado(normalizado)
                 if (existente != null) return@withContext ResultadoAltaPerfil.Conflicto(normalizado, existente)
                 val entidad =
@@ -94,6 +107,7 @@ class PerfilRepositorio
             withContext(Dispatchers.IO) {
                 val actual = dao.porId(id) ?: return@withContext ResultadoRenombrado.NoExiste
                 val normalizado = PerfilNormalizacion.normalizar(nombre, caseFolder)
+                if (normalizado.isEmpty()) return@withContext ResultadoRenombrado.Rechazado()
                 val existente = dao.porNombreNormalizado(normalizado)
                 if (existente != null && existente.id != id) {
                     return@withContext ResultadoRenombrado.Conflicto(normalizado, existente)
@@ -118,4 +132,12 @@ class PerfilRepositorio
                     ResultadoRenombrado.Conflicto(normalizado, carrera)
                 }
             }
+
+        companion object {
+            /** Código contractual de rechazo de un nombre vacío o solo `White_Space`. */
+            const val NOMBRE_PERFIL_VACIO: String = "nombre_perfil_vacio"
+
+            /** Código contractual de conflicto de identidad de Perfil. */
+            const val NOMBRE_PERFIL_DUPLICADO: String = "nombre_perfil_duplicado"
+        }
     }

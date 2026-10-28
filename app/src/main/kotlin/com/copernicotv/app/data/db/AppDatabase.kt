@@ -15,6 +15,7 @@ import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
 import com.copernicotv.app.data.db.dao.ListaDao
 import com.copernicotv.app.data.db.dao.PerfilDao
+import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.db.entities.AparienciaClavePendienteEntity
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.AsociacionEntity
@@ -87,6 +88,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun estadoIndiceHmacDao(): EstadoIndiceHmacDao
 
     abstract fun hmacPendienteDao(): HmacPendienteDao
+
+    abstract fun reconstruccionHmacDao(): ReconstruccionHmacDao
 
     abstract fun fuenteDao(): FuenteDao
 

@@ -18,6 +18,7 @@ import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
 import com.copernicotv.app.data.db.dao.ListaDao
 import com.copernicotv.app.data.db.dao.PerfilDao
+import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.core.identity.CaseFolder
 import com.copernicotv.core.identity.CaseFolderCompleto
 import dagger.Module
@@ -71,6 +72,9 @@ object AppModule {
 
     @Provides
     fun hmacPendienteDao(db: AppDatabase): HmacPendienteDao = db.hmacPendienteDao()
+
+    @Provides
+    fun reconstruccionHmacDao(db: AppDatabase): ReconstruccionHmacDao = db.reconstruccionHmacDao()
 
     /** Case folding completo conforme a Unicode 15.1.0 para la identidad. */
     @Provides

@@ -1,5 +1,11 @@
 package com.copernicotv.core.identity
 
+/** Par clave-valor adicional de una entrada, sin interpretación ni normalización. */
+data class AtributoExtra(
+    val clave: String,
+    val valor: String,
+)
+
 /** Declaración de Canal tal como la entrega un parser, todavía sin identidad. */
 data class DeclaracionCanal(
     val nombre: String?,
@@ -8,6 +14,7 @@ data class DeclaracionCanal(
     val groupTitle: String? = null,
     val tvgName: String? = null,
     val logoOriginal: String? = null,
+    val atributosExtra: List<AtributoExtra> = emptyList(),
 )
 
 /** Apariencia declarada dentro de una importación (DC-05). */
@@ -26,7 +33,9 @@ data class CanalDeclarado(
     val urlOriginal: String,
     val urlCanonica: String,
     val clase: ClaseUrl,
+    val logoOriginal: String? = null,
     val logoCanonica: String?,
+    val atributosExtra: List<AtributoExtra> = emptyList(),
     val claveCanonica: String?,
     val claveUnicidad: String?,
     val claveDerivable: Boolean,
@@ -73,7 +82,9 @@ object AgrupadorImportacion {
         val tvgPersistido: String?,
         val groupTitle: String?,
         val tvgName: String?,
+        val logoOriginal: String?,
         val logoCanonica: String?,
+        val atributosExtra: List<AtributoExtra>,
     )
 
     /** Agrupa [declaraciones] en Canales y Apariencias. */
@@ -106,7 +117,9 @@ object AgrupadorImportacion {
                             tvgPersistido = tvg,
                             groupTitle = declaracion.groupTitle,
                             tvgName = declaracion.tvgName,
+                            logoOriginal = declaracion.logoOriginal,
                             logoCanonica = logo,
+                            atributosExtra = declaracion.atributosExtra,
                         )
                 }
             }
@@ -157,6 +170,7 @@ object AgrupadorImportacion {
                     grupo = declaracion.groupTitle,
                     tvgName = declaracion.tvgName,
                     logo = declaracion.logoCanonica,
+                    extras = declaracion.atributosExtra,
                 )
             val previo = acumulado[clave]
             acumulado[clave] =
@@ -207,7 +221,9 @@ object AgrupadorImportacion {
             urlOriginal = primera.urlOriginal,
             urlCanonica = primera.urlCanonica,
             clase = primera.clase,
+            logoOriginal = grupo.mapNotNull { it.first.logoOriginal }.firstOrNull(),
             logoCanonica = grupo.mapNotNull { it.first.logoCanonica }.firstOrNull(),
+            atributosExtra = primera.atributosExtra,
             claveCanonica = identidad.claveCanonica,
             claveUnicidad = identidad.claveUnicidad,
             claveDerivable = identidad.claveDerivable,
@@ -229,5 +245,6 @@ object AgrupadorImportacion {
         val grupo: String?,
         val tvgName: String?,
         val logo: String?,
+        val extras: List<AtributoExtra>,
     )
 }

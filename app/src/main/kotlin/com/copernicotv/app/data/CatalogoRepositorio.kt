@@ -13,6 +13,7 @@ import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.CanonicalizadorUrl
+import com.copernicotv.core.identity.ClaveCanal
 import com.copernicotv.core.identity.ResultadoCanonizacion
 import com.copernicotv.core.m3u.CanalCanario
 import com.copernicotv.core.m3u.ImportadorCanario
@@ -33,6 +34,12 @@ data class ResumenImportacion(
 )
 
 /**
+ * Rechazo del escritor durante una importación; revierte la transacción completa
+ * y se informa como [ResumenImportacion.error] con su código contractual.
+ */
+open class ImportacionRechazada(val codigo: String) : Exception(codigo)
+
+/**
  * Persistencia del catálogo para el canario de E1-C.
  *
  * La importación es transaccional: o queda la Fuente, la Lista, los Canales,
@@ -48,6 +55,8 @@ class CatalogoRepositorio
         @ApplicationContext private val contexto: Context,
     ) {
         private val io = Dispatchers.IO
+        private val escritorApariencias = AparienciaEscritor(db)
+        private val escritorCanales = CanalEscritor(db)
 
         fun canalesDeLista(listaId: Long): Flow<List<String?>> = db.aparienciaDao().nombresDeLista(listaId)
 
@@ -100,9 +109,18 @@ class CatalogoRepositorio
                     )
                 }
                 val persistida =
-                    db.withTransaction {
-                        listaExistente(nombreFuente)
-                            ?: escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales)
+                    try {
+                        db.withTransaction {
+                            listaExistente(nombreFuente)
+                                ?: escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales)
+                        }
+                    } catch (rechazo: ImportacionRechazada) {
+                        return@withContext ResumenImportacion(
+                            null,
+                            0,
+                            importado.rechazadas.size,
+                            rechazo.codigo,
+                        )
                     }
                 ResumenImportacion(persistida.id, persistida.canales, importado.rechazadas.size)
             }
@@ -161,8 +179,12 @@ class CatalogoRepositorio
                 )
             var orden = 0
             for (canal in canales) {
+                val tvg = canal.tvgId
+                // La forma persistida de la clave de unicidad es la única fuente de
+                // verdad sobre si el tvg-id habilitó la clave (§6.3.2).
+                val tvgUnico = tvg != null && canal.claveUnicidad == ClaveCanal.PREFIJO_TVG + tvg
                 val canalId =
-                    db.canalDao().insertar(
+                    escritorCanales.insertar(
                         CanalEntity(
                             fuenteId = fuenteId,
                             nombre = canal.nombre,
@@ -180,23 +202,29 @@ class CatalogoRepositorio
                             creadoEn = ahora,
                             actualizadoEn = ahora,
                         ),
+                        tvgIdUnicoEnFuente = tvgUnico,
                     )
                 for (apariencia in canal.apariencias) {
                     val grupoId = apariencia.groupTitle?.let { insertarGrupo(idLista, it) }
-                    db.aparienciaDao().insertar(
-                        AparienciaEntity(
-                            listaId = idLista,
-                            canalId = canalId,
-                            grupoId = grupoId,
-                            orden = orden++,
-                            groupTitle = apariencia.groupTitle,
-                            tvgName = apariencia.tvgName,
-                            clavePresentacion = apariencia.clavePresentacion,
-                            repeticiones = apariencia.repeticiones,
-                            creadoEn = ahora,
-                            actualizadoEn = ahora,
-                        ),
-                    )
+                    val escritura =
+                        escritorApariencias.upsert(
+                            AparienciaEntity(
+                                listaId = idLista,
+                                canalId = canalId,
+                                grupoId = grupoId,
+                                orden = orden++,
+                                groupTitle = apariencia.groupTitle,
+                                tvgName = apariencia.tvgName,
+                                clavePresentacion = apariencia.clavePresentacion,
+                                repeticiones = apariencia.repeticiones,
+                                creadoEn = ahora,
+                                actualizadoEn = ahora,
+                            ),
+                            ahora,
+                        )
+                    if (escritura is ResultadoUpsertApariencia.Rechazada) {
+                        throw ImportacionRechazada(escritura.codigo)
+                    }
                 }
             }
             return ListaPersistida(idLista, canales.size)

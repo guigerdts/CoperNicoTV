@@ -116,11 +116,17 @@ class CatalogoRepositorioTest {
     }
 
     @Test
-    fun `reimportar el mismo fixture viola la unicidad de la fuente`() {
+    fun `reimportar el mismo fixture reutiliza la lista existente`() {
         runBlocking {
-            repositorio.importarFixture()
-            val fallo = runCatching { repositorio.importarFixture() }.exceptionOrNull()
-            assertNotNull(fallo)
+            val primera = repositorio.importarFixture()
+            val segunda = repositorio.importarFixture()
+
+            assertEquals(primera.listaId, segunda.listaId)
+            assertEquals(3, segunda.canales)
+            assertEquals(1, db.fuenteDao().contar())
+            assertEquals(1, db.listaDao().contar())
+            assertEquals(3, db.canalDao().contar())
+            assertEquals(3, db.aparienciaDao().contar(requireNotNull(segunda.listaId)))
         }
     }
 

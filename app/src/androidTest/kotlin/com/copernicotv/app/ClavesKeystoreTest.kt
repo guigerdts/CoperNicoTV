@@ -1,8 +1,11 @@
 package com.copernicotv.app
 
+import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.crypto.CifradoAes
@@ -101,6 +104,58 @@ class ClavesKeystoreTest {
         assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
         assertArrayEquals(byteArrayOf(7), (resultado as ResultadoDescifrado.Ok).bytes)
     }
+
+    /**
+     * Una instancia nueva de `ClavesKeystore` equivale al arranque de un proceso:
+     * el `by lazy` se vuelve a evaluar y la sonda decide si la clave sirve. Si la
+     * sonda regenerara una clave válida, el sobre anterior dejaría de descifrar.
+     */
+    @Test
+    fun unaInstanciaNuevaDeClavesReutilizaLaClavePersistida() {
+        val primera = ClavesKeystore()
+        val sobre = CifradoAes.cifrar(primera.claveAes, AAD_SONDA, byteArrayOf(9))
+
+        val segunda = ClavesKeystore()
+        val resultado = CifradoAes.descifrar(segunda.claveAes, AAD_SONDA, sobre)
+
+        assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
+        assertArrayEquals(byteArrayOf(9), (resultado as ResultadoDescifrado.Ok).bytes)
+    }
+
+    /**
+     * Un repositorio y unas claves nuevos releen el catálogo persistido.
+     *
+     * Es la versión con Keystore real de la recreación del proceso: la Lista se
+     * resuelve en Room, no en la memoria del ViewModel, y la URL cifrada se
+     * descifra con la clave que sobrevivió al cambio de instancia.
+     */
+    @Test
+    fun unProcesoNuevoReleeElCatalogoYDescifraConLaClavePersistida() {
+        val resumen = runBlocking { repositorio.importarFixture() }
+        assertNull("La importación reportó el código ${resumen.error}", resumen.error)
+
+        val clavesNuevas = ClavesKeystore()
+        val repositorioNuevo = CatalogoRepositorio(db, clavesNuevas, contexto())
+
+        val nombres = runBlocking { repositorioNuevo.canalesDeListaActiva().first() }
+        assertEquals(listOf("Canario Uno", "Canario Dos", "Canario Tres"), nombres)
+
+        val fuente = runBlocking { db.fuenteDao().todas().single() }
+        val canal = runBlocking { db.canalDao().porFuente(fuente.id) }.first()
+        val descifrado =
+            CifradoAes.descifrar(
+                clavesNuevas.claveAes,
+                CifradoAes.aad("Canal", "url_stream_cifrada"),
+                canal.urlStreamCifrada,
+            )
+        assertTrue("esperaba descifrado ok con la clave persistida", descifrado is ResultadoDescifrado.Ok)
+        assertEquals(
+            "https://example.invalid/canario/uno.m3u8",
+            String((descifrado as ResultadoDescifrado.Ok).bytes, Charsets.UTF_8),
+        )
+    }
+
+    private fun contexto(): Context = InstrumentationRegistry.getInstrumentation().targetContext
 
     /** Crea la clave con el `KeyGenParameterSpec` previo al arreglo del IV. */
     private fun crearClaveHeredada(): SecretKey {

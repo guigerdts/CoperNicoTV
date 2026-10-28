@@ -13,6 +13,9 @@ interface FuenteDao {
     @Query("SELECT * FROM Fuente WHERE id = :id")
     suspend fun porId(id: Long): FuenteEntity?
 
+    @Query("SELECT * FROM Fuente WHERE nombre = :nombre LIMIT 1")
+    suspend fun porNombre(nombre: String): FuenteEntity?
+
     @Query("SELECT * FROM Fuente ORDER BY nombre")
     suspend fun todas(): List<FuenteEntity>
 

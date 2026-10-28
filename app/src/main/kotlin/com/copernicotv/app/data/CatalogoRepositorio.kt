@@ -14,6 +14,7 @@ import com.copernicotv.core.crypto.HmacUrl
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.CanonicalizadorUrl
 import com.copernicotv.core.identity.ResultadoCanonizacion
+import com.copernicotv.core.m3u.CanalCanario
 import com.copernicotv.core.m3u.ImportadorCanario
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -50,6 +51,15 @@ class CatalogoRepositorio
 
         fun canalesDeLista(listaId: Long): Flow<List<String?>> = db.aparienciaDao().nombresDeLista(listaId)
 
+        /**
+         * Catálogo de la Lista activa más reciente.
+         *
+         * La Lista se resuelve en SQL y no a partir de un identificador en
+         * memoria: un proceso nuevo no recuerda ninguna importación previa y
+         * aun así debe mostrar el catálogo ya persistido.
+         */
+        fun canalesDeListaActiva(): Flow<List<String?>> = db.aparienciaDao().nombresDeListaActiva()
+
         /** Importa el fixture sintético incluido en assets. */
         suspend fun importarFixture(): ResumenImportacion {
             val texto =
@@ -64,6 +74,10 @@ class CatalogoRepositorio
          *
          * [ubicacion] es la ubicación original exacta de la lista; se cifra y
          * se indexa por HMAC sobre su forma canónica, nunca se guarda en claro.
+         *
+         * Si la Fuente ya existe con su Lista, la importación no escribe nada y
+         * devuelve la Lista persistida: repetir el disparador no debe duplicar
+         * ni borrar el catálogo, y menos aún fallar por una clave única.
          */
         suspend fun importar(
             texto: String,
@@ -85,90 +99,108 @@ class CatalogoRepositorio
                         errorImportacion.codigo,
                     )
                 }
-                val ahora = Instant.now()
-                val listaId =
+                val persistida =
                     db.withTransaction {
-                        val fuenteId =
-                            db.fuenteDao().insertar(
-                                FuenteEntity(
-                                    nombre = nombreFuente,
-                                    estado = "activa",
-                                    usarIntervaloGlobal = true,
-                                    creadoEn = ahora,
-                                    actualizadoEn = ahora,
-                                ),
-                            )
-                        val idLista =
-                            db.listaDao().insertar(
-                                ListaEntity(
-                                    fuenteId = fuenteId,
-                                    nombre = nombreFuente,
-                                    ubicacionCifrada =
-                                        CifradoAes.cifrar(
-                                            claves.claveAes,
-                                            CifradoAes.aad("Lista", "ubicacion_cifrada"),
-                                            ubicacion.toByteArray(Charsets.UTF_8),
-                                        ),
-                                    ubicacionHmac =
-                                        HmacUrl
-                                            .calcularSobre(
-                                                clave = claves.claveHmac,
-                                                generacion = ImportadorCanario.GENERACION_HMAC,
-                                                campo = CampoUrl.LISTA_UBICACION,
-                                                clase = canonica.clase,
-                                                urlCanonica = canonica.urlCanonica,
-                                            ).toByteArray(Charsets.UTF_8),
-                                    esquema = canonica.urlCanonica.substringBefore(':'),
-                                    orden = 0,
-                                    estado = "activa",
-                                    creadoEn = ahora,
-                                    actualizadoEn = ahora,
-                                ),
-                            )
-                        var orden = 0
-                        for (canal in importado.canales) {
-                            val canalId =
-                                db.canalDao().insertar(
-                                    CanalEntity(
-                                        fuenteId = fuenteId,
-                                        nombre = canal.nombre,
-                                        urlStreamCifrada =
-                                            CifradoAes.cifrar(
-                                                claves.claveAes,
-                                                CifradoAes.aad("Canal", "url_stream_cifrada"),
-                                                canal.urlOriginal.toByteArray(Charsets.UTF_8),
-                                            ),
-                                        urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
-                                        tvgId = canal.tvgId,
-                                        claveCanonica = canal.claveCanonica,
-                                        claveUnicidad = canal.claveUnicidad,
-                                        claveDerivable = canal.claveDerivable,
-                                        creadoEn = ahora,
-                                        actualizadoEn = ahora,
-                                    ),
-                                )
-                            for (apariencia in canal.apariencias) {
-                                val grupoId = apariencia.groupTitle?.let { insertarGrupo(idLista, it) }
-                                db.aparienciaDao().insertar(
-                                    AparienciaEntity(
-                                        listaId = idLista,
-                                        canalId = canalId,
-                                        grupoId = grupoId,
-                                        orden = orden++,
-                                        groupTitle = apariencia.groupTitle,
-                                        tvgName = apariencia.tvgName,
-                                        clavePresentacion = apariencia.clavePresentacion,
-                                        repeticiones = apariencia.repeticiones,
-                                        creadoEn = ahora,
-                                        actualizadoEn = ahora,
-                                    ),
-                                )
-                            }
-                        }
-                        idLista
+                        listaExistente(nombreFuente)
+                            ?: escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales)
                     }
-                ResumenImportacion(listaId, importado.canales.size, importado.rechazadas.size)
+                ResumenImportacion(persistida.id, persistida.canales, importado.rechazadas.size)
             }
+
+        /** Lista ya persistida para [nombreFuente], si la Fuente existe con una Lista. */
+        private suspend fun listaExistente(nombreFuente: String): ListaPersistida? {
+            val fuente = db.fuenteDao().porNombre(nombreFuente) ?: return null
+            val lista = db.listaDao().porFuente(fuente.id).firstOrNull() ?: return null
+            return ListaPersistida(lista.id, db.canalDao().contarPorFuente(fuente.id))
+        }
+
+        private suspend fun escribirCatalogo(
+            nombreFuente: String,
+            ubicacion: String,
+            canonica: ResultadoCanonizacion.Ok,
+            canales: List<CanalCanario>,
+        ): ListaPersistida {
+            val ahora = Instant.now()
+            val fuenteId =
+                db.fuenteDao().porNombre(nombreFuente)?.id
+                    ?: db.fuenteDao().insertar(
+                        FuenteEntity(
+                            nombre = nombreFuente,
+                            estado = "activa",
+                            usarIntervaloGlobal = true,
+                            creadoEn = ahora,
+                            actualizadoEn = ahora,
+                        ),
+                    )
+            val idLista =
+                db.listaDao().insertar(
+                    ListaEntity(
+                        fuenteId = fuenteId,
+                        nombre = nombreFuente,
+                        ubicacionCifrada =
+                            CifradoAes.cifrar(
+                                claves.claveAes,
+                                CifradoAes.aad("Lista", "ubicacion_cifrada"),
+                                ubicacion.toByteArray(Charsets.UTF_8),
+                            ),
+                        ubicacionHmac =
+                            HmacUrl
+                                .calcularSobre(
+                                    clave = claves.claveHmac,
+                                    generacion = ImportadorCanario.GENERACION_HMAC,
+                                    campo = CampoUrl.LISTA_UBICACION,
+                                    clase = canonica.clase,
+                                    urlCanonica = canonica.urlCanonica,
+                                ).toByteArray(Charsets.UTF_8),
+                        esquema = canonica.urlCanonica.substringBefore(':'),
+                        orden = 0,
+                        estado = "activa",
+                        creadoEn = ahora,
+                        actualizadoEn = ahora,
+                    ),
+                )
+            var orden = 0
+            for (canal in canales) {
+                val canalId =
+                    db.canalDao().insertar(
+                        CanalEntity(
+                            fuenteId = fuenteId,
+                            nombre = canal.nombre,
+                            urlStreamCifrada =
+                                CifradoAes.cifrar(
+                                    claves.claveAes,
+                                    CifradoAes.aad("Canal", "url_stream_cifrada"),
+                                    canal.urlOriginal.toByteArray(Charsets.UTF_8),
+                                ),
+                            urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
+                            tvgId = canal.tvgId,
+                            claveCanonica = canal.claveCanonica,
+                            claveUnicidad = canal.claveUnicidad,
+                            claveDerivable = canal.claveDerivable,
+                            creadoEn = ahora,
+                            actualizadoEn = ahora,
+                        ),
+                    )
+                for (apariencia in canal.apariencias) {
+                    val grupoId = apariencia.groupTitle?.let { insertarGrupo(idLista, it) }
+                    db.aparienciaDao().insertar(
+                        AparienciaEntity(
+                            listaId = idLista,
+                            canalId = canalId,
+                            grupoId = grupoId,
+                            orden = orden++,
+                            groupTitle = apariencia.groupTitle,
+                            tvgName = apariencia.tvgName,
+                            clavePresentacion = apariencia.clavePresentacion,
+                            repeticiones = apariencia.repeticiones,
+                            creadoEn = ahora,
+                            actualizadoEn = ahora,
+                        ),
+                    )
+                }
+            }
+            return ListaPersistida(idLista, canales.size)
+        }
 
         private suspend fun insertarGrupo(
             listaId: Long,
@@ -176,6 +208,9 @@ class CatalogoRepositorio
         ): Long =
             db.grupoDao().porNombre(listaId, nombre)?.id
                 ?: db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = nombre))
+
+        /** Lista persistida y cantidad de Canales que la Fuente ya tiene. */
+        private data class ListaPersistida(val id: Long, val canales: Int)
 
         private companion object {
             const val FIXTURE = "fixture-canario.m3u"

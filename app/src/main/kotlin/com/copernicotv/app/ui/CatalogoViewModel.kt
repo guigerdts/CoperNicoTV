@@ -30,9 +30,11 @@ data class CatalogoUiState(
 /**
  * ViewModel del canario de E1-C.
  *
- * `importarFixture` ejecuta el camino real de importación y luego observa el
- * catálogo de la Lista resultante. E2/E3 reemplazan el disparador por el flujo
- * de alta de Fuente, pero el camino de persistencia es el mismo.
+ * Observa el catálogo de la Lista activa desde que se construye, y no solo tras
+ * importar: la Lista se resuelve en Room, así que un proceso nuevo muestra el
+ * catálogo ya persistido sin depender de ningún estado en memoria. E2/E3
+ * reemplazan el disparador por el flujo de alta de Fuente, pero el camino de
+ * persistencia es el mismo.
  */
 @HiltViewModel
 class CatalogoViewModel
@@ -43,6 +45,10 @@ class CatalogoViewModel
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
         private var observacion: Job? = null
+
+        init {
+            observarCatalogo()
+        }
 
         fun importarFixture() {
             if (_estado.value.importando) return
@@ -73,15 +79,23 @@ class CatalogoViewModel
                     return@launch
                 }
                 _estado.value = _estado.value.copy(importando = false, listaId = listaId, mensaje = null)
-                observar(listaId)
+                observarCatalogo()
             }
         }
 
-        private fun observar(listaId: Long) {
+        /**
+         * Observa el catálogo de la Lista activa.
+         *
+         * Se suscribe al construir el ViewModel, no solo después de importar: la
+         * Lista se resuelve en Room, así que un proceso nuevo carga el catálogo ya
+         * persistido. Antes, `listaId` solo existía en memoria y, al reiniciar, la
+         * pantalla quedaba vacía aunque los datos estuvieran intactos.
+         */
+        private fun observarCatalogo() {
             observacion?.cancel()
             observacion =
                 viewModelScope.launch {
-                    repositorio.canalesDeLista(listaId).collectLatest { nombres ->
+                    repositorio.canalesDeListaActiva().collectLatest { nombres ->
                         _estado.value = _estado.value.copy(canales = nombres.mapNotNull { it })
                     }
                 }

@@ -20,6 +20,9 @@ interface CanalDao {
     @Query("SELECT COUNT(*) FROM Canal")
     suspend fun contar(): Int
 
+    @Query("SELECT COUNT(*) FROM Canal WHERE fuenteId = :fuenteId")
+    suspend fun contarPorFuente(fuenteId: Long): Int
+
     @Query(
         """
         SELECT c.* FROM Canal c

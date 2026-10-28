@@ -26,4 +26,22 @@ interface AparienciaDao {
         """,
     )
     fun nombresDeLista(listaId: Long): Flow<List<String?>>
+
+    /**
+     * Catálogo de la Lista activa más reciente.
+     *
+     * Resuelve la Lista en SQL, no en memoria: tras recrear el proceso no hay
+     * ningún `listaId` que recordar y el catálogo debe cargarse igual.
+     */
+    @Query(
+        """
+        SELECT c.nombre FROM Apariencia a
+        INNER JOIN Canal c ON c.id = a.canalId
+        WHERE a.listaId = (
+            SELECT id FROM Lista WHERE estado = 'activa' ORDER BY id DESC LIMIT 1
+        )
+        ORDER BY a.orden, a.id
+        """,
+    )
+    fun nombresDeListaActiva(): Flow<List<String?>>
 }

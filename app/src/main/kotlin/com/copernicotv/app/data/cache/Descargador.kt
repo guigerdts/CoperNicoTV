@@ -38,9 +38,13 @@ fun interface Descargador {
  * Descargador HTTP de producción.
  *
  * Usa `HttpURLConnection` como el resto de la importación de E2 y traduce los
- * fallos a los mismos códigos tipados: `sin_conexion`, `timeout`, `http_4xx` y
- * `http_5xx`. La URL solo se usa para abrir la conexión: no se registra ni se
- * incluye en el código devuelto, porque puede contener credenciales (DC-04).
+ * fallos a los mismos códigos tipados: `sin_conexion`, `timeout`, `http_4xx`,
+ * `http_5xx` y `esquema_no_admitido`. La URL solo se usa para abrir la
+ * conexión: no se registra ni se incluye en el código devuelto, porque puede
+ * contener credenciales (DC-04).
+ *
+ * Solo se admiten `http` y `https`: la caché nunca toca archivos SAF locales,
+ * imágenes/logos ni streams (S51c).
  */
 class DescargadorHttp(
     private val timeoutConexionMs: Int = TIMEOUT_CONEXION_MS,
@@ -51,27 +55,37 @@ class DescargadorHttp(
         destino: File,
     ): ResultadoDescarga =
         withContext(Dispatchers.IO) {
-            val conexion =
-                URL(url).openConnection() as? HttpURLConnection
-                    ?: return@withContext ResultadoDescarga.Fallo(ERROR_SIN_CONEXION)
-            conexion.connectTimeout = timeoutConexionMs
-            conexion.readTimeout = timeoutLecturaMs
-            conexion.requestMethod = "GET"
+            if (!esquemaAdmitido(url)) return@withContext ResultadoDescarga.Fallo(ERROR_ESQUEMA)
             try {
-                when (conexion.responseCode) {
-                    in 200..299 -> copiar(conexion, destino)
-                    in 400..499 -> ResultadoDescarga.Fallo(ERROR_HTTP_4XX)
-                    in 500..599 -> ResultadoDescarga.Fallo(ERROR_HTTP_5XX)
-                    else -> ResultadoDescarga.Fallo(ERROR_SIN_CONEXION)
-                }
+                conectar(url, destino)
             } catch (_: SocketTimeoutException) {
                 ResultadoDescarga.Fallo(ERROR_TIMEOUT)
             } catch (_: IOException) {
                 ResultadoDescarga.Fallo(ERROR_SIN_CONEXION)
-            } finally {
-                conexion.disconnect()
             }
         }
+
+    private fun conectar(
+        url: String,
+        destino: File,
+    ): ResultadoDescarga {
+        val conexion =
+            URL(url).openConnection() as? HttpURLConnection
+                ?: return ResultadoDescarga.Fallo(ERROR_SIN_CONEXION)
+        try {
+            conexion.connectTimeout = timeoutConexionMs
+            conexion.readTimeout = timeoutLecturaMs
+            conexion.requestMethod = "GET"
+            return when (conexion.responseCode) {
+                in 200..299 -> copiar(conexion, destino)
+                in 400..499 -> ResultadoDescarga.Fallo(ERROR_HTTP_4XX)
+                in 500..599 -> ResultadoDescarga.Fallo(ERROR_HTTP_5XX)
+                else -> ResultadoDescarga.Fallo(ERROR_SIN_CONEXION)
+            }
+        } finally {
+            conexion.disconnect()
+        }
+    }
 
     private fun copiar(
         conexion: HttpURLConnection,
@@ -101,6 +115,9 @@ class DescargadorHttp(
         return escritos
     }
 
+    private fun esquemaAdmitido(url: String): Boolean =
+        url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)
+
     private companion object {
         const val TIMEOUT_CONEXION_MS = 15_000
         const val TIMEOUT_LECTURA_MS = 30_000
@@ -110,5 +127,6 @@ class DescargadorHttp(
         const val ERROR_TIMEOUT = "timeout"
         const val ERROR_HTTP_4XX = "http_4xx"
         const val ERROR_HTTP_5XX = "http_5xx"
+        const val ERROR_ESQUEMA = "esquema_no_admitido"
     }
 }

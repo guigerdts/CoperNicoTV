@@ -391,7 +391,7 @@ class RepositorioCacheTest {
     private fun claveM3U(
         listaId: Long,
         urlHmac: String = HMAC_VIGENTE,
-    ): ClaveCache.M3U = ClaveCache.M3U(fuenteId = 1, listaId = listaId, urlHmac = urlHmac)
+    ): ClaveCache.M3U = ClaveCache.M3U(fuenteId = FUENTE_ID, listaId = listaId, urlHmac = urlHmac)
 
     private suspend fun insertarLista(listaId: Long) {
         if (db.fuenteDao().porId(FUENTE_ID) == null) {

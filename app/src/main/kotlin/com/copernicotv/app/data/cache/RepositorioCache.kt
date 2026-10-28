@@ -250,6 +250,7 @@ class RepositorioCache(
         almacenadas: List<EntradaAlmacenada>,
     ): ResultadoActualizacion {
         evictar(evictar, almacenadas)
+        val anterior = almacenadas.firstOrNull { it.entrada.clave == clave }?.archivoRef
         val nombre = almacen.nombreNuevo()
         return try {
             almacen.escribir(nombre, temporal, clave.tipo)
@@ -266,11 +267,23 @@ class RepositorioCache(
                     archivoRef = nombre,
                 ),
             )
+            retirarAnterior(anterior, nombre)
             ResultadoActualizacion.Reemplazada(ahora, expiresAt, tamano)
         } catch (_: IOException) {
             Log.w(TAG, "no se pudo escribir la copia de caché")
             almacen.borrar(nombre)
             ResultadoActualizacion.Fallo(ERROR_ESCRITURA, existeCopia(clave))
+        }
+    }
+
+    /** Retira el contenido reemplazado; si falla, queda huérfano para el barrido. */
+    private fun retirarAnterior(
+        anterior: String?,
+        nuevo: String,
+    ) {
+        if (anterior == null || anterior == nuevo) return
+        if (!almacen.borrar(anterior)) {
+            Log.w(TAG, "no se pudo borrar el archivo reemplazado $anterior")
         }
     }
 

@@ -50,6 +50,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: ktlint y detekt
         run: ./gradlew ktlintCheck detekt --stacktrace
+      - name: Pruebas de los scripts Unicode
+        run: python3 -m unittest discover -s tools/unicode -p "test_*.py" -v
 
   apk:
     name: apk

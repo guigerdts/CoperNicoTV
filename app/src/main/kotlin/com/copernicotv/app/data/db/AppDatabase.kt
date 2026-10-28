@@ -7,6 +7,7 @@ import com.copernicotv.app.data.db.dao.AparienciaDao
 import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
+import com.copernicotv.app.data.db.dao.EstadoActualizacionDao
 import com.copernicotv.app.data.db.dao.FuenteDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
@@ -79,6 +80,8 @@ import com.copernicotv.app.data.db.entities.ProgramaEntity
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun estadoActualizacionDao(): EstadoActualizacionDao
+
     abstract fun fuenteDao(): FuenteDao
 
     abstract fun listaDao(): ListaDao

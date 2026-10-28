@@ -8,6 +8,7 @@ import com.copernicotv.app.data.db.entities.ColeccionEntity
 import com.copernicotv.app.data.db.entities.HistorialEntity
 import com.copernicotv.app.data.db.entities.PerfilEntity
 import com.copernicotv.app.data.db.entities.PerfilListaEntity
+import java.time.Instant
 
 @Dao
 interface HistorialDao {
@@ -31,6 +32,23 @@ interface PerfilDao {
 
     @Query("SELECT * FROM Perfil WHERE nombreNormalizado = :normalizado")
     suspend fun porNombreNormalizado(normalizado: String): PerfilEntity?
+
+    @Query("SELECT * FROM Perfil WHERE id = :id")
+    suspend fun porId(id: Long): PerfilEntity?
+
+    @Query(
+        "UPDATE Perfil SET nombre = :nombre, nombreNormalizado = :normalizado, " +
+            "actualizadoEn = :actualizadoEn WHERE id = :id",
+    )
+    suspend fun actualizarNombre(
+        id: Long,
+        nombre: String,
+        normalizado: String,
+        actualizadoEn: Instant,
+    ): Int
+
+    @Query("SELECT COUNT(*) FROM Perfil")
+    suspend fun contar(): Int
 
     @Insert
     suspend fun asociarLista(fila: PerfilListaEntity)

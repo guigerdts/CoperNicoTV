@@ -16,6 +16,8 @@ import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.ListaDao
 import com.copernicotv.app.data.db.dao.PerfilDao
+import com.copernicotv.core.identity.CaseFolder
+import com.copernicotv.core.identity.CaseFolderCompleto
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -61,6 +63,11 @@ object AppModule {
 
     @Provides
     fun perfilDao(db: AppDatabase): PerfilDao = db.perfilDao()
+
+    /** Case folding completo conforme a Unicode 15.1.0 para la identidad. */
+    @Provides
+    @Singleton
+    fun caseFolder(): CaseFolder = CaseFolderCompleto
 
     @Provides
     fun coleccionCanalDao(db: AppDatabase): ColeccionCanalDao = db.coleccionCanalDao()

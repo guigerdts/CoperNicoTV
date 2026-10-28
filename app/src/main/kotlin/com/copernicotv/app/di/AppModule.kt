@@ -81,7 +81,7 @@ object AppModule {
  * Siembra la fila singleton de `EstadoIndiceHmac` (`id = 1`) al crear la base.
  *
  * El índice HMAC se declara operativo con la generación `v1` y sin filas
- * pendientes; E4 es dueño de la reconstrucción y de sus transiciones.
+ * pendientes; E2-T6 es dueño de la reconstrucción y de sus transiciones.
  */
 private object SembrarEstadoIndiceHmac : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {

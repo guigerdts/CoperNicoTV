@@ -1,8 +1,10 @@
 package com.copernicotv.app.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copernicotv.app.data.CatalogoRepositorio
+import com.copernicotv.app.diagnostico.detalleTecnico
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -48,7 +50,12 @@ class CatalogoViewModel
             viewModelScope.launch {
                 val resumen =
                     runCatching { repositorio.importarFixture() }
-                        .getOrElse {
+                        .getOrElse { fallo ->
+                            // El código de UI no distingue causas a propósito: es
+                            // texto seguro y estable. El detalle técnico va al log
+                            // sin mensajes de excepción, para no filtrar la URL de
+                            // la Lista ni credenciales (S57a).
+                            Log.e(TAG, "Importación del fixture fallida\n${detalleTecnico(fallo)}")
                             _estado.value =
                                 _estado.value.copy(
                                     importando = false,
@@ -83,5 +90,6 @@ class CatalogoViewModel
         private companion object {
             const val CODIGO_FALLO = "importacion_fallida"
             const val CODIGO_SIN_LISTA = "importacion_sin_lista"
+            const val TAG = "CatalogoViewModel"
         }
     }

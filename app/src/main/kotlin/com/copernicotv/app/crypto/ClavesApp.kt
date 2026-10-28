@@ -2,7 +2,11 @@ package com.copernicotv.app.crypto
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.util.Log
+import com.copernicotv.core.crypto.CifradoAes
+import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.security.ProviderException
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.inject.Inject
@@ -42,17 +46,57 @@ interface ClavesApp {
 @Singleton
 @Suppress("ktlint:standard:annotation")
 class ClavesKeystore @Inject constructor() : ClavesApp {
-    override val claveAes: SecretKey
-        get() = clave(ALIAS_AES) { generadorAes(it) }
+    override val claveAes: SecretKey by lazy { cargarAes() }
 
-    override val claveHmac: SecretKey
-        get() = clave(ALIAS_HMAC) { generadorHmac(it) }
+    override val claveHmac: SecretKey by lazy { clave(ALIAS_HMAC) { generadorHmac(it) } }
+
+    /**
+     * Devuelve la clave AES vigente y la regenera si la existente no puede
+     * producir el sobre de [CifradoAes].
+     *
+     * Una clave generada antes de `setRandomizedEncryptionRequired(false)`
+     * nace con esa protección activada y Keystore rechaza cualquier IV del
+     * llamador. El parámetro se fija al generar la clave: cambiar el
+     * `KeyGenParameterSpec` no migra una clave ya existente. Sin esta
+     * comprobación, un dispositivo que conserva la clave de una instalación
+     * anterior falla en cada importación aunque el código ya esté corregido, y
+     * el mensaje de la app solo dice `importacion_fallida`.
+     *
+     * Borrar la clave incompatible no destruye datos: todo cifrado de la
+     * aplicación pasa por [CifradoAes], que siempre aporta su propio IV, así
+     * que esa clave nunca pudo cifrar nada que la app pueda necesitar. Si en el
+     * futuro un llamador deja que Keystore genere el IV, esta regeneración deja
+     * de ser segura y debe revisarse.
+     */
+    private fun cargarAes(): SecretKey {
+        val almacen = almacen()
+        val existente = almacen.getEntry(ALIAS_AES, null) as? KeyStore.SecretKeyEntry
+        if (existente != null) {
+            if (admiteSobrePropio(existente.secretKey)) return existente.secretKey
+            Log.w(TAG, "Clave AES $ALIAS_AES incompatible con el IV del llamador; se regenera")
+            almacen.deleteEntry(ALIAS_AES)
+        }
+        return generadorAes(ALIAS_AES)
+    }
+
+    /** Comprueba el contrato real de la app: cifrar con IV propio, sin guardar nada. */
+    private fun admiteSobrePropio(clave: SecretKey): Boolean =
+        try {
+            CifradoAes.cifrar(clave, AAD_SONDA, SONDA)
+            true
+        } catch (_: GeneralSecurityException) {
+            false
+        } catch (_: ProviderException) {
+            false
+        }
+
+    private fun almacen(): KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
     private fun clave(
         alias: String,
         generar: (String) -> SecretKey,
     ): SecretKey {
-        val almacen = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        val almacen = almacen()
         val existente = almacen.getEntry(alias, null) as? KeyStore.SecretKeyEntry
         return existente?.secretKey ?: generar(alias)
     }
@@ -89,5 +133,8 @@ class ClavesKeystore @Inject constructor() : ClavesApp {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val ALIAS_AES = "copernicotv.aes.v1"
         const val ALIAS_HMAC = "copernicotv.hmac.v1"
+        const val TAG = "ClavesKeystore"
+        const val AAD_SONDA = "ClavesKeystore.sonda"
+        val SONDA = byteArrayOf(0)
     }
 }

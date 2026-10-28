@@ -99,7 +99,7 @@ jobs:
           disable-animations: true
           script: >-
             ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.ClavesKeystoreTest
       - name: Publicar reportes instrumentados
         if: always()
         uses: actions/upload-artifact@v4

@@ -32,7 +32,7 @@ import java.time.Instant
 class CanalEscritorTest {
     private lateinit var db: AppDatabase
     private lateinit var escritor: CanalEscritor
-    private lateinit var fuenteId: Long
+    private var fuenteId: Long = 0
 
     private val ahora: Instant = Instant.parse("2026-01-01T00:00:00Z")
     private val canonica: String = "canon:v2:" + "a".repeat(64)

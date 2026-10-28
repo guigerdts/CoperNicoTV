@@ -209,13 +209,13 @@ class PerfilRepositorioTest {
             val segundo = repositorio.crear("Trabajo", ahora)
             val tercero = repositorio.crear("trabajo", ahora)
 
-            assertTrue(primero is ResultadoAltaPerfil.Creado)
             assertTrue(segundo is ResultadoAltaPerfil.Conflicto)
             assertTrue(tercero is ResultadoAltaPerfil.Conflicto)
+            val creado = primero as ResultadoAltaPerfil.Creado
             assertEquals("trabajo", (segundo as ResultadoAltaPerfil.Conflicto).normalizado)
             assertEquals("trabajo", (tercero as ResultadoAltaPerfil.Conflicto).normalizado)
             assertEquals(1, db.perfilDao().contar())
-            assertEquals("TRABAJO", db.perfilDao().porId(primero.perfil.id)?.nombre)
+            assertEquals("TRABAJO", db.perfilDao().porId(creado.perfil.id)?.nombre)
         }
     }
 
@@ -241,11 +241,13 @@ class PerfilRepositorioTest {
         assertEquals(1, conflictos.size)
         assertEquals("nombre_perfil_duplicado", conflictos.single().codigo)
         assertEquals(creados.single().perfil.id, conflictos.single().existente.id)
-        assertEquals(1, db.perfilDao().contar())
-        val persistido = db.perfilDao().porId(creados.single().perfil.id)
-        assertNotNull(persistido)
-        assertEquals("Trabajo", persistido?.nombre)
-        assertEquals("trabajo", persistido?.nombreNormalizado)
+        runBlocking {
+            assertEquals(1, db.perfilDao().contar())
+            val persistido = db.perfilDao().porId(creados.single().perfil.id)
+            assertNotNull(persistido)
+            assertEquals("Trabajo", persistido?.nombre)
+            assertEquals("trabajo", persistido?.nombreNormalizado)
+        }
     }
 
     @Test
@@ -270,7 +272,7 @@ class PerfilRepositorioTest {
 
         assertEquals(1, resultados.count { it.isSuccess })
         assertEquals(1, resultados.count { it.exceptionOrNull() is SQLiteConstraintException })
-        assertEquals(1, db.perfilDao().contar())
+        runBlocking { assertEquals(1, db.perfilDao().contar()) }
     }
 
     private fun entidad(

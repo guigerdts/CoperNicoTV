@@ -6,8 +6,14 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesKeystore
+import com.copernicotv.app.data.cache.AlmacenCache
+import com.copernicotv.app.data.cache.Descargador
+import com.copernicotv.app.data.cache.DescargadorHttp
+import com.copernicotv.app.data.cache.RepositorioCache
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.dao.AparienciaDao
+import com.copernicotv.app.data.db.dao.CacheM3UDao
+import com.copernicotv.app.data.db.dao.CacheXmltvDao
 import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
@@ -26,6 +32,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.File
 import java.time.Instant
 import javax.inject.Singleton
 
@@ -33,6 +40,8 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    private const val DIRECTORIO_CACHE = "cache-transporte"
+
     @Provides
     @Singleton
     fun baseDeDatos(
@@ -75,6 +84,32 @@ object AppModule {
 
     @Provides
     fun reconstruccionHmacDao(db: AppDatabase): ReconstruccionHmacDao = db.reconstruccionHmacDao()
+
+    @Provides
+    fun cacheM3UDao(db: AppDatabase): CacheM3UDao = db.cacheM3UDao()
+
+    @Provides
+    fun cacheXmltvDao(db: AppDatabase): CacheXmltvDao = db.cacheXmltvDao()
+
+    @Provides
+    @Singleton
+    fun almacenCache(
+        @ApplicationContext contexto: Context,
+        claves: ClavesApp,
+    ): AlmacenCache = AlmacenCache(File(contexto.filesDir, DIRECTORIO_CACHE), claves)
+
+    @Provides
+    @Singleton
+    fun descargadorHttp(): Descargador = DescargadorHttp()
+
+    @Provides
+    @Singleton
+    fun repositorioCache(
+        db: AppDatabase,
+        almacen: AlmacenCache,
+        descargador: Descargador,
+        claves: ClavesApp,
+    ): RepositorioCache = RepositorioCache(db, almacen, descargador, claves)
 
     /** Case folding completo conforme a Unicode 15.1.0 para la identidad. */
     @Provides

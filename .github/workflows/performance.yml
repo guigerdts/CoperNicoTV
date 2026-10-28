@@ -1,0 +1,36 @@
+name: Performance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  p1:
+    name: p1-parseo-10k
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Medicion P1 de parseo
+        run: ./gradlew :core:p1Performance -Pp1.commit="$GITHUB_SHA" --stacktrace
+      - name: Publicar evidencia P1
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-medicion
+          path: core/build/p1/
+          if-no-files-found: ignore
+      - name: Resumen de la medicion
+        if: always()
+        run: cat core/build/p1/medicion.json || true

@@ -37,10 +37,10 @@ import kotlin.math.max
  * parseo y se registra el máximo; la memoria nativa se informa aparte y no se
  * usa para el límite.
  *
- * La evidencia se escribe en el almacenamiento externo de la app para que el
- * workflow la extraiga con `adb pull` aunque el test falle. Un fixture alterado,
- * una API distinta de 34, menos de 20 mediciones o un límite excedido hacen
- * fallar el test: no se publica una corrida parcial como válida.
+ * La evidencia se escribe en `additionalTestOutputDir`, que UTP copia al host
+ * antes de desinstalar la app. Un fixture alterado, una API distinta de 34,
+ * menos de 20 mediciones o un límite excedido hacen fallar el test: no se
+ * publica una corrida parcial como válida.
  */
 @RunWith(AndroidJUnit4::class)
 class MedicionP1AndroidTest {
@@ -153,14 +153,28 @@ class MedicionP1AndroidTest {
         picoHeapMiB: Double,
         cumple: Boolean,
     ) {
-        val contexto = InstrumentationRegistry.getInstrumentation().targetContext
-        val raiz =
-            contexto.getExternalFilesDir(DIRECTORIO_EVIDENCIA)
-                ?: error("El almacenamiento externo de la app no está disponible")
+        val raiz = directorioEvidencia()
         raiz.mkdirs()
         File(raiz, "mediciones.csv").writeText(csv(tiempos, "medicion,ms"))
         File(raiz, "mediciones-heap.csv").writeText(csv(picosHeap, "medicion,heapMiB"))
         File(raiz, "medicion.json").writeText(json(mediana, p95, maximo, picoHeapMiB, cumple))
+    }
+
+    /**
+     * UTP copia `additionalTestOutputDir` al host antes de desinstalar la app.
+     * Escribir en `getExternalFilesDir` pierde la evidencia porque la
+     * desinstalación borra el directorio externo de la app. Si el argumento no
+     * existe (ejecución local fuera de UTP), se usa el almacenamiento externo.
+     */
+    private fun directorioEvidencia(): File {
+        val rutaAdicional =
+            InstrumentationRegistry.getArguments().getString(ARGUMENTO_SALIDA_ADICIONAL)
+        if (!rutaAdicional.isNullOrBlank()) {
+            return File(rutaAdicional)
+        }
+        val contexto = InstrumentationRegistry.getInstrumentation().targetContext
+        return contexto.getExternalFilesDir(DIRECTORIO_EVIDENCIA)
+            ?: error("El almacenamiento externo de la app no está disponible")
     }
 
     private fun csv(
@@ -252,6 +266,7 @@ class MedicionP1AndroidTest {
         const val LIMITE_HEAP_MIB = 384.0
         const val API_ESPERADA = 34
         const val DIRECTORIO_EVIDENCIA = "p1"
+        const val ARGUMENTO_SALIDA_ADICIONAL = "additionalTestOutputDir"
         const val DESCONOCIDO = "desconocido"
     }
 }

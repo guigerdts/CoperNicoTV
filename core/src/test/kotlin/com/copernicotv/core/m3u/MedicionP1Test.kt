@@ -87,6 +87,11 @@ class MedicionP1Test {
     @Suppress("ExplicitGarbageCollectionCall")
     private fun medirPicoHeap(bytes: ByteArray): Double {
         val runtime = Runtime.getRuntime()
+        // El GC va antes de arrancar el muestreador: si el muestreador arranca
+        // primero, su primera muestra puede capturar basura de los
+        // calentamientos y registrar un pico que no pertenece al parseo medido.
+        // Se observó 228.520 MiB frente a ~30 MiB estables con el mismo código.
+        System.gc()
         val pico = AtomicLong(0)
         val alcance = CoroutineScope(Dispatchers.Default)
         val muestreador =
@@ -97,7 +102,6 @@ class MedicionP1Test {
                 }
             }
         try {
-            System.gc()
             repeat(MEDICIONES_HEAP) { parsear(bytes) }
             return pico.get() / (1024.0 * 1024.0)
         } finally {

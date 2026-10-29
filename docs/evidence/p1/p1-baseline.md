@@ -59,14 +59,26 @@ Se toma el peor valor de las tres corridas, no el promedio:
 
 ## Revisión humana
 
-**Pendiente.** DC-10 exige revisión humana del baseline antes de usarlo como
-referencia de regresión. Este archivo registra las tres corridas verdes y los
-valores observados; no afirma que la revisión esté hecha. Los datos y los puntos
-de decisión del propietario están en
-`docs/evidence/p1/revision-humana-pendiente.md`.
+**Aprobada el 2026-10-29 por el propietario del producto.** La aprobación
+explícita de las cinco decisiones de
+`docs/evidence/p1/revision-humana-pendiente.md` satisface la revisión humana que
+DC-10 §5 exige para versionar el baseline. Quedan aprobados:
+
+1. el baseline y su referencia: p95 **15.067 ms** y pico **45.827 MiB**;
+2. el criterio de referencia: peor valor de las tres corridas, no promedio ni
+   mediana;
+3. la validez de tres corridas verdes sobre el mismo commit `b186c3a`;
+4. el descarte de `40711018242`, `40857174822`, `40861342045` y `40870356075`;
+5. la regresión no evaluada hasta la primera medición posterior.
+
+La aprobación no incluye una medición de regresión posterior ni una medición P1
+en Android. El baseline rige para las mediciones JVM posteriores; la primera
+medición comparable se contrasta contra 18.080 ms de p95 y 52.701 MiB de pico.
 
 ## Alcance
 
-Cubre el parseo M3U y su pico de heap. **No** cubre las métricas de búsqueda
-(150 ms) ni de página 2 (80 ms): dependen de la consulta de E3, que todavía no
-existe, y quedan asignadas a esa etapa.
+Cubre el parseo M3U y su pico de heap en JVM. **No** cubre las métricas de
+búsqueda (150 ms) ni de página 2 (80 ms): dependen de la consulta de E3, que
+todavía no existe, y quedan asignadas a esa etapa. **No** cubre la medición P1
+en Android (≤2500 ms de parseo, heap Java ≤384 MiB, 5+20 mediciones): no se
+ejecutó.

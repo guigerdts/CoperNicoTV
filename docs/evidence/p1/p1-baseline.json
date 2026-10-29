@@ -72,8 +72,19 @@
     "regresionMemoriaMiB": 52.701
   },
   "revisionHumana": {
-    "estado": "pendiente",
-    "detalle": "DC-10 exige revisión humana del baseline antes de usarlo como referencia de regresión. El archivo registra las tres corridas verdes; la revisión es una acción del propietario y no se declara hecha. Puntos de decisión en docs/evidence/p1/revision-humana-pendiente.md."
+    "estado": "aprobado",
+    "fecha": "2026-10-29",
+    "aprobadoPor": "propietario del producto",
+    "decisiones": [
+      "Baseline y referencia aprobados: p95 15.067 ms y pico 45.827 MiB.",
+      "Criterio de referencia: peor valor de las tres corridas, no promedio ni mediana.",
+      "Validez: las tres corridas verdes sobre el mismo commit b186c3a cuentan como tres corridas verdes consecutivas.",
+      "Descarte confirmado de 40711018242, 40857174822, 40861342045 y 40870356075 por los motivos registrados.",
+      "La regresión no se evalúa hasta la primera medición posterior a la aprobación."
+    ],
+    "detalle": "El propietario aprobó expresamente las cinco decisiones de docs/evidence/p1/revision-humana-pendiente.md el 2026-10-29, lo que satisface la revisión humana de DC-10 §5 para versionar este baseline. La aprobación cubre la medición JVM registrada; no incluye una medición P1 en Android ni una medición de regresión posterior.",
+    "regresionEvaluada": false,
+    "medicionAndroid": "no ejecutada"
   },
   "descartadas": [
     {

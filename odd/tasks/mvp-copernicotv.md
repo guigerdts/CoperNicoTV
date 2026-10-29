@@ -44,7 +44,7 @@ Una función no se declara validada si alguna de sus verificaciones requeridas e
 - `S14 (alcance)`: **aprobada la cobertura de `README.md:38`/`:84`** como combinación de modos A/B/C y sus direcciones, orden manual de Apariencias, orden independiente de Colecciones y preferencias de ordenación por Lista persistidas entre reinicios. No se agregan funciones implícitas de presentación u organización sin requisito concreto aprobado. Es una decisión de alcance; implementación y validación pendientes. S14 y E3 no se cierran hasta implementar y validar las reglas aprobadas de comparación, Canales sin nombre y Canales sin grupo.
 - `S14 (reglas)`: **aprobadas** las tres reglas: (1) comparación sin distinguir mayúsculas/minúsculas, con reglas de español; los acentos desempatan y la clave final es determinista; (2) Canales sin nombre se conservan, se muestran como «Sin nombre» y van al final con desempate determinista, sin rechazar la entrada ni usar el nombre mostrado como identidad; (3) en Modo B, sección visual «Sin grupo» al final, ordenada por nombre, sin crear un Grupo ficticio en Room. La comparación técnica reproducible se detalla en §2.1. Implementación y validación pendientes.
 - `Q3–Q4`: **aprobadas como especificación inicial** (ver L23): límites del parser M3U (64 KiB por línea física; 64 atributos por entrada; sin límite de entrada ni de documento en el parser) y retención de EPG (1 día de pasado + 7 días de futuro; 500 programas por `(fuente_guia_id, channel_id_texto)`; 200 MB por FuenteGuia como tamaño lógico serializado de los `Programa` retenidos). Son valores normativos iniciales, no implementados ni validados experimentalmente; la calibración con datos reales sigue pendiente. El presupuesto de la caché XMLTV se fija en DC-09 (256 MiB totales, 96 MiB por `FuenteGuia` y archivo), no es una medición.
-- `P1–P2`: **P1 aprobada como política híbrida** con límites absolutos y procedimiento p95 fijados en **DC-10** (JVM: 1200 ms/150 ms/80 ms/256 MiB; Android: 2500 ms/300 ms/150 ms/384 MiB; regresión p95 ≤ ×1.20 tiempo y ×1.15 memoria; 10+30 mediciones JVM y 5+20 Android; baseline tras 3 corridas verdes). **P2 aprobada como política híbrida para Android TV** con umbrales y procedimiento fijados en **DC-11** (cuerpo ≥18 sp, título ≥24 sp, encabezado ≥32 sp, metadatos ≥16 sp; foco ≥56×56 dp, indicador ≥2 dp y contraste 3:1, separación ≥8 dp; táctil ≥48×48 dp; escala 1.0–2.0; revisión humana a 1080p/320 dpi, 10 pies/3 m y sala tenue). Los umbrales son criterios de aceptación, **no mediciones ejecutadas**; la calibración, el baseline y la firma humana siguen pendientes. No se usa ningún número no aprobado como criterio de cierre.
+- `P1–P2`: **P1 aprobada como política híbrida** con límites absolutos y procedimiento p95 fijados en **DC-10** (JVM: 1200 ms/150 ms/80 ms/256 MiB; Android: 2500 ms/300 ms/150 ms/384 MiB; regresión p95 ≤ ×1.20 tiempo y ×1.15 memoria; 10+30 mediciones JVM y 5+20 Android; baseline tras 3 corridas verdes). **P2 aprobada como política híbrida para Android TV** con umbrales y procedimiento fijados en **DC-11** (cuerpo ≥18 sp, título ≥24 sp, encabezado ≥32 sp, metadatos ≥16 sp; foco ≥56×56 dp, indicador ≥2 dp y contraste 3:1, separación ≥8 dp; táctil ≥48×48 dp; escala 1.0–2.0; revisión humana a 1080p/320 dpi, 10 pies/3 m y sala tenue). Los umbrales son criterios de aceptación, **no mediciones ejecutadas**; el baseline P1 (JVM) quedó aprobado por el propietario el 2026-10-29 (L47), mientras que la medición P1 en Android y la firma humana de P2 siguen pendientes. No se usa ningún número no aprobado como criterio de cierre.
 - `H-01–H-11 (L28–L31)`: **H-01 y H-03–H-11 quedan resueltos documentalmente; H-02 queda resuelto en versión y política, con la estrategia de implementación pendiente de E1.** La fórmula, el orden y la serialización de H-02 están fijados; la versión normativa es Unicode 15.1.0 (DC-02). La forma de obtener esa versión en JVM y Android se verifica en E1; si exige una tabla o dependencia, se autoriza antes. H-04 se precisa en DC-04 y H-03 en DC-01/§6.3.2; L30 resuelve DP-01–DP-04 (clases HMAC, canonicalización RTSP/RTMP, URL original/canónica y errores tipados) sin reabrir H-01 ni H-05–H-11. L31 cierra el bloqueo residual de PD-4 con el sobre `hmac:vN:cvM:`, la asociación `canon:v2`↔`cv1` y la reconstrucción que conserva `cvM`. Lo pendiente es implementación, medición, verificación o esa estrategia, no una reapertura de H-01/H-03–H-11.
 - `K1–K15`: restricciones de stack del README y de los ADR.
 
@@ -171,7 +171,7 @@ Distinciones obligatorias:
 
 ## 3. Matriz de trazabilidad funcional (provisional)
 
-La etapa es **provisional por implementación y validación, no por decisiones abiertas de B1–B11**. Las decisiones D1(a), D2(a), D3, D4 y D5 (base) están aprobadas y sus detalles se resuelven en §6.2 (DC-01–DC-11); P1 y P2 tienen límites y procedimiento en DC-10/DC-11. Siguen pendientes la implementación/verificación de D2(a), D3, D4 y D5, la calibración y el baseline de P1, la revisión visual y firma de P2, la ejecución de E1-C y las definiciones funcionales marcadas como pendientes. Cada fila declara nivel, aserción observable y procedimiento reproducible. Las mediciones remiten a P1–P2. Ninguna fila dependiente de P1/P2 se declara completa hasta medir y registrar; ninguna fila cubierta por DC-01–DC-11 se considera bloqueada por una decisión abierta. Las rutas con `...`, `*` o `**` son **previstas**, no existentes; se verificarán al crear los archivos.
+La etapa es **provisional por implementación y validación, no por decisiones abiertas de B1–B11**. Las decisiones D1(a), D2(a), D3, D4 y D5 (base) están aprobadas y sus detalles se resuelven en §6.2 (DC-01–DC-11); P1 y P2 tienen límites y procedimiento en DC-10/DC-11. Siguen pendientes la implementación/verificación de D2(a), D3, D4 y D5, la medición P1 en Android (el baseline JVM quedó aprobado el 2026-10-29, L47), la revisión visual y firma de P2, la ejecución de E1-C y las definiciones funcionales marcadas como pendientes. Cada fila declara nivel, aserción observable y procedimiento reproducible. Las mediciones remiten a P1–P2. Ninguna fila dependiente de P1/P2 se declara completa hasta medir y registrar; ninguna fila cubierta por DC-01–DC-11 se considera bloqueada por una decisión abierta. Las rutas con `...`, `*` o `**` son **previstas**, no existentes; se verificarán al crear los archivos.
 
 | S# | Etapa | Nivel(es) | Aserción | Procedimiento |
 |---|---|---|---|---|
@@ -960,13 +960,13 @@ P1 y P2 están aprobadas como políticas; sus límites, procedimiento y criterio
 
 ### P1 — Rendimiento de listas y catálogo (P1 aprobada; límites y procedimiento en DC-10)
 
-- **Estado:** **P1 aprobada como política híbrida**; los límites absolutos, el criterio de regresión y el procedimiento p95 se fijan en **DC-10**. La calibración, el baseline y la validación requieren implementación y entorno estable; **no se declara rendimiento validado**.
+- **Estado:** **P1 aprobada como política híbrida**; los límites absolutos, el criterio de regresión y el procedimiento p95 se fijan en **DC-10**. La calibración JVM se ejecutó y su baseline quedó **aprobado por el propietario el 2026-10-29** (L47; `docs/evidence/p1/`). La medición P1 en Android no se ejecutó. **No se declara rendimiento validado** fuera del baseline JVM aprobado.
 - **Métricas:** (1) tiempo de parseo de 10 000 entradas; (2) primera página de búsqueda; (3) consulta paginada; (4) memoria máxima del proceso/heap.
 - **Límites absolutos (DC-10):** JVM 1200 ms / 150 ms / 80 ms / heap 256 MiB; Android 2500 ms / 300 ms / 150 ms / heap Java 384 MiB.
 - **Regresión (DC-10):** p95 de tiempo ≤ baseline ×1.20; p95 de memoria ≤ baseline ×1.15; además, límite absoluto. Baseline versionado solo tras 3 corridas verdes y revisión humana; nunca se actualiza para ocultar una regresión.
 - **Procedimiento (DC-10):** 10 calentamientos + 30 mediciones en JVM; 5 + 20 en Android; p95 nearest-rank; mediana/p95/máximo; fixture determinista `F-P1-10k.m3u` con SHA-256; se descarta una corrida solo por falla de entorno documentada.
 - **Evidencia:** comando, JDK/AGP, runner, fixture/hash, fecha, commit, salida cruda, baseline comparado y conclusión; `docs/evidence/p1/`. Job `performance` obligatorio para cerrar P1, no para cada PR.
-- **Límite:** S5, S9, S52, E2-T5 y E3-T1 no se declaran cerradas hasta ejecutar la medición, registrar el baseline y cumplir los límites. La aprobación de DC-10 no es una medición.
+- **Límite:** S5, S9, S52 y E3-T1 no se declaran cerradas hasta ejecutar la medición, registrar el baseline y cumplir los límites. E2-T5 cumple la medición JVM y el baseline aprobado; su cláusula P1 en Android sigue pendiente. La aprobación de DC-10 no es una medición.
 
 ### P2 — Legibilidad y navegación en TV (P2 aprobada; umbrales y procedimiento en DC-11)
 
@@ -1017,7 +1017,7 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 | E2-T2 | Alta de Fuente y Lista (archivo/URL) | URL http/https validada; archivo local vía SAF `content://` con permiso persistido; errores tipados; Estado de Actualización actualizado |
 | E2-T3 | Persistencia de catálogo, Grupo y Apariencia | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; Hilt usado para repositorios |
 | E2-T4 | Metadatos y logos | Logo, nombre y atributos disponibles persistidos; ausencia no rompe |
-| E2-T5 | Rendimiento y errores | 10 000 entradas con medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10 (JVM 1200/150/80 ms, 256 MiB; Android 2500/300/150 ms, 384 MiB; p95 y baseline); la medición no se ejecutó. Timeout y 4xx/5xx sin destruir catálogo previo. No se declara cerrada hasta medir, registrar baseline y cumplir los límites. |
+| E2-T5 | Rendimiento y errores | 10 000 entradas con medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10 (JVM 1200/150/80 ms, 256 MiB; Android 2500/300/150 ms, 384 MiB; p95 y baseline); la medición JVM se ejecutó y el baseline quedó aprobado el 2026-10-29 (L47); la medición P1 en Android no se ejecutó. Timeout y 4xx/5xx sin destruir catálogo previo. No se declara cerrada hasta medir, registrar baseline y cumplir los límites en el entorno que la cláusula exige. |
 | E2-T6 | Protección de credenciales en reposo | Cifrado de todas las columnas URL con claves protegidas mediante Android Keystore; prohibición de credenciales en logs, diagnóstico, errores y textos copiables; S57a/S57b; D5 base aprobada. Inventario, gestión de claves, backup/restauración y pruebas de recuperación: DC-04. Se distinguen AES y HMAC; se implementan `EstadoIndiceHmac` (`operativo`, `recuperacion_pendiente`, `recuperacion_en_curso`, `bloqueado_parcial`) y `HmacPendiente` con el sobre `hmac:vN:cvM:` y `version_origen` (`cvM` o `desconocida`); la pérdida de HMAC bloquea igualdad HMAC con `indice_hmac_no_operativo`, no compara generaciones ni `cvM` distintos, no fusiona ni borra automáticamente y exige reconstrucción coherente e idempotente antes de volver a `operativo`; un valor legacy sin `cvM` no se asume `cv1` y requiere reimportación o migración explícita. Se cifran todas las columnas URL por uniformidad, sin afirmar que todas sean credenciales. No se implementa cifrado de base completa. No se declara implementado ni probado |
 | E2-T7 | Caché local de descargas M3U/XMLTV | Solo descargas HTTP/HTTPS de M3U/XMLTV; no cachea archivos SAF locales, imágenes/logos ni streams. Estructura obligatoria del esquema v1 cuando se implemente E1; funcionalidad no implementada: metadatos en `CacheM3U` y `CacheXmltv` (Room, FK reales, unicidad por propietario y `url_hmac`) y contenido en archivos privados con nombres opacos o referencias relativas; nunca la URL como nombre de archivo. Campos: propietario, clave, tipo, `url_cifrada`/`url_hmac`, `fetched_at`, `expires_at`, estado de frescura y referencia al archivo. Clave M3U `(fuente_id, lista_id, "m3u", url_hmac)`; clave XMLTV `(fuente_guia_id, "xmltv", url_hmac)`. `expires_at` indica frescura y no inicia descargas por sí mismo; cambiar el intervalo no recalcula entradas existentes. Una copia M3U vencida puede servirse marcada `stale` con indicador visible; sin copia utilizable, error tipado. Actualización exitosa reemplaza y recalcula; fallo conserva la última copia válida y no se presenta como éxito. Invalidación por cambio de URL o eliminación de Lista/Fuente; barrido de huérfanos y errores de borrado registrados. La frescura de la caché se distingue del Estado de Actualización y de la Disponibilidad de Reproducción. XMLTV: copia de transporte, no fuente de verdad; la UI lee solo la generación publicada; una copia antigua solo alimenta una actualización explícita que pase por parseo, validación, retención y publicación atómica; una importación fallida o parcial no sustituye la generación publicada. Seguridad: DC-04; URLs, contenido, temporales, logs y errores pueden contener credenciales; cifrado AES-256-GCM, HMAC, claves de Keystore, backup y borrado definidos en DC-04. Reintentos de actualización: DC-07, no S20. Presupuesto: DC-09 (M3U 64 MiB total/16 MiB por Lista y archivo; XMLTV 256 MiB total/96 MiB por FuenteGuia y archivo; global 320 MiB; reserva 100 MiB); evicción primero inválidas/stale y luego `fetched_at` más antiguo. S51a–S51h; S51. Prueba con cliente HTTP contador y reloj de prueba; no se declara implementada ni validada |
 
@@ -1172,7 +1172,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E2-T7 (política de caché) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/cache/PoliticaCache.kt`, `core/src/test/kotlin/com/copernicotv/core/cache/PoliticaCacheTest.kt` | Commit `c26f811` | `./gradlew :core:test` | `:core` 228 pruebas verdes; 21 de caché | `40858929094` | Cubierta |
 | E2-T2/T4 (importador y atributos) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/m3u/{ImportadorM3U,CodecAtributosExtra}.kt` y pruebas | Commit `725e205` | `./gradlew :core:test` | `:core` 240 verdes; 12 nuevas | `40858929094` | Cubierta |
 | E2-T2/T3/T4 (importación en `:app`) | 2026-10-28 | `app/.../data/{CatalogoRepositorio,CanalEscritor}.kt`, `app/.../data/db/{AppDatabase,dao/EstadoActualizacionDao}.kt`, `app/src/test/.../ImportacionE2Test.kt` | Commit `f50810e` | `./gradlew :app:ktlintCheck :app:detekt`; CI | 10 casos de importación; `:app` 118 verdes en CI | `40858929094` | Cubierta |
-| E2-T5 (fixture y medición de 10 000) | 2026-10-28 | `core/src/test/resources/fixtures/F-P1-10k.m3u`, `tools/fixtures/generar_f_p1_10k.py`, `core/src/test/.../m3u/{FixtureP1,ParserM3U10kTest,MedicionP1Test}.kt`, `core/build.gradle.kts` | Commits `85b8796`, `6364e4f` | `./gradlew :core:p1Performance --offline` | Job `p1-performance`; p95 15.075 ms y 32.888 MiB en la primera corrida | `40711018242` | Parcial (revisión humana del baseline pendiente) |
+| E2-T5 (fixture y medición de 10 000) | 2026-10-28 | `core/src/test/resources/fixtures/F-P1-10k.m3u`, `tools/fixtures/generar_f_p1_10k.py`, `core/src/test/.../m3u/{FixtureP1,ParserM3U10kTest,MedicionP1Test}.kt`, `core/build.gradle.kts` | Commits `85b8796`, `6364e4f` | `./gradlew :core:p1Performance --offline` | Job `p1-performance`; p95 15.075 ms y 32.888 MiB en la primera corrida | `40711018242` | JVM: baseline aprobado el 2026-10-29 (L47); Android: no medido |
 | E2-T6 (estado y reconstrucción HMAC) | 2026-10-28 | `app/.../data/{IndiceHmacRepositorio,ReconstructorIndiceHmac}.kt`, `app/.../data/db/dao/{EstadoIndiceHmacDao,HmacPendienteDao,ReconstruccionHmacDao}.kt` y pruebas | Commits `09e04fd`, `c0b116c` | CI `jvm-tests` | 11 + 10 pruebas; CI `40715485318` verde 6/6 | `40715485318` | Cubierta |
 | E2-T7 (caché de transporte en `:app`) | 2026-10-28 | `app/.../data/cache/{CacheDao,AlmacenCache,Descargador,RepositorioCache}.kt`, `app/src/test/.../data/cache/*`, `AppModule.kt` | Commits `afc45a1`, `fe1cc19`, `68a36c5` | CI `jvm-tests` | 16 + 3 pruebas; tres correcciones hasta verde | `40854438558` | Cubierta |
 | E2-T6 (pruebas instrumentadas de DC-04) | 2026-10-29 | `app/src/androidTest/kotlin/com/copernicotv/app/CredencialesEnReposoTest.kt`, `.github/workflows/ci.yml` | Commit `993d3b4` | CI `instrumented-mobile` | 6/6 en emulador: ciphertext alterado, AAD cruzado, clave eliminada, backup, dump sin plaintext, logcat sin URL | `40854438558` | Cubierta |
@@ -1363,7 +1363,7 @@ reinicio se ejecuta en E4.
 
 DC-10 fija 1200 ms de parseo, 150 ms de búsqueda y 80 ms de página 2 en JVM. Las
 dos últimas miden la consulta de E3, que no existe todavía: no se miden ni se
-declaran cumplidas. La medición P1 cubre parseo y pico de heap.
+declaran cumplidas. La medición P1 cubre parseo y pico de heap en JVM.
 
 El baseline se apoya en tres corridas verdes consecutivas sobre `b186c3a`:
 `40877200854` (p95 10.334 ms, pico 44.836 MiB), `40878469399` (p95 10.421 ms,
@@ -1375,9 +1375,12 @@ con el mismo código. La corrección está en `b186c3a`. Se descartan
 `40711018242` (run cancelado globalmente por concurrencia), `40857174822` y
 `40861342045` (procedimiento anterior) y `40870356075` (pico contaminado). La
 regresión no se evalúa en esta primera calibración (DC-10 §5). La revisión
-humana que DC-10 exige para usar el baseline como referencia sigue **pendiente**;
-los datos y las decisiones del propietario están en
-`docs/evidence/p1/revision-humana-pendiente.md`.
+humana que DC-10 exige para versionar el baseline fue **aprobada por el
+propietario el 2026-10-29**: se aprobaron las cinco decisiones registradas en
+`docs/evidence/p1/revision-humana-pendiente.md` (peor valor, tres corridas sobre
+el mismo commit, descartes y regresión no evaluada). La aprobación cubre la
+medición JVM. La medición P1 en Android (≤2500 ms de parseo, heap Java ≤384 MiB,
+5+20 mediciones) no se ejecutó y no está incluida en esta aprobación.
 
 #### 10.9.3 E2-T7: frontera con E4
 
@@ -1397,16 +1400,24 @@ ejecutado dentro de la importación.
 | SAF | `OpenDocument` (`ACTION_OPEN_DOCUMENT`); grant persistible; comprobación en `persistedUriPermissions`; nombre visible con fallback; error de permiso conserva datos | `MainActivity`; `CatalogoRepositorio.importarDesdeSaf`; `NombreDocumentoTest` 5; `ImportacionSafTest` 2 en `instrumented-mobile` 15; prueba física del propietario 2026-10-29 | Aceptada por el propietario el 2026-10-29 con limitación; grant real no inspeccionado (§10.4) |
 | Persistencia e idempotencia | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; segunda importación no duplica ni borra | `CatalogoAmbitoTest` 2; `CatalogoPersistenciaTest` 5; `ImportacionE2Test` («repetir la importacion no duplica…»); `CatalogoRepositorioTest` | Aprobado en CI |
 | Caché | DC-09: presupuesto, temp+fsync+rename, invalidación, `stale`; no integrada en la primera importación | `PoliticaCacheTest` 21; `RepositorioCacheTest` 16; `DescargadorHttpTest` 3 | Aprobado como subsistema; integración E4 (§10.9.3) |
-| P1 | 10 000 entradas; p95 15.067 ms ≤ 1200 ms; pico 45.827 MiB ≤ 256 MiB; tres corridas verdes | `ParserM3U10kTest`; `MedicionP1Test`; runs `40877200854`, `40878469399`, `40879581126` | Aprobado técnicamente; revisión humana pendiente |
+| P1 | 10 000 entradas; p95 15.067 ms ≤ 1200 ms; pico 45.827 MiB ≤ 256 MiB; tres corridas verdes | `ParserM3U10kTest`; `MedicionP1Test`; runs `40877200854`, `40878469399`, `40879581126` | Aprobado en JVM; revisión humana aprobada el 2026-10-29 (L47); medición Android no ejecutada |
 | Migraciones y estático | Esquema v1 exportado; 26 tablas; índices y FK; ktlint y detekt | `EsquemaConformidadTest`; `EsquemaRoomTest`; `IntegridadRoomTest`; `MigracionAparienciaTest`; `static-analysis` en `40877127294` | Aprobado en CI |
 
 | Estado | Tareas |
 |---|---|
 | Aprobado con evidencia ejecutada | T1, T3, T4, T6, T7 |
 | Aceptada por el propietario con limitación | T2 (prueba SAF ejecutada el 2026-10-29; grant no inspeccionado directamente) |
-| Pendiente del propietario | T5 (revisión humana del baseline P1) |
+| Pendiente de medición | T5 (P1 en Android; la medición JVM y la revisión humana quedaron aprobadas el 2026-10-29) |
 | Bloqueado | Ninguno |
 | Hallazgo abierto fuera de E2 | Colisión por `Fuente.nombre` (severidad media; reconciliación por identidad en E4) |
+
+**Estado de E2: abierta.** T1, T3, T4, T6 y T7 están aprobadas con evidencia
+ejecutada; T2 está aceptada por el propietario con la limitación SAF registrada.
+T5 queda satisfecha en JVM —10 000 entradas medidas, límites absolutos cumplidos,
+baseline registrado y revisión humana aprobada el 2026-10-29—, pero el criterio de
+§8.2 enumera además los límites P1 en Android (≤2500 ms de parseo, heap Java
+≤384 MiB, 5+20 mediciones), que no se midieron. Esa cláusula es la única pendiente
+obligatoria identificada de E2; no se declara E2 cerrada.
 
 ## 11. Log
 
@@ -2036,23 +2047,74 @@ ejecutado dentro de la importación.
 - **Veredicto.** E2 no se declara cerrada. SAF ya está aceptado; el único
   pendiente obligatorio es la revisión humana del baseline P1.
 
+### L47 — E2: aprobación del baseline P1 y estado de cierre
+
+- **Autorización.** Continuación de E2 sobre `feat/e1-bootstrap`; registrar la
+  aprobación del propietario de las cinco decisiones P1 y contrastar el cierre de
+  E2. No se inicia E3, E4 ni E5; E3-U1 solo se documenta como siguiente
+  unidad.
+- **Aprobación P1 (2026-10-29).** El propietario aprobó expresamente: (1) baseline
+  y referencia p95 15.067 ms / pico 45.827 MiB; (2) peor valor de las tres
+  corridas, no promedio ni mediana; (3) validez de tres corridas verdes sobre el
+  mismo commit `b186c3a`; (4) descarte de `40711018242`, `40857174822`,
+  `40861342045` y `40870356075`; (5) regresión no evaluada hasta la primera
+  medición posterior. Registrada en `docs/evidence/p1/p1-baseline.json`
+  (`revisionHumana.estado = "aprobado"`), `p1-baseline.md` y
+  `revision-humana-pendiente.md`.
+- **Efecto contractual.** La aprobación satisface la revisión humana de DC-10 §5
+  para versionar el baseline. No es una medición de regresión: la primera
+  medición comparable posterior se contrasta contra 18.080 ms de p95 y 52.701 MiB
+  de pico.
+- **Alcance.** Cubre la medición JVM. No incluye la medición P1 en Android ni una
+  medición de regresión.
+- **Auditoría de cierre de E2.** T1, T3, T4, T6 y T7 tienen evidencia ejecutada;
+  T2 está aceptada por el propietario con la limitación SAF. T5 cumple en JVM:
+  10 000 entradas medidas, p95 15.067 ms ≤ 1200 ms, pico 45.827 MiB ≤ 256 MiB,
+  baseline versionado y revisión humana aprobada. E2-T5 enumera además los
+  límites P1 en Android (≤2500 ms de parseo, heap Java ≤384 MiB, 5+20 mediciones)
+  y esa medición no se ejecutó: es la única cláusula obligatoria pendiente.
+- **Veredicto.** E2 permanece **abierta** por la cláusula Android de E2-T5. No se
+  declara cerrada. La resolución requiere decisión del propietario: medir P1 en
+  Android o enmendar explícitamente el alcance de E2-T5.
+- **Frontera.** E3 no se inicia. La relectura tras reinicio y la reconciliación
+  por `Fuente.nombre` siguen en E4.
+- **Validación de esta entrada.** Solo documental: sin cambios de código, sin
+  Gradle. Se revisó el diff, se confirmó CRLF en este archivo y que
+  `docs/evidence/u0-manifest.md` no cambió. La CI de este commit documental se
+  verifica al publicarlo; no se declara verde antes de observar el run.
+
 ### Próximo paso
 
-E1 queda **cerrada** sobre `3140d34`. E2 queda **abierta** sobre `4b3692d`: T2
+E1 queda **cerrada** sobre `3140d34`. E2 queda **abierta** sobre `be324f5`: T2
 está **aceptada por el propietario el 2026-10-29 con limitación** (prueba SAF
 ejecutada; `persistedUriPermissions` no inspeccionado directamente, §10.4 y
-§10.9.1), T1, T3, T4, T6 y T7 están cubiertas, y el único pendiente obligatorio
-es la revisión humana del baseline P1 (E2-T5,
-`docs/evidence/p1/revision-humana-pendiente.md`), que DC-10 §5 exige para
-versionar el baseline. La relectura del documento tras reinicio y la
-reconciliación por `Fuente.nombre` se ejecutan en E4. El código de entrada SAF,
-la concurrencia de CI, el filtro instrumentado y la medición de heap están
-corregidos y verificados en CI (`40877127294`, `40877200854`, `40878469399`,
-`40879581126`); el commit `4b3692d` tiene el run `40882394994`, 5/5 verde con
-`p1-performance` omitido. U0 sigue aprobada documentalmente en L32 sobre
-`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L44, L45
-ni L46. DC-01–DC-11 y H-01–H-11 siguen normativos. Las métricas de búsqueda y
-página 2 pertenecen a E3, la integración de la caché y la relectura a E4 y la
-reproducción a E6; ninguna se adelanta sin autorización. Cualquier cambio
-posterior de requisitos o decisiones reabre la aprobación de U0 y exige una
-nueva entrada L#.
+§10.9.1); T1, T3, T4, T6 y T7 están cubiertas; T5 está **aprobada en JVM** con
+baseline versionado y revisión humana aprobada el 2026-10-29 (L47), pero la
+cláusula P1 en Android de E2-T5 (≤2500 ms de parseo, heap Java ≤384 MiB, 5+20
+mediciones) no se midió y es la única pendiente obligatoria. La relectura del
+documento tras reinicio y la reconciliación por `Fuente.nombre` se ejecutan en
+E4. El código de entrada SAF, la concurrencia de CI, el filtro instrumentado y
+la medición de heap están corregidos y verificados en CI (`40877127294`,
+`40877200854`, `40878469399`, `40879581126`); el commit `4b3692d` tiene el run
+`40882394994`, 5/5 verde con `p1-performance` omitido; el commit `be324f5` tiene
+el run `40906464669`, 5/5 verde con `p1-performance` omitido.
+
+**Siguiente unidad autorizada: E3-U1 (estado de usuario).** Cubre E3-T2
+(Favoritos), E3-T3 (Historial) y E3-T4 (Ocultaciones) sobre el esquema v1 ya
+exportado. Está **documentada y no iniciada**: depende del cierre de E2. Sus
+precondiciones son: E2 cerrada; baseline P1 aprobado y disponible; DAOs de
+`Favorito`, `Ocultacion` e `Historial` sobre las entidades existentes; pruebas
+JVM/Robolectric escritas antes de la UI; sin cambios de esquema que exijan
+migración post-v1. La secuencia propuesta para el resto de E3 es: U2 búsqueda y
+filtros (E3-T1, depende de U1 y de la medición P1 de búsqueda y página 2); U3
+catálogo móvil y reordenamiento (E3-T6, E3-T8); U4 ordenación A/B/C y DataStore
+(E3-T7); U5 colecciones (E3-T5); U6 perfiles (E3-T9); U7 cierre y evidencia. No
+se implementa ninguna.
+
+U0 sigue aprobada documentalmente en L32 sobre
+`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y
+L44–L47 solo actualizan estados con evidencia. DC-01–DC-11 y H-01–H-11 siguen
+normativos. Las métricas de búsqueda y página 2 pertenecen a E3, la integración
+de la caché y la relectura a E4 y la reproducción a E6; ninguna se adelanta sin
+autorización. Cualquier cambio posterior de requisitos o decisiones reabre la
+aprobación de U0 y exige una nueva entrada L#.

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.copernicotv.app.data.CatalogoRepositorio
+import com.copernicotv.app.data.ResumenImportacion
 import com.copernicotv.app.diagnostico.detalleTecnico
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -51,17 +52,35 @@ class CatalogoViewModel
         }
 
         fun importarFixture() {
+            importar { repositorio.importarFixture() }
+        }
+
+        /**
+         * Importa una Lista desde un documento SAF elegido por el usuario.
+         *
+         * La selección ocurre en la capa de UI con `ACTION_OPEN_DOCUMENT`, que
+         * es la única que produce un permiso persistible; aquí solo se resuelve
+         * el nombre de la Fuente y se delega en el repositorio.
+         */
+        fun importarDesdeSaf(uriTexto: String) {
+            importar {
+                val nombre = repositorio.nombreDeDocumento(uriTexto)
+                repositorio.importarDesdeSaf(nombre, uriTexto)
+            }
+        }
+
+        private fun importar(bloque: suspend () -> ResumenImportacion) {
             if (_estado.value.importando) return
             _estado.value = _estado.value.copy(importando = true, mensaje = null)
             viewModelScope.launch {
                 val resumen =
-                    runCatching { repositorio.importarFixture() }
+                    runCatching { bloque() }
                         .getOrElse { fallo ->
                             // El código de UI no distingue causas a propósito: es
                             // texto seguro y estable. El detalle técnico va al log
                             // sin mensajes de excepción, para no filtrar la URL de
                             // la Lista ni credenciales (S57a).
-                            Log.e(TAG, "Importación del fixture fallida\n${detalleTecnico(fallo)}")
+                            Log.e(TAG, "Importación fallida\n${detalleTecnico(fallo)}")
                             _estado.value =
                                 _estado.value.copy(
                                     importando = false,

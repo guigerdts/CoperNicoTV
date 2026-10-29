@@ -3,6 +3,7 @@ package com.copernicotv.app.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
@@ -196,6 +197,29 @@ class CatalogoRepositorio
                     return@withContext ResumenImportacion(null, 0, 0, ERROR_ARCHIVO_INACCESIBLE)
                 }
                 persistir(nombreFuente, uriTexto, canonica, importado)
+            }
+
+        /**
+         * Nombre de Fuente para un documento SAF.
+         *
+         * Usa el nombre visible que expone el proveedor de documentos, que es
+         * el que el usuario reconoce, y cae al último segmento de la URI o a un
+         * valor estable. Se resuelve fuera del hilo principal y nunca registra
+         * la URI: puede contener rutas del dispositivo.
+         */
+        suspend fun nombreDeDocumento(uriTexto: String): String =
+            withContext(io) {
+                val uri = Uri.parse(uriTexto)
+                val visible =
+                    runCatching {
+                        contexto.contentResolver
+                            .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                            ?.use { cursor ->
+                                val indice = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                                if (indice >= 0 && cursor.moveToFirst()) cursor.getString(indice) else null
+                            }
+                    }.getOrNull()
+                nombreDeDocumento(visible, uriTexto)
             }
 
         private suspend fun persistir(
@@ -479,6 +503,23 @@ class CatalogoRepositorio
             const val ERROR_SIN_CANALES = "sin_canales"
         }
     }
+
+/**
+ * Nombre de Fuente para un documento SAF a partir de su nombre visible.
+ *
+ * Función pura para poder probar la selección sin un `ContentResolver`: el
+ * nombre visible manda; si falta, se usa el último segmento de la URI; si
+ * tampoco hay, un valor estable. Nunca se registra la URI.
+ */
+internal fun nombreDeDocumento(
+    nombreVisible: String?,
+    uriTexto: String,
+): String =
+    nombreVisible?.trim()?.takeIf { it.isNotEmpty() }
+        ?: uriTexto.substringAfterLast('/').substringBefore('?').trim().takeIf { it.isNotEmpty() }
+        ?: NOMBRE_DOCUMENTO_POR_DEFECTO
+
+private const val NOMBRE_DOCUMENTO_POR_DEFECTO = "Lista importada"
 
 /**
  * Tiempos de espera de la descarga HTTP de importación.

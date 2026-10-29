@@ -2,7 +2,9 @@ package com.copernicotv.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -20,7 +22,18 @@ class MainActivity : ComponentActivity() {
             CoperNicoTheme {
                 val viewModel: CatalogoViewModel = hiltViewModel()
                 val estado by viewModel.estado.collectAsStateWithLifecycle()
-                CatalogoScreen(estado = estado, onImportar = viewModel::importarFixture)
+                // `ACTION_OPEN_DOCUMENT` es el único mecanismo que produce un
+                // grant persistible; `GET_CONTENT` no lo hace y rompería la
+                // reapertura de la Lista tras reiniciar el proceso.
+                val selector =
+                    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                        if (uri != null) viewModel.importarDesdeSaf(uri.toString())
+                    }
+                CatalogoScreen(
+                    estado = estado,
+                    onImportar = viewModel::importarFixture,
+                    onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
+                )
             }
         }
     }

@@ -22,6 +22,9 @@ import com.copernicotv.app.R
 /** Etiqueta del disparador de importación del canario. */
 const val TAG_IMPORTAR = "importar-fixture"
 
+/** Etiqueta del disparador de selección de documento SAF. */
+const val TAG_ABRIR_DOCUMENTO = "abrir-documento"
+
 /** Prefijo de las etiquetas de canal del catálogo. */
 const val PREFIJO_TAG_CANAL = "canal-"
 
@@ -36,6 +39,7 @@ const val PREFIJO_TAG_CANAL = "canal-"
 fun CatalogoScreen(
     estado: CatalogoUiState,
     onImportar: () -> Unit,
+    onAbrirDocumento: () -> Unit,
 ) {
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -46,6 +50,13 @@ fun CatalogoScreen(
                 text = stringResource(R.string.catalogo_titulo),
                 style = MaterialTheme.typography.headlineMedium,
             )
+            Button(
+                onClick = onAbrirDocumento,
+                enabled = !estado.importando,
+                modifier = Modifier.testTag(TAG_ABRIR_DOCUMENTO),
+            ) {
+                Text(stringResource(R.string.catalogo_abrir_documento))
+            }
             Button(
                 onClick = onImportar,
                 enabled = !estado.importando,

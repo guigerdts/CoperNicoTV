@@ -38,8 +38,8 @@ import java.time.Instant
 class BusquedaCatalogoPersistenciaTest {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: BusquedaCatalogoRepositorio
-    private lateinit var fuenteId: Long
-    private lateinit var listaId: Long
+    private var fuenteId: Long = 0
+    private var listaId: Long = 0
     private lateinit var canalIds: List<Long>
     private lateinit var grupos: Map<Int, Long>
 

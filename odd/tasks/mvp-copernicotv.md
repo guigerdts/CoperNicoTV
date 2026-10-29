@@ -960,13 +960,13 @@ P1 y P2 están aprobadas como políticas; sus límites, procedimiento y criterio
 
 ### P1 — Rendimiento de listas y catálogo (P1 aprobada; límites y procedimiento en DC-10)
 
-- **Estado:** **P1 aprobada como política híbrida**; los límites absolutos, el criterio de regresión y el procedimiento p95 se fijan en **DC-10**. La calibración JVM se ejecutó y su baseline quedó **aprobado por el propietario el 2026-10-29** (L47; `docs/evidence/p1/`). La medición P1 en Android no se ejecutó. **No se declara rendimiento validado** fuera del baseline JVM aprobado.
+- **Estado:** **P1 aprobada como política híbrida**; los límites absolutos, el criterio de regresión y el procedimiento p95 se fijan en **DC-10**. La calibración JVM se ejecutó y su baseline quedó **aprobado por el propietario el 2026-10-29** (L47; `docs/evidence/p1/`). La medición P1 en Android se ejecutó el 2026-10-29 sobre el commit `a28971a` (run `40929318245`; L48) como primera calibración: cumple los límites absolutos y no versiona baseline Android (DC-10 §5). **No se declara rendimiento validado** fuera del baseline JVM aprobado y de esa medición Android.
 - **Métricas:** (1) tiempo de parseo de 10 000 entradas; (2) primera página de búsqueda; (3) consulta paginada; (4) memoria máxima del proceso/heap.
 - **Límites absolutos (DC-10):** JVM 1200 ms / 150 ms / 80 ms / heap 256 MiB; Android 2500 ms / 300 ms / 150 ms / heap Java 384 MiB.
 - **Regresión (DC-10):** p95 de tiempo ≤ baseline ×1.20; p95 de memoria ≤ baseline ×1.15; además, límite absoluto. Baseline versionado solo tras 3 corridas verdes y revisión humana; nunca se actualiza para ocultar una regresión.
 - **Procedimiento (DC-10):** 10 calentamientos + 30 mediciones en JVM; 5 + 20 en Android; p95 nearest-rank; mediana/p95/máximo; fixture determinista `F-P1-10k.m3u` con SHA-256; se descarta una corrida solo por falla de entorno documentada.
 - **Evidencia:** comando, JDK/AGP, runner, fixture/hash, fecha, commit, salida cruda, baseline comparado y conclusión; `docs/evidence/p1/`. Job `performance` obligatorio para cerrar P1, no para cada PR.
-- **Límite:** S5, S9, S52 y E3-T1 no se declaran cerradas hasta ejecutar la medición, registrar el baseline y cumplir los límites. E2-T5 cumple la medición JVM y el baseline aprobado; su cláusula P1 en Android sigue pendiente. La aprobación de DC-10 no es una medición.
+- **Límite:** S5, S9, S52 y E3-T1 no se declaran cerradas hasta ejecutar la medición, registrar el baseline y cumplir los límites. E2-T5 cumple la medición JVM, el baseline aprobado y la medición P1 en Android del 2026-10-29 (límites absolutos; primera calibración sin baseline Android). La aprobación de DC-10 no es una medición.
 
 ### P2 — Legibilidad y navegación en TV (P2 aprobada; umbrales y procedimiento en DC-11)
 
@@ -1017,7 +1017,7 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 | E2-T2 | Alta de Fuente y Lista (archivo/URL) | URL http/https validada; archivo local vía SAF `content://` con permiso persistido; errores tipados; Estado de Actualización actualizado |
 | E2-T3 | Persistencia de catálogo, Grupo y Apariencia | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; Hilt usado para repositorios |
 | E2-T4 | Metadatos y logos | Logo, nombre y atributos disponibles persistidos; ausencia no rompe |
-| E2-T5 | Rendimiento y errores | 10 000 entradas con medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10 (JVM 1200/150/80 ms, 256 MiB; Android 2500/300/150 ms, 384 MiB; p95 y baseline); la medición JVM se ejecutó y el baseline quedó aprobado el 2026-10-29 (L47); la medición P1 en Android no se ejecutó. Timeout y 4xx/5xx sin destruir catálogo previo. No se declara cerrada hasta medir, registrar baseline y cumplir los límites en el entorno que la cláusula exige. |
+| E2-T5 | Rendimiento y errores | 10 000 entradas con medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10 (JVM 1200/150/80 ms, 256 MiB; Android 2500/300/150 ms, 384 MiB; p95 y baseline); la medición JVM se ejecutó y el baseline quedó aprobado el 2026-10-29 (L47); la medición P1 en Android se ejecutó el 2026-10-29 sobre `a28971a` (run `40929318245`, L48) y cumplió p95 231.794 ms ≤ 2500 ms y pico de heap 35.809 MiB ≤ 384 MiB con 5+20 mediciones. Timeout y 4xx/5xx sin destruir catálogo previo. La primera calibración Android no versiona baseline (DC-10 §5); la tarea cumple los límites en JVM y Android. |
 | E2-T6 | Protección de credenciales en reposo | Cifrado de todas las columnas URL con claves protegidas mediante Android Keystore; prohibición de credenciales en logs, diagnóstico, errores y textos copiables; S57a/S57b; D5 base aprobada. Inventario, gestión de claves, backup/restauración y pruebas de recuperación: DC-04. Se distinguen AES y HMAC; se implementan `EstadoIndiceHmac` (`operativo`, `recuperacion_pendiente`, `recuperacion_en_curso`, `bloqueado_parcial`) y `HmacPendiente` con el sobre `hmac:vN:cvM:` y `version_origen` (`cvM` o `desconocida`); la pérdida de HMAC bloquea igualdad HMAC con `indice_hmac_no_operativo`, no compara generaciones ni `cvM` distintos, no fusiona ni borra automáticamente y exige reconstrucción coherente e idempotente antes de volver a `operativo`; un valor legacy sin `cvM` no se asume `cv1` y requiere reimportación o migración explícita. Se cifran todas las columnas URL por uniformidad, sin afirmar que todas sean credenciales. No se implementa cifrado de base completa. No se declara implementado ni probado |
 | E2-T7 | Caché local de descargas M3U/XMLTV | Solo descargas HTTP/HTTPS de M3U/XMLTV; no cachea archivos SAF locales, imágenes/logos ni streams. Estructura obligatoria del esquema v1 cuando se implemente E1; funcionalidad no implementada: metadatos en `CacheM3U` y `CacheXmltv` (Room, FK reales, unicidad por propietario y `url_hmac`) y contenido en archivos privados con nombres opacos o referencias relativas; nunca la URL como nombre de archivo. Campos: propietario, clave, tipo, `url_cifrada`/`url_hmac`, `fetched_at`, `expires_at`, estado de frescura y referencia al archivo. Clave M3U `(fuente_id, lista_id, "m3u", url_hmac)`; clave XMLTV `(fuente_guia_id, "xmltv", url_hmac)`. `expires_at` indica frescura y no inicia descargas por sí mismo; cambiar el intervalo no recalcula entradas existentes. Una copia M3U vencida puede servirse marcada `stale` con indicador visible; sin copia utilizable, error tipado. Actualización exitosa reemplaza y recalcula; fallo conserva la última copia válida y no se presenta como éxito. Invalidación por cambio de URL o eliminación de Lista/Fuente; barrido de huérfanos y errores de borrado registrados. La frescura de la caché se distingue del Estado de Actualización y de la Disponibilidad de Reproducción. XMLTV: copia de transporte, no fuente de verdad; la UI lee solo la generación publicada; una copia antigua solo alimenta una actualización explícita que pase por parseo, validación, retención y publicación atómica; una importación fallida o parcial no sustituye la generación publicada. Seguridad: DC-04; URLs, contenido, temporales, logs y errores pueden contener credenciales; cifrado AES-256-GCM, HMAC, claves de Keystore, backup y borrado definidos en DC-04. Reintentos de actualización: DC-07, no S20. Presupuesto: DC-09 (M3U 64 MiB total/16 MiB por Lista y archivo; XMLTV 256 MiB total/96 MiB por FuenteGuia y archivo; global 320 MiB; reserva 100 MiB); evicción primero inválidas/stale y luego `fetched_at` más antiguo. S51a–S51h; S51. Prueba con cliente HTTP contador y reloj de prueba; no se declara implementada ni validada |
 
@@ -1172,7 +1172,8 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E2-T7 (política de caché) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/cache/PoliticaCache.kt`, `core/src/test/kotlin/com/copernicotv/core/cache/PoliticaCacheTest.kt` | Commit `c26f811` | `./gradlew :core:test` | `:core` 228 pruebas verdes; 21 de caché | `40858929094` | Cubierta |
 | E2-T2/T4 (importador y atributos) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/m3u/{ImportadorM3U,CodecAtributosExtra}.kt` y pruebas | Commit `725e205` | `./gradlew :core:test` | `:core` 240 verdes; 12 nuevas | `40858929094` | Cubierta |
 | E2-T2/T3/T4 (importación en `:app`) | 2026-10-28 | `app/.../data/{CatalogoRepositorio,CanalEscritor}.kt`, `app/.../data/db/{AppDatabase,dao/EstadoActualizacionDao}.kt`, `app/src/test/.../ImportacionE2Test.kt` | Commit `f50810e` | `./gradlew :app:ktlintCheck :app:detekt`; CI | 10 casos de importación; `:app` 118 verdes en CI | `40858929094` | Cubierta |
-| E2-T5 (fixture y medición de 10 000) | 2026-10-28 | `core/src/test/resources/fixtures/F-P1-10k.m3u`, `tools/fixtures/generar_f_p1_10k.py`, `core/src/test/.../m3u/{FixtureP1,ParserM3U10kTest,MedicionP1Test}.kt`, `core/build.gradle.kts` | Commits `85b8796`, `6364e4f` | `./gradlew :core:p1Performance --offline` | Job `p1-performance`; p95 15.075 ms y 32.888 MiB en la primera corrida | `40711018242` | JVM: baseline aprobado el 2026-10-29 (L47); Android: no medido |
+| E2-T5 (fixture y medición de 10 000) | 2026-10-28 | `core/src/test/resources/fixtures/F-P1-10k.m3u`, `tools/fixtures/generar_f_p1_10k.py`, `core/src/test/.../m3u/{FixtureP1,ParserM3U10kTest,MedicionP1Test}.kt`, `core/build.gradle.kts` | Commits `85b8796`, `6364e4f` | `./gradlew :core:p1Performance --offline` | Job `p1-performance`; p95 15.075 ms y 32.888 MiB en la primera corrida | `40711018242` | JVM: baseline aprobado el 2026-10-29 (L47); Android: medido el 2026-10-29 (fila siguiente, L48) |
+| E2-T5 (medición P1 Android) | 2026-10-29 | `app/src/androidTest/kotlin/com/copernicotv/app/p1/MedicionP1AndroidTest.kt`, `app/src/androidTest/assets/F-P1-10k.m3u`, `.github/scripts/p1-android.sh`, `.github/workflows/ci.yml`, `docs/evidence/p1/android/{medicion.json,mediciones.csv,mediciones-heap.csv,registro.md}` | Commits `f13a6c6`, `523c8f7`, `a28971a`; ver L48 | `./gradlew :app:connectedDebugAndroidTest` en emulador API 34 vía `p1-android`; verificación de CSV/JSON con Python | API 34, 1080x1920, 320 dpi, fixture 10 000 con SHA-256 correcto; 5+20 mediciones; p95 231.794 ms ≤ 2500 ms; pico 35.809 MiB ≤ 384 MiB; `cumple: true` | `40929318245` (7/7 jobs verdes) | **Cubierta**; primera calibración Android sin baseline versionado (DC-10 §5) |
 | E2-T6 (estado y reconstrucción HMAC) | 2026-10-28 | `app/.../data/{IndiceHmacRepositorio,ReconstructorIndiceHmac}.kt`, `app/.../data/db/dao/{EstadoIndiceHmacDao,HmacPendienteDao,ReconstruccionHmacDao}.kt` y pruebas | Commits `09e04fd`, `c0b116c` | CI `jvm-tests` | 11 + 10 pruebas; CI `40715485318` verde 6/6 | `40715485318` | Cubierta |
 | E2-T7 (caché de transporte en `:app`) | 2026-10-28 | `app/.../data/cache/{CacheDao,AlmacenCache,Descargador,RepositorioCache}.kt`, `app/src/test/.../data/cache/*`, `AppModule.kt` | Commits `afc45a1`, `fe1cc19`, `68a36c5` | CI `jvm-tests` | 16 + 3 pruebas; tres correcciones hasta verde | `40854438558` | Cubierta |
 | E2-T6 (pruebas instrumentadas de DC-04) | 2026-10-29 | `app/src/androidTest/kotlin/com/copernicotv/app/CredencialesEnReposoTest.kt`, `.github/workflows/ci.yml` | Commit `993d3b4` | CI `instrumented-mobile` | 6/6 en emulador: ciphertext alterado, AAD cruzado, clave eliminada, backup, dump sin plaintext, logcat sin URL | `40854438558` | Cubierta |
@@ -1363,7 +1364,8 @@ reinicio se ejecuta en E4.
 
 DC-10 fija 1200 ms de parseo, 150 ms de búsqueda y 80 ms de página 2 en JVM. Las
 dos últimas miden la consulta de E3, que no existe todavía: no se miden ni se
-declaran cumplidas. La medición P1 cubre parseo y pico de heap en JVM.
+declaran cumplidas. La medición P1 cubre parseo y pico de heap en JVM y en
+Android.
 
 El baseline se apoya en tres corridas verdes consecutivas sobre `b186c3a`:
 `40877200854` (p95 10.334 ms, pico 44.836 MiB), `40878469399` (p95 10.421 ms,
@@ -1380,7 +1382,19 @@ propietario el 2026-10-29**: se aprobaron las cinco decisiones registradas en
 `docs/evidence/p1/revision-humana-pendiente.md` (peor valor, tres corridas sobre
 el mismo commit, descartes y regresión no evaluada). La aprobación cubre la
 medición JVM. La medición P1 en Android (≤2500 ms de parseo, heap Java ≤384 MiB,
-5+20 mediciones) no se ejecutó y no está incluida en esta aprobación.
+5+20 mediciones) se ejecutó el 2026-10-29 sobre el commit `a28971a` (run
+`40929318245`, job `p1-android`, 7/7 jobs verdes) en un emulador API 34
+(`sdk_gphone64_x86_64`, `emu64xa`, 1080x1920, 320 dpi, 4 GB de RAM). El fixture
+`F-P1-10k.m3u` conservó el SHA-256
+`45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c` y sus
+10 000 entradas. Con 5 calentamientos y 20 mediciones de tiempo y de heap, el
+resultado fue: mediana 134.333 ms, p95 231.794 ms, máximo 250.297 ms y pico de
+heap Java 35.809 MiB; `cumple: true`. Los CSV y el JSON individuales están en
+`docs/evidence/p1/android/` y en el artifact `p1-android-medicion`. La evidencia
+se escribe en `additionalTestOutputDir`, que UTP copia al host antes de
+desinstalar la app; el script `.github/scripts/p1-android.sh` la recupera y falla
+si falta `medicion.json`. Es la primera calibración Android: aplica límites
+absolutos y no versiona baseline Android (DC-10 §5).
 
 #### 10.9.3 E2-T7: frontera con E4
 
@@ -1400,24 +1414,26 @@ ejecutado dentro de la importación.
 | SAF | `OpenDocument` (`ACTION_OPEN_DOCUMENT`); grant persistible; comprobación en `persistedUriPermissions`; nombre visible con fallback; error de permiso conserva datos | `MainActivity`; `CatalogoRepositorio.importarDesdeSaf`; `NombreDocumentoTest` 5; `ImportacionSafTest` 2 en `instrumented-mobile` 15; prueba física del propietario 2026-10-29 | Aceptada por el propietario el 2026-10-29 con limitación; grant real no inspeccionado (§10.4) |
 | Persistencia e idempotencia | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; segunda importación no duplica ni borra | `CatalogoAmbitoTest` 2; `CatalogoPersistenciaTest` 5; `ImportacionE2Test` («repetir la importacion no duplica…»); `CatalogoRepositorioTest` | Aprobado en CI |
 | Caché | DC-09: presupuesto, temp+fsync+rename, invalidación, `stale`; no integrada en la primera importación | `PoliticaCacheTest` 21; `RepositorioCacheTest` 16; `DescargadorHttpTest` 3 | Aprobado como subsistema; integración E4 (§10.9.3) |
-| P1 | 10 000 entradas; p95 15.067 ms ≤ 1200 ms; pico 45.827 MiB ≤ 256 MiB; tres corridas verdes | `ParserM3U10kTest`; `MedicionP1Test`; runs `40877200854`, `40878469399`, `40879581126` | Aprobado en JVM; revisión humana aprobada el 2026-10-29 (L47); medición Android no ejecutada |
+| P1 | JVM: 10 000 entradas; p95 15.067 ms ≤ 1200 ms; pico 45.827 MiB ≤ 256 MiB; tres corridas verdes. Android: 10 000 entradas; p95 231.794 ms ≤ 2500 ms; pico 35.809 MiB ≤ 384 MiB; 5+20 mediciones | `ParserM3U10kTest`; `MedicionP1Test`; `MedicionP1AndroidTest`; runs `40877200854`, `40878469399`, `40879581126`, `40929318245` | Aprobado en JVM y Android; revisión humana del baseline JVM aprobada el 2026-10-29 (L47); medición Android ejecutada el 2026-10-29 (L48) |
 | Migraciones y estático | Esquema v1 exportado; 26 tablas; índices y FK; ktlint y detekt | `EsquemaConformidadTest`; `EsquemaRoomTest`; `IntegridadRoomTest`; `MigracionAparienciaTest`; `static-analysis` en `40877127294` | Aprobado en CI |
 
 | Estado | Tareas |
 |---|---|
-| Aprobado con evidencia ejecutada | T1, T3, T4, T6, T7 |
+| Aprobado con evidencia ejecutada | T1, T3, T4, T5, T6, T7 |
 | Aceptada por el propietario con limitación | T2 (prueba SAF ejecutada el 2026-10-29; grant no inspeccionado directamente) |
-| Pendiente de medición | T5 (P1 en Android; la medición JVM y la revisión humana quedaron aprobadas el 2026-10-29) |
+| Pendiente de medición | Ninguno |
 | Bloqueado | Ninguno |
 | Hallazgo abierto fuera de E2 | Colisión por `Fuente.nombre` (severidad media; reconciliación por identidad en E4) |
 
-**Estado de E2: abierta.** T1, T3, T4, T6 y T7 están aprobadas con evidencia
-ejecutada; T2 está aceptada por el propietario con la limitación SAF registrada.
-T5 queda satisfecha en JVM —10 000 entradas medidas, límites absolutos cumplidos,
-baseline registrado y revisión humana aprobada el 2026-10-29—, pero el criterio de
-§8.2 enumera además los límites P1 en Android (≤2500 ms de parseo, heap Java
-≤384 MiB, 5+20 mediciones), que no se midieron. Esa cláusula es la única pendiente
-obligatoria identificada de E2; no se declara E2 cerrada.
+**Estado de E2: cerrada.** T1, T3, T4, T5, T6 y T7 están aprobadas con
+evidencia ejecutada; T2 está aceptada por el propietario con la limitación SAF
+registrada. T5 queda satisfecha en JVM —10 000 entradas medidas, límites
+absolutos cumplidos, baseline registrado y revisión humana aprobada el
+2026-10-29— y en Android —10 000 entradas medidas el 2026-10-29 sobre
+`a28971a`, p95 231.794 ms ≤ 2500 ms, pico de heap 35.809 MiB ≤ 384 MiB y 5+20
+mediciones—. La primera calibración Android no versiona baseline (DC-10 §5). No
+queda ninguna cláusula obligatoria pendiente de E2; el hallazgo de
+`Fuente.nombre` pertenece a E4.
 
 ## 11. Log
 
@@ -2083,26 +2099,68 @@ obligatoria identificada de E2; no se declara E2 cerrada.
   `docs/evidence/u0-manifest.md` no cambió. La CI de este commit documental se
   verifica al publicarlo; no se declara verde antes de observar el run.
 
+### L48 — E2: medición P1 en Android y cierre
+
+- **Autorización.** Continuación de E2 sobre `feat/e1-bootstrap`; medir P1 en
+  Android conforme a DC-10, registrar la evidencia y cerrar E2 solo si se
+  cumplen los límites. No se inicia E3, E4 ni E5.
+- **Implementación.** `MedicionP1AndroidTest` ejecuta el parser real de `:core`
+  sobre `F-P1-10k.m3u` en un emulador API 34; mide 5 calentamientos, 20 tiempos
+  y 20 picos de heap Java. El job `p1-android` se ejecuta solo con
+  `workflow_dispatch`; `.github/scripts/p1-android.sh` fija 1080x1920/320 dpi,
+  ejecuta Gradle, recupera la evidencia y propaga el código de salida.
+- **Defectos corregidos en el camino.** UTP desinstala la app después del test y
+  borraba `files/p1` antes del `adb pull`; además, la acción del emulador ejecuta
+  cada línea del `script` en un `sh -c` separado, así que una continuación con
+  `\` se interpretaba como una tarea llamada `\`. La evidencia ahora se escribe
+  en `additionalTestOutputDir`, que UTP copia al host antes de desinstalar, y el
+  script versionado recupera esa salida. Commits `f13a6c6`, `523c8f7` y
+  `a28971a`.
+- **Medición válida.** Run `40929318245` sobre `a28971a`, workflow `ci.yml`,
+  job `p1-android`, 7/7 jobs verdes. Emulador API 34 / Android 14
+  (`sdk_gphone64_x86_64`, `emu64xa`, `ranchu`), 1080x1920, 320 dpi, 4 GB de RAM.
+  Fixture `F-P1-10k.m3u` con 10 000 entradas y SHA-256
+  `45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c`.
+  Resultados: mediana 134.333 ms, p95 231.794 ms, máximo 250.297 ms y pico de
+  heap Java 35.809 MiB; `cumple: true`. Límites: 2500 ms y 384 MiB.
+- **Evidencia.** `docs/evidence/p1/android/` contiene `medicion.json`,
+  `mediciones.csv`, `mediciones-heap.csv` y `registro.md`, copiados del artifact
+  `p1-android-medicion` (1 236 bytes). El JSON y los CSV se verificaron con
+  Python: 20 filas de tiempo y 20 de heap; p95 nearest-rank, mediana con
+  redondeo HALF_UP, máximo y pico de heap coinciden con el resumen.
+- **Estado de E2.** Cerrada. T1, T3, T4, T5, T6 y T7 aprobadas con evidencia
+  ejecutada; T2 aceptada por el propietario con la limitación SAF registrada. La
+  primera calibración Android aplica límites absolutos y no versiona baseline
+  Android (DC-10 §5); el baseline JVM aprobado no se modifica.
+- **Frontera.** E3 no se inicia. La relectura tras reinicio y la reconciliación
+  por `Fuente.nombre` siguen en E4.
+- **Validación de esta entrada.** Documental y de evidencia: sin cambios de
+  código de producción; ktlint de `:app` y la CI del commit de evidencia se
+  verifican al publicarlo. `docs/evidence/u0-manifest.md` no se modifica.
+
 ### Próximo paso
 
-E1 queda **cerrada** sobre `3140d34`. E2 queda **abierta** sobre `be324f5`: T2
+E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
 está **aceptada por el propietario el 2026-10-29 con limitación** (prueba SAF
 ejecutada; `persistedUriPermissions` no inspeccionado directamente, §10.4 y
-§10.9.1); T1, T3, T4, T6 y T7 están cubiertas; T5 está **aprobada en JVM** con
-baseline versionado y revisión humana aprobada el 2026-10-29 (L47), pero la
-cláusula P1 en Android de E2-T5 (≤2500 ms de parseo, heap Java ≤384 MiB, 5+20
-mediciones) no se midió y es la única pendiente obligatoria. La relectura del
-documento tras reinicio y la reconciliación por `Fuente.nombre` se ejecutan en
-E4. El código de entrada SAF, la concurrencia de CI, el filtro instrumentado y
-la medición de heap están corregidos y verificados en CI (`40877127294`,
+§10.9.1); T1, T3, T4, T6 y T7 están cubiertas; T5 está **aprobada en JVM y en
+Android**: baseline JVM versionado y revisión humana aprobada el 2026-10-29
+(L47), y medición Android del 2026-10-29 sobre `a28971a` con p95 231.794 ms ≤
+2500 ms, pico de heap 35.809 MiB ≤ 384 MiB y 5+20 mediciones (L48). La primera
+calibración Android no versiona baseline (DC-10 §5). La relectura del documento
+tras reinicio y la reconciliación por `Fuente.nombre` se ejecutan en E4. El
+código de entrada SAF, la concurrencia de CI, el filtro instrumentado y la
+medición de heap están corregidos y verificados en CI (`40877127294`,
 `40877200854`, `40878469399`, `40879581126`); el commit `4b3692d` tiene el run
 `40882394994`, 5/5 verde con `p1-performance` omitido; el commit `be324f5` tiene
-el run `40906464669`, 5/5 verde con `p1-performance` omitido.
+el run `40906464669`, 5/5 verde con `p1-performance` omitido; el commit
+`a28971a` tiene el run `40929318245`, 7/7 verde con `p1-android`.
 
-**Siguiente unidad autorizada: E3-U1 (estado de usuario).** Cubre E3-T2
+**Siguiente unidad: E3-U1 (estado de usuario).** Cubre E3-T2
 (Favoritos), E3-T3 (Historial) y E3-T4 (Ocultaciones) sobre el esquema v1 ya
-exportado. Está **documentada y no iniciada**: depende del cierre de E2. Sus
-precondiciones son: E2 cerrada; baseline P1 aprobado y disponible; DAOs de
+exportado. Está **documentada y no iniciada**, a la espera de autorización
+explícita; E2 ya está cerrada. Sus precondiciones son: E2 cerrada; baseline P1
+aprobado y disponible; DAOs de
 `Favorito`, `Ocultacion` e `Historial` sobre las entidades existentes; pruebas
 JVM/Robolectric escritas antes de la UI; sin cambios de esquema que exijan
 migración post-v1. La secuencia propuesta para el resto de E3 es: U2 búsqueda y
@@ -2113,7 +2171,7 @@ se implementa ninguna.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y
-L44–L47 solo actualizan estados con evidencia. DC-01–DC-11 y H-01–H-11 siguen
+L44–L48 solo actualizan estados con evidencia. DC-01–DC-11 y H-01–H-11 siguen
 normativos. Las métricas de búsqueda y página 2 pertenecen a E3, la integración
 de la caché y la relectura a E4 y la reproducción a E6; ninguna se adelanta sin
 autorización. Cualquier cambio posterior de requisitos o decisiones reabre la

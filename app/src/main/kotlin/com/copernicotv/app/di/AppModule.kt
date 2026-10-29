@@ -6,6 +6,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesKeystore
+import com.copernicotv.app.data.TiemposHttp
 import com.copernicotv.app.data.cache.AlmacenCache
 import com.copernicotv.app.data.cache.Descargador
 import com.copernicotv.app.data.cache.DescargadorHttp
@@ -51,6 +52,9 @@ object AppModule {
             .databaseBuilder(contexto, AppDatabase::class.java, AppDatabase.NOMBRE)
             .addCallback(SembrarEstadoIndiceHmac)
             .build()
+
+    @Provides
+    fun tiemposHttp(): TiemposHttp = TiemposHttp()
 
     @Provides
     fun fuenteDao(db: AppDatabase): FuenteDao = db.fuenteDao()

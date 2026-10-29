@@ -10,6 +10,7 @@ import com.copernicotv.core.crypto.ResultadoDescifrado
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
@@ -184,6 +185,25 @@ class ImportacionE2Test {
         }
     }
 
+    @Test(timeout = 60_000)
+    fun `un timeout conserva el catalogo previo`() {
+        runBlocking {
+            val primera = repositorio.importar(TEXTO_E2, "Fuente E2", UBICACION)
+            assertEquals(1, primera.canales)
+            val rapido = CatalogoRepositorio(db, claves, contexto, TiemposHttp(lecturaMs = 300))
+            conServidorMudo { url ->
+                val resumen = rapido.importarDesdeUrl("Fuente E2", url)
+
+                assertEquals("timeout", resumen.error)
+                assertEquals(1, db.canalDao().contar())
+                assertEquals(1, db.fuenteDao().todas().size)
+                val estado =
+                    requireNotNull(db.estadoActualizacionDao().ultimoDeLista(requireNotNull(primera.listaId)))
+                assertEquals("timeout", estado.resultado)
+            }
+        }
+    }
+
     private fun descifrarLogo(sobre: ByteArray): String {
         val resultado = CifradoAes.descifrar(claves.claveAes, CifradoAes.aad("Canal", "logo_url_cifrada"), sobre)
         assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
@@ -212,6 +232,27 @@ class ImportacionE2Test {
         }
     }
 
+    /** Acepta la conexión y no responde: el cliente vence por tiempo de lectura. */
+    private suspend fun conServidorMudo(bloque: suspend (String) -> Unit) {
+        val servidor = ServerSocket(0)
+        coroutineScope {
+            val mudo =
+                async(Dispatchers.IO) {
+                    runCatching {
+                        servidor.use { escucha ->
+                            escucha.accept().use { delay(TIEMPO_MUDO_MS) }
+                        }
+                    }
+                }
+            try {
+                bloque("http://127.0.0.1:${servidor.localPort}/lista.m3u")
+            } finally {
+                servidor.close()
+                withTimeoutOrNull(TIEMPO_ESPERA_MS) { mudo.await() }
+            }
+        }
+    }
+
     private fun responder(
         socket: Socket,
         codigo: Int,
@@ -233,6 +274,7 @@ class ImportacionE2Test {
         const val LOGO = "https://example.invalid/logo.png"
         const val UBICACION = "https://example.invalid/e2.m3u"
         const val TIEMPO_ESPERA_MS = 5_000L
+        const val TIEMPO_MUDO_MS = 2_000L
 
         val TEXTO_E2 =
             """

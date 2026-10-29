@@ -68,6 +68,7 @@ class CatalogoRepositorio
         private val db: AppDatabase,
         private val claves: ClavesApp,
         @ApplicationContext private val contexto: Context,
+        private val tiempos: TiemposHttp = TiemposHttp(),
     ) {
         private val io = Dispatchers.IO
         private val escritorApariencias = AparienciaEscritor(db)
@@ -250,8 +251,8 @@ class CatalogoRepositorio
 
         private fun descargar(url: String): Descarga {
             val conexion = URL(url).openConnection() as? HttpURLConnection ?: return Descarga.Fallo(ERROR_SIN_CONEXION)
-            conexion.connectTimeout = TIMEOUT_CONEXION_MS
-            conexion.readTimeout = TIMEOUT_LECTURA_MS
+            conexion.connectTimeout = tiempos.conexionMs
+            conexion.readTimeout = tiempos.lecturaMs
             conexion.requestMethod = "GET"
             return try {
                 when (conexion.responseCode) {
@@ -476,9 +477,16 @@ class CatalogoRepositorio
             const val ERROR_HTTP_4XX = "http_4xx"
             const val ERROR_HTTP_5XX = "http_5xx"
             const val ERROR_SIN_CANALES = "sin_canales"
-
-            /** Valores iniciales de especificación, pendientes de calibración. */
-            const val TIMEOUT_CONEXION_MS = 15_000
-            const val TIMEOUT_LECTURA_MS = 30_000
         }
     }
+
+/**
+ * Tiempos de espera de la descarga HTTP de importación.
+ *
+ * Es un valor y no dos constantes para que la prueba del camino `timeout`
+ * pueda ejercitarlo sin esperar los 30 s de producción.
+ */
+data class TiemposHttp(
+    val conexionMs: Int = 15_000,
+    val lecturaMs: Int = 30_000,
+)

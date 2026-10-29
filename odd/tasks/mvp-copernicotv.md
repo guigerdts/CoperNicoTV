@@ -1167,6 +1167,17 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E1-U20 (persistencia del catálogo) | 2026-10-28 | `app/src/main/kotlin/com/copernicotv/app/data/CatalogoRepositorio.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/AparienciaDao.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/CanalDao.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/FuenteDao.kt`, `app/src/main/kotlin/com/copernicotv/app/ui/CatalogoViewModel.kt`, `app/src/test/kotlin/com/copernicotv/app/data/CatalogoPersistenciaTest.kt`, `app/src/test/kotlin/com/copernicotv/app/data/CatalogoRepositorioTest.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/ClavesKeystoreTest.kt` | Commit `ee443b8` (8 archivos, +441/−91); ver L40 | `/tmp/opencode/ktlint.sh` sobre los 8 `.kt`; `gh run view`; `gh run download` y lectura de los HTML de resultados; `sha256sum` | `AparienciaDao.nombresDeListaActiva()` resuelve la Lista activa en SQL y `CatalogoViewModel` se suscribe en `init`, no solo tras importar; `importar` reutiliza Fuente y Lista existentes sin escribir; `CatalogoPersistenciaTest` (5 pruebas con base de archivo) recrea repositorio y ViewModel; `CatalogoRepositorioTest` sustituye el test que fijaba el fallo; `ClavesKeystoreTest` añade 2 pruebas instrumentadas | `40629345381` | **Corregido y verificado en CI**; verificación en dispositivo físico pendiente (§10.4) |
 | E1-U21 (validación física del propietario) | 2026-10-28 | Ninguno (verificación, sin cambios de código) | Sin diff; el APK validado es el artifact `copernicotv-debug-apk` del run `40629345381` (commit `ee443b8`, 10 589 548 bytes) | Declaración del propietario en dispositivo Android físico; este entorno no tiene `adb` ni dispositivo | Tres confirmaciones: los canales aparecen al abrir, la segunda importación no produce `importacion_fallida` ni pierde canales, y los canales siguen visibles tras cerrar y reabrir. Evidencia de usuario, distinta de CI | `40629345381` (APK validado) | **Verificada por el propietario**; cierra las verificaciones físicas de E1-U19 y E1-U20 |
 | E1-U22 (E1-U4 residual) | 2026-10-28 | `app/src/main/kotlin/com/copernicotv/app/data/{MigracionApariencia,AparienciaEscritor,CanalEscritor,PerfilRepositorio,CatalogoRepositorio}.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/AparienciaDao.kt`, pruebas `app/src/test/kotlin/com/copernicotv/app/data/{MigracionAparienciaTest,CanalEscritorTest,PerfilRepositorioTest}.kt`, `app/src/test/kotlin/com/copernicotv/app/data/db/IntegridadRoomTest.kt`, `.github/workflows/ci.yml` | Commits `0624068` (migración y escritor de Apariencia), `b4edf4e` (invariantes de Canal y cableado de los escritores), `f73f166` (códigos de Perfil y concurrencia), `3140d34` (corrección de compilación de las pruebas); 11 archivos, +987/−19 respecto de `b1cf7f9` | `./gradlew :core:test` y `./gradlew :app:detekt :app:ktlintCheck` en local; `jvm-tests` y `static-analysis` en CI | Local: `:core` 135 pruebas, 0 fallos; ktlint y detekt de `:app` sin hallazgos. CI: `:app` 67 pruebas, 0 fallos | `40681632913` | **Verificada en CI**; cierra los puntos 1 y 4 de L42 y los huecos de E1-U4 demostrados ausentes |
+| E2-T1 (parser M3U streaming) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/m3u/{ParserM3U,ModeloM3U}.kt`, `core/src/test/kotlin/com/copernicotv/core/m3u/ParserM3UTest.kt` | Commit `b8a16db` | `./gradlew :core:test :core:ktlintCheck :core:detekt` | Parser independiente del camino canario de E1; `:core` verde | `40858929094` | Cubierta |
+| E2-T6 (cifrado y errores tipados) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/crypto/*`, `core/src/test/kotlin/com/copernicotv/core/crypto/*` | Commit `d6c2b96` | `./gradlew :core:test` | 42 pruebas nuevas; `FALLO_AUTENTICACION` mapeado a `ciphertext_corrupto` | `40858929094` | Cubierta |
+| E2-T7 (política de caché) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/cache/PoliticaCache.kt`, `core/src/test/kotlin/com/copernicotv/core/cache/PoliticaCacheTest.kt` | Commit `c26f811` | `./gradlew :core:test` | `:core` 228 pruebas verdes; 21 de caché | `40858929094` | Cubierta |
+| E2-T2/T4 (importador y atributos) | 2026-10-28 | `core/src/main/kotlin/com/copernicotv/core/m3u/{ImportadorM3U,CodecAtributosExtra}.kt` y pruebas | Commit `725e205` | `./gradlew :core:test` | `:core` 240 verdes; 12 nuevas | `40858929094` | Cubierta |
+| E2-T2/T3/T4 (importación en `:app`) | 2026-10-28 | `app/.../data/{CatalogoRepositorio,CanalEscritor}.kt`, `app/.../data/db/{AppDatabase,dao/EstadoActualizacionDao}.kt`, `app/src/test/.../ImportacionE2Test.kt` | Commit `f50810e` | `./gradlew :app:ktlintCheck :app:detekt`; CI | 10 casos de importación; `:app` 118 verdes en CI | `40858929094` | Cubierta |
+| E2-T5 (fixture y medición de 10 000) | 2026-10-28 | `core/src/test/resources/fixtures/F-P1-10k.m3u`, `tools/fixtures/generar_f_p1_10k.py`, `core/src/test/.../m3u/{FixtureP1,ParserM3U10kTest,MedicionP1Test}.kt`, `core/build.gradle.kts` | Commits `85b8796`, `6364e4f` | `./gradlew :core:p1Performance --offline` | Job `p1-performance`; p95 15.075 ms y 32.888 MiB en la primera corrida | `40711018242` | Parcial (revisión humana del baseline pendiente) |
+| E2-T6 (estado y reconstrucción HMAC) | 2026-10-28 | `app/.../data/{IndiceHmacRepositorio,ReconstructorIndiceHmac}.kt`, `app/.../data/db/dao/{EstadoIndiceHmacDao,HmacPendienteDao,ReconstruccionHmacDao}.kt` y pruebas | Commits `09e04fd`, `c0b116c` | CI `jvm-tests` | 11 + 10 pruebas; CI `40715485318` verde 6/6 | `40715485318` | Cubierta |
+| E2-T7 (caché de transporte en `:app`) | 2026-10-28 | `app/.../data/cache/{CacheDao,AlmacenCache,Descargador,RepositorioCache}.kt`, `app/src/test/.../data/cache/*`, `AppModule.kt` | Commits `afc45a1`, `fe1cc19`, `68a36c5` | CI `jvm-tests` | 16 + 3 pruebas; tres correcciones hasta verde | `40854438558` | Cubierta |
+| E2-T6 (pruebas instrumentadas de DC-04) | 2026-10-29 | `app/src/androidTest/kotlin/com/copernicotv/app/CredencialesEnReposoTest.kt`, `.github/workflows/ci.yml` | Commit `993d3b4` | CI `instrumented-mobile` | 6/6 en emulador: ciphertext alterado, AAD cruzado, clave eliminada, backup, dump sin plaintext, logcat sin URL | `40854438558` | Cubierta |
+| E2-T2/T5 (red y timeout) | 2026-10-29 | `app/src/main/AndroidManifest.xml`, `app/.../data/CatalogoRepositorio.kt`, `app/src/test/.../ImportacionE2Test.kt`, `AppModule.kt` | Commits `6d26566`, `e4ce7a8` | CI `jvm-tests`, `instrumented-mobile` | `INTERNET` faltante corregido; camino `timeout` ejercitado con lectura de 300 ms | `40854438558` | Parcial (SAF físico pendiente) |
+| E2-T3 (ámbito de Canal y Grupo) | 2026-10-29 | `app/src/test/kotlin/com/copernicotv/app/data/CatalogoAmbitoTest.kt` | Commit `5e13de3` | CI `jvm-tests` | 2 casos; `:app` 120 verdes | `40858929094` | Cubierta |
 
 ### 10.2 Evidencia de CI
 
@@ -1200,6 +1211,19 @@ Cada unidad que use CI registra: workflow, job, URL o ID del run, SHA, artifact 
 | `40681632913` (CI) | `3140d34` | **5/5 verdes**: `jvm-tests` (`:core` 135, `:app` 67 = 47 + 5 de `MigracionAparienciaTest` + 6 de `CanalEscritorTest` + 7 nuevas de `PerfilRepositorioTest` + 2 nuevas de `IntegridadRoomTest`), `static-analysis`, `apk`, `instrumented-mobile` (7 = 2 + 5 de `ClavesKeystoreTest`), `instrumented-tv` (1) | `copernicotv-debug-apk` (10 172 579), `reportes-jvm` (45 036), `reportes-instrumented-mobile` (6 352), `reportes-instrumented-tv` (5 181), `room-schema-v1` (4 581) |
 | `40681632833` (`TV emulator trial`) | `3140d34` | **verde**: emulador arrancado, canario 1/1, `BUILD SUCCESSFUL in 4m 6s` | `reporte-tv-trial` (5 182) |
 
+| `40711018242` (CI, dispatch) | `6364e4f` | `p1-performance` verde: p95 15.075 ms, pico 32.888 MiB | `p1-medicion` |
+| `40715485318` (CI) | `c0b116c` | **6/6 verdes**; `:app` 118 pruebas | `reportes-jvm`, `reportes-instrumented-mobile` |
+| `40723479282` (CI) | `fe1cc19` | 5 verdes; `jvm-tests` fallido: 1 de 117, `un archivo mayor que el limite por archivo no se almacena` | `reportes-jvm` |
+| `40852560679` (CI) | `68a36c5` | cancelado por la `concurrency` al despachar `40852620797`; sin resultado propio | — |
+| `40852620797` (CI, dispatch) | `68a36c5` | cancelado manualmente para no desplazar la verificación del push | — |
+| `40853142638` (CI) | `993d3b4` | 5 verdes; `instrumented-mobile` fallido: `SecurityException` por `INTERNET` ausente | `reportes-instrumented-mobile` |
+| `40854438558` (CI) | `e4ce7a8` | **6/6 verdes**: `:core` 244 (1 ignorada), `:app` 118, `instrumented-mobile` 13, `instrumented-tv` 1 | `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `copernicotv-debug-apk` |
+| `40854438514` (`TV emulator trial`) | `e4ce7a8` | **verde**: emulador arrancado, canario de TV 1/1 | `reporte-tv-trial` |
+| `40857174822` (CI, dispatch) | `e4ce7a8` | **6/6 verdes**; `p1-performance` verde: p95 11.840 ms, pico 33.419 MiB | `p1-medicion` |
+| `40858929094` (CI) | `5e13de3` | **6/6 verdes**: `:core` 244 (1 ignorada), `:app` 120, `instrumented-mobile` 13, `instrumented-tv` 1 | `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `copernicotv-debug-apk` |
+| `40858929081` (`TV emulator trial`) | `5e13de3` | **verde**: emulador arrancado, canario de TV 1/1 | `reporte-tv-trial` |
+| `40861342045` (CI, dispatch) | `5e13de3` | **6/6 verdes**; `p1-performance` verde: p95 8.605 ms, pico 42.861 MiB | `p1-medicion` |
+
 ### 10.3 Límites de Termux
 
 - Local: `./gradlew :core:test` (JVM) y el wrapper; nada de Android real.
@@ -1214,6 +1238,8 @@ Una verificación física pendiente se registra con: procedimiento exacto, resul
 | Verificación | Procedimiento exacto | Resultado esperado | Estado | Bloqueo | Qué falta |
 |---|---|---|---|---|---|
 | Importación desde «Importar lista de prueba» en teléfono físico, sobre una instalación previa que conserva datos y clave AES | Instalar el APK del run `40629345381` (artifact `copernicotv-debug-apk`, 10 589 548 bytes) sobre la instalación existente, sin desinstalar ni borrar datos; abrir la app; pulsar «Importar lista de prueba»; esperar a que termine; cerrar completamente la app; volver a abrirla; pulsar de nuevo «Importar lista de prueba» | Tras reabrir, los 3 canales del fixture (`example.invalid`) siguen visibles; la segunda importación no muestra `importacion_fallida` y no duplica canales | **Verificada por el propietario el 2026-10-28**; evidencia de usuario, no automatizada | — (desbloqueada) | — |
+| Importación de una lista desde SAF en teléfono físico (E2-T2) | Instalar el APK del run `40858929094`, pulsar «Importar», elegir «Abrir documento» y seleccionar un archivo `.m3u` del almacenamiento; cerrar y reabrir la app; abrir de nuevo la Lista importada | La Lista se importa con sus Canales; el permiso sobrevive al reinicio del proceso y la reapertura no vuelve a pedir selección; no aparece `permiso_saf_no_persistido` | Pendiente por bloqueo externo | Requiere dispositivo físico y selección real de archivo: el grant persistible solo lo produce un `ACTION_OPEN_DOCUMENT` resuelto por el usuario | Verificación física del propietario |
+
 **Confirmación del propietario (2026-10-28, dispositivo Android físico, APK del run `40629345381`, commit `ee443b8`, rama `feat/e1-bootstrap`):** (1) los tres canales del fixture aparecen automáticamente al abrir la aplicación; (2) una segunda importación no provoca `importacion_fallida` ni elimina los canales; (3) los tres canales continúan visibles después de cerrar completamente y volver a abrir la aplicación. Es **evidencia de usuario**: se registra por declaración del propietario, sin `adb` ni captura automatizada, y no sustituye ni se suma como prueba de CI. Resuelve las verificaciones físicas pendientes de L39 (clave AES heredada) y L40 (persistencia del catálogo).
 
 ### 10.5 Evidencia E0 (auditoría previa a E1, ejecutada)
@@ -1273,6 +1299,59 @@ U0 creó este archivo con 364 líneas y 28 119 bytes (fotografía histórica). V
 | H-09 Glosario | PD-2/PD-4/PD-6 | GLOSSARY Favorito, Actualización, Clave de Canal, Canal, URL canónica, Versión de canonicalización URL y Asociación; enmiendas L29/L30/L31 |
 | H-10 Registro L27–L32/próximo paso | PD-7 | §10.1 filas L27/L28/L29/L30/L31/L32, §10.6, §10.8 y «Próximo paso» |
 | H-11 Referencias EPG | PD-7 | S25, S26, S28, S29, S27, DC-06, §6.3.2 y GLOSSARY Asociación |
+
+### 10.9 Evidencia E2 (importación M3U y catálogo base)
+
+Alcance: las siete tareas de §8.2, sin invadir E3, E4 ni E5. Cada fila se apoya
+en un run de CI ejecutado sobre el commit indicado; no se declara cubierto nada
+por inspección de código. Run de referencia: `40858929094` sobre `5e13de3`,
+**6/6 jobs verdes** (`jvm-tests`, `static-analysis`, `apk`,
+`instrumented-mobile`, `instrumented-tv`; `p1-performance` omitido por diseño en
+`push`). Conteos observados en los artefactos: `:core` 244 pruebas (1 ignorada,
+`MedicionP1Test`), `:app` 120 pruebas, `instrumented-mobile` 13,
+`instrumented-tv` 1, sin fallos.
+
+| Tarea | Criterio de §8.2 | Implementación | Evidencia ejecutada | Estado |
+|---|---|---|---|---|
+| E2-T1 | Parser M3U streaming | `core/src/main/kotlin/com/copernicotv/core/m3u/ParserM3U.kt` | `ParserM3UTest`, `ParserM3U10kTest` en `jvm-tests` | Cubierta |
+| E2-T2 | Alta de Fuente y Lista (URL y SAF `content://`), errores tipados, Estado de Actualización | `app/.../data/CatalogoRepositorio.kt` (`importarDesdeUrl`, `importarDesdeSaf`, `registrarIntento`, `registrarFallo`) | `ImportacionE2Test` 11 casos; `CredencialesEnReposoTest` expuso la falta de `INTERNET`, corregida en `6d26566` | Parcial: falta el camino feliz SAF con permiso persistido real (§10.9.1) |
+| E2-T3 | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; Hilt | `app/.../db/entities/CatalogoEntities.kt`, `CatalogoRepositorio.kt`, `AppModule.kt` | `CatalogoAmbitoTest` 2 casos; `CatalogoRepositorioTest` (orden por Apariencia); `CatalogoPersistenciaTest` 5 casos | Cubierta |
+| E2-T4 | Logo, nombre y atributos persistidos; ausencia no rompe | `core/.../m3u/ImportadorM3U.kt`, `CodecAtributosExtra.kt`; `CatalogoRepositorio.cifrarLogo` | `CodecAtributosExtraTest`, `ImportadorM3UTest`, `ImportacionE2Test` («persiste logo cifrado y atributos extra deterministas»); el fixture sin `tvg-logo` importa 3 Canales con logo nulo | Cubierta |
+| E2-T5 | 10 000 entradas con P1 conforme a §7; timeout y 4xx/5xx sin destruir catálogo | `tools/fixtures/generar_f_p1_10k.py`, `FixtureP1`, `TiemposHttp`, `CatalogoRepositorio.descargar` | `ParserM3U10kTest`, `MedicionP1Test`, job `p1-performance`; baseline de 3 corridas verdes en `docs/evidence/p1/p1-baseline.json`; `ImportacionE2Test` («un 404…», «un 500…», «un timeout conserva el catalogo previo») | Parcial: baseline registrado, **revisión humana pendiente**; métricas de búsqueda y página 2 son de E3 (§10.9.2) |
+| E2-T6 | Cifrado de columnas URL con Keystore; prohibición en logs, diagnóstico y textos copiables; DC-04 | `core/.../crypto/CifradoAes.kt`, `app/.../crypto/ClavesApp.kt`, `IndiceHmacRepositorio`, `ReconstructorIndiceHmac` | `CredencialesEnReposoTest` 6/6 y `ClavesKeystoreTest` 5/5 en `instrumented-mobile`; `IndiceHmacRepositorioTest` 11, `ReconstructorIndiceHmacTest` 10 | Cubierta |
+| E2-T7 | Caché M3U/XMLTV (DC-09, S51a–S51h) | `core/.../cache/PoliticaCache.kt`; `app/.../data/cache/{CacheDao,AlmacenCache,Descargador,RepositorioCache}.kt` | `PoliticaCacheTest` 21; `RepositorioCacheTest` 16; `DescargadorHttpTest` 3 | Cubierta como subsistema; la integración en la reimportación es E4 (§10.9.3) |
+
+#### 10.9.1 E2-T2: pendiente de verificación SAF con permiso real
+
+`takePersistableUriPermission` solo concede un permiso persistente cuando el
+`content://` llega con `FLAG_GRANT_PERSISTABLE_URI_PERMISSION` desde un
+`ACTION_OPEN_DOCUMENT` resuelto por el usuario. Ni Robolectric ni una prueba
+instrumentada sin interacción pueden fabricar ese grant, así que el camino feliz
+SAF **no está ejecutado** en ningún nivel.
+
+Lo que sí está ejecutado: rechazo de esquema no SAF, rechazo de SAF con esquema
+`http`, y el error tipado `permiso_saf_no_persistido` cuando la toma falla.
+Estado: `Pendiente por bloqueo externo` — requiere una verificación física con
+selección real de archivo, con procedimiento, resultado esperado y estado, según
+§10.4.
+
+#### 10.9.2 E2-T5: alcance de la medición
+
+DC-10 fija 1200 ms de parseo, 150 ms de búsqueda y 80 ms de página 2 en JVM. Las
+dos últimas miden la consulta de E3, que no existe todavía: no se miden ni se
+declaran cumplidas. La medición P1 cubre parseo y pico de heap.
+
+El baseline se apoya en tres corridas verdes consecutivas (`40711018242`,
+`40857174822`, `40861342045`). La revisión humana que DC-10 exige para usarlo
+como referencia de regresión sigue **pendiente** y es una acción del propietario.
+
+#### 10.9.3 E2-T7: frontera con E4
+
+La primera importación no tiene Lista a la que asociar una clave de caché y
+E2-T2 exige descargar antes de persistir, así que `importarDesdeUrl` no consulta
+la caché. La integración corresponde a la reimportación y actualización de E4. La
+caché queda validada como subsistema con sus propias pruebas, no como camino
+ejecutado dentro de la importación.
 
 ## 11. Log
 
@@ -1770,6 +1849,69 @@ U0 creó este archivo con 364 líneas y 28 119 bytes (fotografía histórica). V
 - **Ejecución.** Local (Termux): `./gradlew :core:test` → 135 pruebas, 0 fallos; `./gradlew :app:detekt :app:ktlintCheck` → sin hallazgos. `:app` no compila en local (`SDK location not found`) y no se instaló ningún SDK. CI: run `40681632913` sobre `3140d34`, **5/5 verdes** —`jvm-tests` (`:core` 135, `:app` 67), `static-analysis`, `apk`, `instrumented-mobile` (7) e `instrumented-tv` (1)— con artifacts `copernicotv-debug-apk` (10 172 579), `reportes-jvm` (45 036), `reportes-instrumented-mobile` (6 352), `reportes-instrumented-tv` (5 181) y `room-schema-v1` (4 581). Trial de TV `40681632833` sobre el mismo commit: verde, `BUILD SUCCESSFUL in 4m 6s`. El run intermedio `40679453849` sobre `f73f166` falló en `jvm-tests` por dos defectos propios de las pruebas nuevas (`lateinit` sobre un `Long` y llamadas suspendidas fuera de corrutina), corregidos en `3140d34`; no fue un defecto del producto.
 - **Veredicto.** E1 **se cierra**. Los diez puntos de §9.2 están satisfechos: (1) wrapper y Gradle verificados desde L33; (2) `:core:test` ejecutado en local y en `jvm-tests`; (3) suites de identidad verdes; (4) esquema v1 completo, con el JSON exportado publicado; (5) pruebas de integridad observadas; (6) cinco jobs verdes con artifacts; (7) trial de TV verde; (8) documento releído y evidencia actualizada por unidad; (9) `AGENTS.md` corregido en L35; (10) el diff de E1 no contiene transiciones A/B/C, correspondencia, plan de fusión ni ciclo de vida de Observaciones. Los dos pendientes de L42 quedan cerrados con prueba observada, y los puntos 2 y 3 de L42 siguen asignados a E2-T6, E2-T2, E4-T3, E5-T2, E5-T3 y E5-T4 sin bloquear E1. La validación física del propietario (E1-U21) se mantiene como evidencia separada de CI.
 
+### L44 — E2: importación M3U/M3U8 y catálogo base
+
+- **Autorización.** El propietario autorizó E2 completa (importación M3U/M3U8 y
+  catálogo base) sobre `feat/e1-bootstrap`, sin autorizar E3, E4 ni E5.
+- **Alcance ejecutado.** Las siete tareas de §8.2. Lógica de dominio en `:core`
+  (verificable en local) y persistencia/glue en `:app` (verificable solo en CI por
+  ausencia de Android SDK en Termux). No se reabrió E1.
+- **Commits.** `b8a16db` parser M3U; `d6c2b96` cifrado y errores tipados;
+  `c26f811` `PoliticaCache`; `725e205` `ImportadorM3U` y atributos extra;
+  `f50810e` importación en `:app`; `85b8796` fixture y medición de 10 000
+  entradas; `6364e4f` job `p1-performance`; `03c7730` evidencia P1; `09e04fd` y
+  `c0b116c` estado y reconstrucción del índice HMAC; `afc45a1` caché de
+  transporte; `fe1cc19` y `68a36c5` correcciones de la caché; `993d3b4` pruebas
+  instrumentadas de DC-04; `6d26566` permiso `INTERNET`; `e4ce7a8` camino
+  `timeout`; `5e13de3` ámbito de Canal y Grupo.
+- **Evidencia por tarea.** Matriz completa en §10.9. Run `40858929094` sobre
+  `5e13de3`: 6/6 jobs verdes; `:core` 244 pruebas (1 ignorada), `:app` 120,
+  `instrumented-mobile` 13, `instrumented-tv` 1, sin fallos. Trial de TV
+  `40858929081` verde.
+- **Defecto real encontrado y corregido.** La app no declaraba
+  `android.permission.INTERNET`. Lo expuso `CredencialesEnReposoTest` con
+  `SecurityException` al importar desde una URL: toda importación HTTP y la caché
+  de transporte fallaban en dispositivo. Corregido en `6d26566`; es permiso
+  normal de instalación, sin diálogo.
+- **Defecto de prueba encontrado y corregido.** La prueba de límite por archivo
+  de la caché descargaba cero bytes (29 cifrados) y no superaba el límite de 50,
+  así que el caso no se ejercitaba. Corregida en `68a36c5`.
+- **P1.** Tres corridas verdes consecutivas del job `p1-performance`:
+  `40711018242` p95 15.075 ms, `40857174822` p95 11.840 ms, `40861342045`
+  p95 8.605 ms, con pico de heap 32.888 / 33.419 / 42.861 MiB frente a los
+  límites de 1200 ms y 256 MiB. Baseline en `docs/evidence/p1/p1-baseline.json`
+  y `.md`, con la referencia tomada del peor valor. **La revisión humana que
+  DC-10 exige sigue pendiente.**
+- **Pendiente por bloqueo externo.** E2-T2 no tiene ejecutado el camino feliz SAF
+  con permiso persistido real: el grant persistible solo lo produce un
+  `ACTION_OPEN_DOCUMENT` resuelto por el usuario (§10.9.1). Requiere verificación
+  física con procedimiento y resultado esperado.
+- **Frontera con E4.** La caché no se consulta dentro de `importarDesdeUrl`: la
+  primera importación no tiene Lista para la clave y E2-T2 exige descargar antes
+  de persistir. Su integración pertenece a la reimportación de E4 (§10.9.3).
+- **Frontera con E3.** Las métricas de búsqueda (150 ms) y de página 2 (80 ms) de
+  DC-10 miden la consulta de E3, que no existe: no se midieron ni se declaran
+  cumplidas.
+- **Nota operativa.** El grupo de concurrencia `ci-${{ github.ref }}` con
+  `cancel-in-progress: true` hace que un `workflow_dispatch` cancele el run de
+  `push` en curso. Un dispatch lanzado durante la verificación de `68a36c5`
+  canceló ese run; se rehizo la verificación en commits posteriores. Las
+  mediciones P1 se secuenciaron después de cada verificación.
+- **Veredicto.** E2 queda **abierta**: cinco tareas cubiertas con evidencia
+  ejecutada (T1, T3, T4, T6, T7), y T2 y T5 con un pendiente cada una —
+  verificación SAF física y revisión humana del baseline. No se declara cerrada
+  ninguna tarea con un criterio obligatorio pendiente.
+
 ### Próximo paso
 
-E1 queda **cerrada** sobre `3140d34`: los diez puntos de §9.2 están satisfechos y los dos pendientes de L42 se cerraron con prueba observada en el run `40681632913` (5/5 verdes) y el trial `40681632833`. U0 sigue aprobada documentalmente en L32 sobre `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L43. El siguiente trabajo autorizable es **E2** (importación M3U/M3U8 y catálogo base), que requiere autorización explícita del propietario. DC-01–DC-11 y H-01–H-11 siguen normativos; las pruebas instrumentadas de DC-04 (backup, `run-as`, logcat), la implementación de E2–E7, las mediciones P1/P2 y la migración post-v1 siguen pendientes. Cualquier cambio posterior de requisitos o decisiones reabre la aprobación de U0 y exige una nueva entrada L#.
+E1 queda **cerrada** sobre `3140d34` y E2 queda **abierta** sobre `5e13de3` con
+cinco tareas cubiertas y dos pendientes concretos: la verificación física del
+camino SAF con permiso persistido (E2-T2) y la revisión humana del baseline P1
+(E2-T5). Ninguno de los dos es trabajo de código pendiente: el primero necesita
+un dispositivo con selección real de archivo y el segundo una decisión del
+propietario. U0 sigue aprobada documentalmente en L32 sobre
+`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L44.
+DC-01–DC-11 y H-01–H-11 siguen normativos. Las métricas de búsqueda y página 2
+pertenecen a E3, la integración de la caché a E4 y la reproducción a E6; ninguna
+se adelanta sin autorización. Cualquier cambio posterior de requisitos o
+decisiones reabre la aprobación de U0 y exige una nueva entrada L#.

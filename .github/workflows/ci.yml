@@ -107,9 +107,12 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
+          # El filtro es una lista explícita: toda prueba instrumentada de móvil
+          # nueva debe añadirse aquí o no se ejecutará en CI. `CanarioTvTest` se
+          # excluye a propósito porque corre en el job de TV.
           script: >-
             ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest
       - name: Publicar reportes instrumentados
         if: always()
         uses: actions/upload-artifact@v4

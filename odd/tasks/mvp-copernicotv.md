@@ -1179,6 +1179,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E2-T6 (pruebas instrumentadas de DC-04) | 2026-10-29 | `app/src/androidTest/kotlin/com/copernicotv/app/CredencialesEnReposoTest.kt`, `.github/workflows/ci.yml` | Commit `993d3b4` | CI `instrumented-mobile` | 6/6 en emulador: ciphertext alterado, AAD cruzado, clave eliminada, backup, dump sin plaintext, logcat sin URL | `40854438558` | Cubierta |
 | E2-T2/T5 (red y timeout) | 2026-10-29 | `app/src/main/AndroidManifest.xml`, `app/.../data/CatalogoRepositorio.kt`, `app/src/test/.../ImportacionE2Test.kt`, `AppModule.kt` | Commits `6d26566`, `e4ce7a8` | CI `jvm-tests`, `instrumented-mobile` | `INTERNET` faltante corregido; camino `timeout` ejercitado con lectura de 300 ms | `40854438558` | Parcial (SAF físico pendiente) |
 | E2-T3 (ámbito de Canal y Grupo) | 2026-10-29 | `app/src/test/kotlin/com/copernicotv/app/data/CatalogoAmbitoTest.kt` | Commit `5e13de3` | CI `jvm-tests` | 2 casos; `:app` 120 verdes | `40858929094` | Cubierta |
+| E3-U1 (datos de Favoritos, Historial y Ocultaciones) | 2026-10-29 | `app/.../data/db/dao/{EstadoUsuarioDaos,IntegridadDaos}.kt`, `app/.../data/db/AppDatabase.kt`, `app/.../di/AppModule.kt`, `app/.../data/{Favoritos,Historial,Ocultaciones}Repositorio.kt`, `app/src/test/.../data/EstadoUsuarioPersistenciaTest.kt` | Commit `9781bf2`; 8 archivos, +758 | Local: `:core:test`, `ktlintCheck`, `detekt`, `:app:ktlintCheck` y `:app:detekt` verdes; `:app:testDebugUnitTest` no ejecutable local por SDK ausente. CI: `jvm-tests` | `:app` 137 pruebas, 0 fallos; `EstadoUsuarioPersistenciaTest` 12/12 (incluye atomicidad); `TV emulator trial` verde | `40950814485` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `40950814041` | Parcial: E3-T2/T3 con capa de datos; E3-T4 cubierta en datos (UI en E3-T6); E3 abierta |
 
 ### 10.2 Evidencia de CI
 
@@ -2138,6 +2139,58 @@ queda ninguna cláusula obligatoria pendiente de E2; el hallazgo de
   código de producción; ktlint de `:app` y la CI del commit de evidencia se
   verifican al publicarlo. `docs/evidence/u0-manifest.md` no se modifica.
 
+### L49 — E3-U1: datos de Favoritos, Historial y Ocultaciones
+
+- **Autorización.** Ejecutar E3-U1 sobre `feat/e1-bootstrap` con pruebas
+  JVM/Robolectric antes de la UI, sin cambios de esquema v1 y sin implementar
+  E3-U2 ni la UI del catálogo. E2 permanece cerrada; no se reabre.
+- **Implementación.** `FavoritoDao`, `OcultacionCanalDao` y
+  `OcultacionGrupoDao` en `EstadoUsuarioDaos.kt`; `HistorialDao` extendido con
+  `actualizarFecha` y `recortar(limite)`; accesores en `AppDatabase` y
+  provisión Hilt en `AppModule`. Tres repositorios `@Singleton` con
+  `Dispatchers.IO`: `FavoritosRepositorio` (alta y baja idempotentes, sin borrar
+  el Canal), `HistorialRepositorio` (una fila por Canal, fecha máxima y recorte
+  a 10 dentro de `withTransaction`) y `OcultacionesRepositorio` (Canal y Grupo
+  por FK, sin tocar Listas ni Apariencias). No se agregaron entidades, columnas,
+  índices, FKs, restricciones ni migraciones: `AppDatabase` conserva 26
+  entidades y `version = 1`.
+- **Pruebas.** `EstadoUsuarioPersistenciaTest` con 12 casos Robolectric/Room
+  reales: favorito y consulta, alta repetida, baja sin borrar el Canal,
+  historial con una fila y fecha reciente, orden `fecha DESC, canalId DESC`,
+  límite de 10, atomicidad con un trigger `BEFORE DELETE` que aborta el
+  recorte, ocultar y mostrar Canal, ocultar y mostrar Grupo sin alterar
+  Apariencias ni Canales, Grupos homónimos en Listas distintas, unicidad y FK
+  reales, y snapshot de `sqlite_master` sin cambios de esquema. La semántica SQL
+  del recorte y del trigger se validó además con `sqlite3` 3.53.4: 10 filas
+  conservadas y `ROLLBACK` con las 10 originales.
+- **Ejecución local.** `./gradlew :core:test`, `ktlintCheck`, `detekt`,
+  `:app:ktlintCheck` y `:app:detekt` verdes. `:app:testDebugUnitTest` **no se
+  ejecutó localmente**: no hay Android SDK (`ANDROID_HOME`, `platforms`,
+  `sdkmanager` ni `local.properties`); no se instaló SDK. No se declara esa
+  suite como ejecutada localmente.
+- **Ejecución en CI.** Run `40950814485` sobre `9781bf2`, workflow `ci.yml`:
+  5/5 jobs verdes (`jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile`,
+  `instrumented-tv`); `p1-performance` y `p1-android` omitidos por diseño en
+  `push`. `jvm-tests` ejecutó `:app:testDebugUnitTest`: 137 pruebas, 0 fallos,
+  0 ignoradas, 14.980 s; `EstadoUsuarioPersistenciaTest` 12/12 verdes en
+  0.721 s. El workflow `TV emulator trial` (`40950814041`) también quedó verde
+  sobre el mismo SHA. El artifact `reportes-jvm` confirma el reporte HTML de las
+  12 pruebas.
+- **Estado de E3.** E3-U1 ejecutada como capa de datos. E3-T2 y E3-T3 quedan
+  **parcialmente cubiertas**: faltan «sobrevive a Actualización», la fusión
+  `max(fecha)` entre Canales que convergen, `EXPLAIN QUERY PLAN` y el acceso
+  rápido, todos de E4/UI. E3-T4 queda cubierta en la capa de datos; su UI
+  pertenece a E3-T6. E3-T1, E3-T5, E3-T6, E3-T7, E3-T8 y E3-T9 no se tocan y E3
+  sigue abierta.
+- **Frontera.** No se implementa UI del catálogo, E3-U2 ni otras unidades de E3.
+  No se modifica la identidad del Canal ni la reconciliación de E4; no se
+  fusionan Canales.
+- **Validación de esta entrada.** `docs/evidence/u0-manifest.md`, el baseline
+  P1 JVM (`docs/evidence/p1/p1-baseline.json`, `p1-baseline.md`) y la evidencia
+  P1 Android no se modifican. Este archivo conserva CRLF (0 LF sueltos). La CI
+  del commit documental se verifica al publicarlo; no se declara verde antes de
+  observar el run.
+
 ### Próximo paso
 
 E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
@@ -2156,22 +2209,24 @@ medición de heap están corregidos y verificados en CI (`40877127294`,
 el run `40906464669`, 5/5 verde con `p1-performance` omitido; el commit
 `a28971a` tiene el run `40929318245`, 7/7 verde con `p1-android`.
 
-**Siguiente unidad: E3-U1 (estado de usuario).** Cubre E3-T2
-(Favoritos), E3-T3 (Historial) y E3-T4 (Ocultaciones) sobre el esquema v1 ya
-exportado. Está **documentada y no iniciada**, a la espera de autorización
-explícita; E2 ya está cerrada. Sus precondiciones son: E2 cerrada; baseline P1
-aprobado y disponible; DAOs de
-`Favorito`, `Ocultacion` e `Historial` sobre las entidades existentes; pruebas
-JVM/Robolectric escritas antes de la UI; sin cambios de esquema que exijan
-migración post-v1. La secuencia propuesta para el resto de E3 es: U2 búsqueda y
-filtros (E3-T1, depende de U1 y de la medición P1 de búsqueda y página 2); U3
-catálogo móvil y reordenamiento (E3-T6, E3-T8); U4 ordenación A/B/C y DataStore
-(E3-T7); U5 colecciones (E3-T5); U6 perfiles (E3-T9); U7 cierre y evidencia. No
-se implementa ninguna.
+**E3-U1 (estado de usuario) ejecutada el 2026-10-29.** Cubre la capa de datos
+de E3-T2 (Favoritos), E3-T3 (Historial) y E3-T4 (Ocultaciones) sobre el esquema
+v1, con 12 pruebas Robolectric/Room reales y sin migración post-v1. Commit
+`9781bf2`; run `40950814485` con 5/5 jobs verdes (`p1-performance` y
+`p1-android` omitidos por diseño) y `TV emulator trial` `40950814041` verde. La
+suite `:app` quedó en 137 pruebas, 0 fallos; `EstadoUsuarioPersistenciaTest`
+12/12. E3-T2 y E3-T3 siguen **parciales** por «sobrevive a Actualización», la
+fusión `max(fecha)`, `EXPLAIN QUERY PLAN` y el acceso rápido (E4/UI); E3-T4
+queda cubierta en datos, con UI en E3-T6. E3 sigue **abierta**. La secuencia
+propuesta para el resto de E3 es: U2 búsqueda y filtros (E3-T1, depende de U1,
+ya ejecutada, y de la medición P1 de búsqueda y página 2); U3 catálogo móvil y
+reordenamiento (E3-T6, E3-T8); U4 ordenación A/B/C y DataStore (E3-T7); U5
+colecciones (E3-T5); U6 perfiles (E3-T9); U7 cierre y evidencia. No se
+implementa ninguna.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y
-L44–L48 solo actualizan estados con evidencia. DC-01–DC-11 y H-01–H-11 siguen
+L44–L49 solo actualizan estados con evidencia. DC-01–DC-11 y H-01–H-11 siguen
 normativos. Las métricas de búsqueda y página 2 pertenecen a E3, la integración
 de la caché y la relectura a E4 y la reproducción a E6; ninguna se adelanta sin
 autorización. Cualquier cambio posterior de requisitos o decisiones reabre la

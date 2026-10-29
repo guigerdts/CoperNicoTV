@@ -1,6 +1,6 @@
 {
   "esquema": "p1-baseline/v1",
-  "fecha": "2026-10-29T10:56:50.848508236Z",
+  "fecha": "2026-10-29T13:12:52.786547318Z",
   "entorno": {
     "runner": "ubuntu24",
     "arquitectura": "X64",
@@ -20,7 +20,8 @@
     "comando": "./gradlew :core:p1Performance --offline",
     "calentamientos": 10,
     "mediciones": 30,
-    "estadistico": "p95 nearest-rank"
+    "estadistico": "p95 nearest-rank",
+    "notaGc": "El muestreador de heap arranca después de System.gc(); la corrección está en el commit b186c3a. Las corridas anteriores a ese commit no son comparables en pico de heap."
   },
   "limites": {
     "parseoP95Ms": 1200.0,
@@ -31,47 +32,71 @@
   "corridas": [
     {
       "orden": 1,
-      "run": "40711018242",
-      "commit": "6364e4f73bc7ed27f4b3cb727d129821c8fb0ccd",
-      "fecha": "2026-10-28T14:59:33.606692245Z",
-      "medianaMs": 10.129,
-      "p95Ms": 15.075,
-      "maximoMs": 16.032,
-      "picoHeapMiB": 32.888,
+      "run": "40877200854",
+      "commit": "b186c3a29283472d4f0e63cf4cf6f1bad75479b1",
+      "fecha": "2026-10-29T12:56:22.970367378Z",
+      "medianaMs": 7.403,
+      "p95Ms": 10.334,
+      "maximoMs": 12.26,
+      "picoHeapMiB": 44.836,
       "cumple": true
     },
     {
       "orden": 2,
-      "run": "40857174822",
-      "commit": "e4ce7a8a22110056095bcdf855445e68f0c5792f",
-      "fecha": "2026-10-29T10:25:13.194220295Z",
-      "medianaMs": 7.616,
-      "p95Ms": 11.84,
-      "maximoMs": 13.095,
-      "picoHeapMiB": 33.419,
+      "run": "40878469399",
+      "commit": "b186c3a29283472d4f0e63cf4cf6f1bad75479b1",
+      "fecha": "2026-10-29T13:05:14.823554546Z",
+      "medianaMs": 7.401,
+      "p95Ms": 10.421,
+      "maximoMs": 11.773,
+      "picoHeapMiB": 45.223,
       "cumple": true
     },
     {
       "orden": 3,
-      "run": "40861342045",
-      "commit": "5e13de3fd52a62b4ae7bbbf3394a95e9d787acfc",
-      "fecha": "2026-10-29T10:56:50.848508236Z",
-      "medianaMs": 5.401,
-      "p95Ms": 8.605,
-      "maximoMs": 14.982,
-      "picoHeapMiB": 42.861,
+      "run": "40879581126",
+      "commit": "b186c3a29283472d4f0e63cf4cf6f1bad75479b1",
+      "fecha": "2026-10-29T13:12:52.786547318Z",
+      "medianaMs": 10.047,
+      "p95Ms": 15.067,
+      "maximoMs": 21.284,
+      "picoHeapMiB": 45.827,
       "cumple": true
     }
   ],
   "referencia": {
     "criterio": "peor p95 y peor pico de heap de las tres corridas",
-    "p95Ms": 15.075,
-    "picoHeapMiB": 42.861
+    "p95Ms": 15.067,
+    "picoHeapMiB": 45.827,
+    "regresionTiempoMs": 18.08,
+    "regresionMemoriaMiB": 52.701
   },
   "revisionHumana": {
     "estado": "pendiente",
-    "detalle": "DC-10 exige revisión humana del baseline antes de usarlo como referencia de regresión. El archivo registra las tres corridas verdes; la revisión es una acción del propietario y no se declara hecha."
+    "detalle": "DC-10 exige revisión humana del baseline antes de usarlo como referencia de regresión. El archivo registra las tres corridas verdes; la revisión es una acción del propietario y no se declara hecha. Puntos de decisión en docs/evidence/p1/revision-humana-pendiente.md."
   },
+  "descartadas": [
+    {
+      "run": "40711018242",
+      "commit": "6364e4f73bc7ed27f4b3cb727d129821c8fb0ccd",
+      "motivo": "El run figura cancelled por la concurrencia cruzada de CI, aunque su job p1-performance terminó en success. No es una corrida completa verde."
+    },
+    {
+      "run": "40857174822",
+      "commit": "e4ce7a8a22110056095bcdf855445e68f0c5792f",
+      "motivo": "Procedimiento anterior a la corrección del GC (b186c3a); no comparable con el pico de heap actual."
+    },
+    {
+      "run": "40861342045",
+      "commit": "5e13de3fd52a62b4ae7bbbf3394a95e9d787acfc",
+      "motivo": "Procedimiento anterior a la corrección del GC (b186c3a); no comparable con el pico de heap actual."
+    },
+    {
+      "run": "40870356075",
+      "commit": "2b70543",
+      "motivo": "Pico de heap 228.520 MiB contaminado por basura previa al System.gc(); el muestreador arrancaba antes de la recolección. Descartada y superada por la corrección b186c3a."
+    }
+  ],
   "alcance": {
     "cubre": "parseo M3U de 10 000 entradas y pico de heap del parseo",
     "noCubre": "métricas de búsqueda (150 ms) y de página 2 (80 ms), que dependen de la consulta de E3 y aún no tienen implementación"

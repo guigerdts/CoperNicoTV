@@ -1211,7 +1211,7 @@ Cada unidad que use CI registra: workflow, job, URL o ID del run, SHA, artifact 
 | `40681632913` (CI) | `3140d34` | **5/5 verdes**: `jvm-tests` (`:core` 135, `:app` 67 = 47 + 5 de `MigracionAparienciaTest` + 6 de `CanalEscritorTest` + 7 nuevas de `PerfilRepositorioTest` + 2 nuevas de `IntegridadRoomTest`), `static-analysis`, `apk`, `instrumented-mobile` (7 = 2 + 5 de `ClavesKeystoreTest`), `instrumented-tv` (1) | `copernicotv-debug-apk` (10 172 579), `reportes-jvm` (45 036), `reportes-instrumented-mobile` (6 352), `reportes-instrumented-tv` (5 181), `room-schema-v1` (4 581) |
 | `40681632833` (`TV emulator trial`) | `3140d34` | **verde**: emulador arrancado, canario 1/1, `BUILD SUCCESSFUL in 4m 6s` | `reporte-tv-trial` (5 182) |
 
-| `40711018242` (CI, dispatch) | `6364e4f` | `p1-performance` verde: p95 15.075 ms, pico 32.888 MiB | `p1-medicion` |
+| `40711018242` (CI, dispatch) | `6364e4f` | `p1-performance` verde: p95 15.075 ms, pico 32.888 MiB; el run figura `cancelled` globalmente por la concurrencia cruzada, así que no cuenta como corrida completa verde | `p1-medicion` |
 | `40715485318` (CI) | `c0b116c` | **6/6 verdes**; `:app` 118 pruebas | `reportes-jvm`, `reportes-instrumented-mobile` |
 | `40723479282` (CI) | `fe1cc19` | 5 verdes; `jvm-tests` fallido: 1 de 117, `un archivo mayor que el limite por archivo no se almacena` | `reportes-jvm` |
 | `40852560679` (CI) | `68a36c5` | cancelado por la `concurrency` al despachar `40852620797`; sin resultado propio | — |
@@ -1223,6 +1223,12 @@ Cada unidad que use CI registra: workflow, job, URL o ID del run, SHA, artifact 
 | `40858929094` (CI) | `5e13de3` | **6/6 verdes**: `:core` 244 (1 ignorada), `:app` 120, `instrumented-mobile` 13, `instrumented-tv` 1 | `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `copernicotv-debug-apk` |
 | `40858929081` (`TV emulator trial`) | `5e13de3` | **verde**: emulador arrancado, canario de TV 1/1 | `reporte-tv-trial` |
 | `40861342045` (CI, dispatch) | `5e13de3` | **6/6 verdes**; `p1-performance` verde: p95 8.605 ms, pico 42.861 MiB | `p1-medicion` |
+| `40870334073` (CI) | `2b70543` | **5/5 verdes** (`p1-performance` omitido por diseño en `push`); experimento deliberado de concurrencia: convivió con el dispatch `40870356075` sin cancelarse | `copernicotv-debug-apk`, `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv` |
+| `40870356075` (CI, dispatch) | `2b70543` | **6/6 verdes**; `p1-performance` pico 228.520 MiB contaminado por el muestreador previo al `System.gc()`; descartada del baseline | `p1-medicion` |
+| `40877127294` (CI) | `b186c3a` | **5/5 verdes** (`p1-performance` omitido por diseño en `push`): `:core` 244 (1 ignorada), `:app` 125, `instrumented-mobile` 15 (incluye `ImportacionSafTest`), `instrumented-tv` 1 | `copernicotv-debug-apk`, `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `room-schema-v1` |
+| `40877200854` (CI, dispatch) | `b186c3a` | **6/6 verdes**; `p1-performance` verde: p95 10.334 ms, pico 44.836 MiB | `p1-medicion` |
+| `40878469399` (CI, dispatch) | `b186c3a` | **6/6 verdes**; `p1-performance` verde: p95 10.421 ms, pico 45.223 MiB | `p1-medicion` |
+| `40879581126` (CI, dispatch) | `b186c3a` | **6/6 verdes**; `p1-performance` verde: p95 15.067 ms, pico 45.827 MiB | `p1-medicion` |
 
 ### 10.3 Límites de Termux
 
@@ -1238,7 +1244,11 @@ Una verificación física pendiente se registra con: procedimiento exacto, resul
 | Verificación | Procedimiento exacto | Resultado esperado | Estado | Bloqueo | Qué falta |
 |---|---|---|---|---|---|
 | Importación desde «Importar lista de prueba» en teléfono físico, sobre una instalación previa que conserva datos y clave AES | Instalar el APK del run `40629345381` (artifact `copernicotv-debug-apk`, 10 589 548 bytes) sobre la instalación existente, sin desinstalar ni borrar datos; abrir la app; pulsar «Importar lista de prueba»; esperar a que termine; cerrar completamente la app; volver a abrirla; pulsar de nuevo «Importar lista de prueba» | Tras reabrir, los 3 canales del fixture (`example.invalid`) siguen visibles; la segunda importación no muestra `importacion_fallida` y no duplica canales | **Verificada por el propietario el 2026-10-28**; evidencia de usuario, no automatizada | — (desbloqueada) | — |
-| Importación de una lista desde SAF en teléfono físico (E2-T2) | Instalar el APK del run `40858929094`, pulsar «Importar», elegir «Abrir documento» y seleccionar un archivo `.m3u` del almacenamiento; cerrar y reabrir la app; abrir de nuevo la Lista importada | La Lista se importa con sus Canales; el permiso sobrevive al reinicio del proceso y la reapertura no vuelve a pedir selección; no aparece `permiso_saf_no_persistido` | Pendiente por bloqueo externo | Requiere dispositivo físico y selección real de archivo: el grant persistible solo lo produce un `ACTION_OPEN_DOCUMENT` resuelto por el usuario | Verificación física del propietario |
+| Importación de una lista desde SAF en teléfono físico (E2-T2) | Instalar el APK del run `40877127294` (artifact `copernicotv-debug-apk`, commit `b186c3a`) sobre la instalación existente, sin desinstalar ni borrar datos; abrir la app; pulsar «Abrir documento»; seleccionar un archivo `.m3u`/`.m3u8` del almacenamiento; comprobar que aparecen sus Canales; ejecutar `adb shell dumpsys activity uri-grants` y anotar el grant de `com.copernicotv.app`; forzar la detención (`adb shell am force-stop com.copernicotv.app`) y volver a abrir la app; repetir el `dumpsys`; anotar fecha, dispositivo y resultado | La Lista se importa con sus Canales; el grant `content://` aparece como permiso de lectura persistido y sigue presente tras el reinicio del proceso; no aparece `permiso_saf_no_persistido`; los datos previos se conservan | Pendiente por bloqueo externo | Requiere dispositivo físico y selección real de archivo: el grant persistible solo lo produce un `ACTION_OPEN_DOCUMENT` resuelto por el usuario | Verificación física del propietario; la relectura del documento tras reinicio se ejecuta en la actualización de E4 |
+
+**Campos obligatorios al ejecutar la verificación SAF (E2-T2):** fecha, dispositivo (modelo y versión de Android), run y commit del APK, nombre visible del documento, presencia del grant antes y después del reinicio, resultado (`verificado`/`fallido`) y observaciones. Sin esos campos la verificación queda `Pendiente por bloqueo externo`, no `Verificada`.
+
+La relectura del documento tras reinicio no se ejecuta en E2: la app todavía no tiene un camino de reimportación/actualización. E2 verifica que el grant persistible se solicite, se conserve y sobreviva al reinicio; la relectura pertenece a E4.
 
 **Confirmación del propietario (2026-10-28, dispositivo Android físico, APK del run `40629345381`, commit `ee443b8`, rama `feat/e1-bootstrap`):** (1) los tres canales del fixture aparecen automáticamente al abrir la aplicación; (2) una segunda importación no provoca `importacion_fallida` ni elimina los canales; (3) los tres canales continúan visibles después de cerrar completamente y volver a abrir la aplicación. Es **evidencia de usuario**: se registra por declaración del propietario, sin `adb` ni captura automatizada, y no sustituye ni se suma como prueba de CI. Resuelve las verificaciones físicas pendientes de L39 (clave AES heredada) y L40 (persistencia del catálogo).
 
@@ -1304,36 +1314,44 @@ U0 creó este archivo con 364 líneas y 28 119 bytes (fotografía histórica). V
 
 Alcance: las siete tareas de §8.2, sin invadir E3, E4 ni E5. Cada fila se apoya
 en un run de CI ejecutado sobre el commit indicado; no se declara cubierto nada
-por inspección de código. Run de referencia: `40858929094` sobre `5e13de3`,
+por inspección de código. Run de referencia: `40877200854` sobre `b186c3a`,
 **6/6 jobs verdes** (`jvm-tests`, `static-analysis`, `apk`,
-`instrumented-mobile`, `instrumented-tv`; `p1-performance` omitido por diseño en
-`push`). Conteos observados en los artefactos: `:core` 244 pruebas (1 ignorada,
-`MedicionP1Test`), `:app` 120 pruebas, `instrumented-mobile` 13,
-`instrumented-tv` 1, sin fallos.
+`instrumented-mobile`, `instrumented-tv`, `p1-performance`). El push
+`40877127294` sobre el mismo commit fue **5/5 verde** con `p1-performance`
+omitido por diseño. Conteos observados en los artefactos: `:core` 244 pruebas
+(1 ignorada, `MedicionP1Test`), `:app` 125 pruebas, `instrumented-mobile` 15
+(incluye `ImportacionSafTest`), `instrumented-tv` 1, sin fallos.
 
 | Tarea | Criterio de §8.2 | Implementación | Evidencia ejecutada | Estado |
 |---|---|---|---|---|
 | E2-T1 | Parser M3U streaming | `core/src/main/kotlin/com/copernicotv/core/m3u/ParserM3U.kt` | `ParserM3UTest`, `ParserM3U10kTest` en `jvm-tests` | Cubierta |
-| E2-T2 | Alta de Fuente y Lista (URL y SAF `content://`), errores tipados, Estado de Actualización | `app/.../data/CatalogoRepositorio.kt` (`importarDesdeUrl`, `importarDesdeSaf`, `registrarIntento`, `registrarFallo`) | `ImportacionE2Test` 11 casos; `CredencialesEnReposoTest` expuso la falta de `INTERNET`, corregida en `6d26566` | Parcial: falta el camino feliz SAF con permiso persistido real (§10.9.1) |
+| E2-T2 | Alta de Fuente y Lista (URL y SAF `content://`), errores tipados, Estado de Actualización | `app/.../data/CatalogoRepositorio.kt` (`importarDesdeUrl`, `importarDesdeSaf`, `nombreDeDocumento`, `registrarIntento`, `registrarFallo`); `MainActivity` (`OpenDocument`); `CatalogoScreen` («Abrir documento»); `CatalogoViewModel.importarDesdeSaf` | `ImportacionE2Test` 11 casos; `NombreDocumentoTest` 5 JVM; `ImportacionSafTest` 2 instrumentados en `instrumented-mobile` 15; `CredencialesEnReposoTest` expuso la falta de `INTERNET`, corregida en `6d26566` | Parcial: falta el camino feliz SAF con permiso persistido real (§10.9.1) |
 | E2-T3 | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; Hilt | `app/.../db/entities/CatalogoEntities.kt`, `CatalogoRepositorio.kt`, `AppModule.kt` | `CatalogoAmbitoTest` 2 casos; `CatalogoRepositorioTest` (orden por Apariencia); `CatalogoPersistenciaTest` 5 casos | Cubierta |
 | E2-T4 | Logo, nombre y atributos persistidos; ausencia no rompe | `core/.../m3u/ImportadorM3U.kt`, `CodecAtributosExtra.kt`; `CatalogoRepositorio.cifrarLogo` | `CodecAtributosExtraTest`, `ImportadorM3UTest`, `ImportacionE2Test` («persiste logo cifrado y atributos extra deterministas»); el fixture sin `tvg-logo` importa 3 Canales con logo nulo | Cubierta |
-| E2-T5 | 10 000 entradas con P1 conforme a §7; timeout y 4xx/5xx sin destruir catálogo | `tools/fixtures/generar_f_p1_10k.py`, `FixtureP1`, `TiemposHttp`, `CatalogoRepositorio.descargar` | `ParserM3U10kTest`, `MedicionP1Test`, job `p1-performance`; baseline de 3 corridas verdes en `docs/evidence/p1/p1-baseline.json`; `ImportacionE2Test` («un 404…», «un 500…», «un timeout conserva el catalogo previo») | Parcial: baseline registrado, **revisión humana pendiente**; métricas de búsqueda y página 2 son de E3 (§10.9.2) |
+| E2-T5 | 10 000 entradas con P1 conforme a §7; timeout y 4xx/5xx sin destruir catálogo | `tools/fixtures/generar_f_p1_10k.py`, `FixtureP1`, `TiemposHttp`, `CatalogoRepositorio.descargar` | `ParserM3U10kTest`, `MedicionP1Test`, job `p1-performance`; baseline de 3 corridas verdes sobre `b186c3a` en `docs/evidence/p1/p1-baseline.json` (p95 15.067 ms, pico 45.827 MiB); `ImportacionE2Test` («un 404…», «un 500…», «un timeout conserva el catalogo previo») | Parcial: baseline registrado, **revisión humana pendiente**; métricas de búsqueda y página 2 son de E3 (§10.9.2) |
 | E2-T6 | Cifrado de columnas URL con Keystore; prohibición en logs, diagnóstico y textos copiables; DC-04 | `core/.../crypto/CifradoAes.kt`, `app/.../crypto/ClavesApp.kt`, `IndiceHmacRepositorio`, `ReconstructorIndiceHmac` | `CredencialesEnReposoTest` 6/6 y `ClavesKeystoreTest` 5/5 en `instrumented-mobile`; `IndiceHmacRepositorioTest` 11, `ReconstructorIndiceHmacTest` 10 | Cubierta |
 | E2-T7 | Caché M3U/XMLTV (DC-09, S51a–S51h) | `core/.../cache/PoliticaCache.kt`; `app/.../data/cache/{CacheDao,AlmacenCache,Descargador,RepositorioCache}.kt` | `PoliticaCacheTest` 21; `RepositorioCacheTest` 16; `DescargadorHttpTest` 3 | Cubierta como subsistema; la integración en la reimportación es E4 (§10.9.3) |
 
-#### 10.9.1 E2-T2: pendiente de verificación SAF con permiso real
+#### 10.9.1 E2-T2: SAF con permiso persistible
 
-`takePersistableUriPermission` solo concede un permiso persistente cuando el
-`content://` llega con `FLAG_GRANT_PERSISTABLE_URI_PERMISSION` desde un
-`ACTION_OPEN_DOCUMENT` resuelto por el usuario. Ni Robolectric ni una prueba
-instrumentada sin interacción pueden fabricar ese grant, así que el camino feliz
-SAF **no está ejecutado** en ningún nivel.
+La entrada usa `ActivityResultContracts.OpenDocument` (`ACTION_OPEN_DOCUMENT`),
+el único mecanismo que produce un grant persistible; `GET_CONTENT` no lo hace.
+`importarDesdeSaf` toma el permiso de lectura y después exige que la URI
+aparezca en `contentResolver.persistedUriPermissions` con `isReadPermission`:
+tomar el permiso sin excepción no basta.
 
-Lo que sí está ejecutado: rechazo de esquema no SAF, rechazo de SAF con esquema
-`http`, y el error tipado `permiso_saf_no_persistido` cuando la toma falla.
-Estado: `Pendiente por bloqueo externo` — requiere una verificación física con
-selección real de archivo, con procedimiento, resultado esperado y estado, según
-§10.4.
+Ejecutado en CI (`instrumented-mobile`, 15 pruebas): `ImportacionSafTest`
+comprueba que un `content://` sin grant devuelve `permiso_saf_no_persistido` y
+conserva los 3 Canales y la Fuente previos, y que el nombre visible cae al
+último segmento de la URI cuando el proveedor no responde. `NombreDocumentoTest`
+cubre la selección pura del nombre (5 casos JVM). `ImportacionE2Test` cubre los
+rechazos de esquema y los errores HTTP.
+
+Pendiente: el camino feliz con un grant real. Solo lo produce una selección
+humana de archivo, así que no se fabrica en Robolectric ni en una prueba
+instrumentada sin interacción. Estado: `Pendiente por bloqueo externo`, con
+procedimiento y campos obligatorios en §10.4. La relectura tras reinicio se
+ejecuta en E4.
 
 #### 10.9.2 E2-T5: alcance de la medición
 
@@ -1341,9 +1359,19 @@ DC-10 fija 1200 ms de parseo, 150 ms de búsqueda y 80 ms de página 2 en JVM. L
 dos últimas miden la consulta de E3, que no existe todavía: no se miden ni se
 declaran cumplidas. La medición P1 cubre parseo y pico de heap.
 
-El baseline se apoya en tres corridas verdes consecutivas (`40711018242`,
-`40857174822`, `40861342045`). La revisión humana que DC-10 exige para usarlo
-como referencia de regresión sigue **pendiente** y es una acción del propietario.
+El baseline se apoya en tres corridas verdes consecutivas sobre `b186c3a`:
+`40877200854` (p95 10.334 ms, pico 44.836 MiB), `40878469399` (p95 10.421 ms,
+pico 45.223 MiB) y `40879581126` (p95 15.067 ms, pico 45.827 MiB). La
+referencia es el peor valor: p95 15.067 ms y pico 45.827 MiB. El procedimiento
+corrige un defecto de medición: el muestreador de heap arrancaba antes de
+`System.gc()` y podía capturar basura previa; una corrida registró 228.520 MiB
+con el mismo código. La corrección está en `b186c3a`. Se descartan
+`40711018242` (run cancelado globalmente por concurrencia), `40857174822` y
+`40861342045` (procedimiento anterior) y `40870356075` (pico contaminado). La
+regresión no se evalúa en esta primera calibración (DC-10 §5). La revisión
+humana que DC-10 exige para usar el baseline como referencia sigue **pendiente**;
+los datos y las decisiones del propietario están en
+`docs/evidence/p1/revision-humana-pendiente.md`.
 
 #### 10.9.3 E2-T7: frontera con E4
 
@@ -1352,6 +1380,27 @@ E2-T2 exige descargar antes de persistir, así que `importarDesdeUrl` no consult
 la caché. La integración corresponde a la reimportación y actualización de E4. La
 caché queda validada como subsistema con sus propias pruebas, no como camino
 ejecutado dentro de la importación.
+
+#### 10.9.4 Auditoría final por criterio (E2)
+
+| Criterio | Qué se comprobó | Evidencia | Veredicto |
+|---|---|---|---|
+| Seguridad y cifrado | Columnas URL cifradas con AES-256-GCM y Keystore; HMAC separado; sin URL en logs, diagnóstico ni textos copiables; `allowBackup=false` | `CifradoAesTest`, `HmacUrlTest`, `CredencialesEnReposoTest` 6/6 y `ClavesKeystoreTest` 5/5 en `instrumented-mobile`; `IndiceHmacRepositorioTest` 11, `ReconstructorIndiceHmacTest` 10; run `40877127294` | Aprobado en CI |
+| Errores tipados | `ubicacion_invalida`, `esquema_no_admitido`, `permiso_saf_no_persistido`, `archivo_inaccesible`, `sin_conexion`, `timeout`, `http_4xx`, `http_5xx`, `sin_canales`; un fallo no destruye el catálogo | `ImportacionE2Test` (404, 500, timeout, ubicación inválida, lista vacía, esquema); `ImportacionSafTest` (permiso) | Aprobado en CI |
+| HTTP | URL http/https validada; timeout; 4xx/5xx sin escribir; `INTERNET` declarado | `ImportacionE2Test`; `DescargadorHttpTest` 3; corrección `6d26566` | Aprobado en CI |
+| SAF | `OpenDocument` (`ACTION_OPEN_DOCUMENT`); grant persistible; comprobación en `persistedUriPermissions`; nombre visible con fallback; error de permiso conserva datos | `MainActivity`; `CatalogoRepositorio.importarDesdeSaf`; `NombreDocumentoTest` 5; `ImportacionSafTest` 2 en `instrumented-mobile` 15 | Parcial: camino feliz pendiente de verificación física (§10.4) |
+| Persistencia e idempotencia | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; segunda importación no duplica ni borra | `CatalogoAmbitoTest` 2; `CatalogoPersistenciaTest` 5; `ImportacionE2Test` («repetir la importacion no duplica…»); `CatalogoRepositorioTest` | Aprobado en CI |
+| Caché | DC-09: presupuesto, temp+fsync+rename, invalidación, `stale`; no integrada en la primera importación | `PoliticaCacheTest` 21; `RepositorioCacheTest` 16; `DescargadorHttpTest` 3 | Aprobado como subsistema; integración E4 (§10.9.3) |
+| P1 | 10 000 entradas; p95 15.067 ms ≤ 1200 ms; pico 45.827 MiB ≤ 256 MiB; tres corridas verdes | `ParserM3U10kTest`; `MedicionP1Test`; runs `40877200854`, `40878469399`, `40879581126` | Aprobado técnicamente; revisión humana pendiente |
+| Migraciones y estático | Esquema v1 exportado; 26 tablas; índices y FK; ktlint y detekt | `EsquemaConformidadTest`; `EsquemaRoomTest`; `IntegridadRoomTest`; `MigracionAparienciaTest`; `static-analysis` en `40877127294` | Aprobado en CI |
+
+| Estado | Tareas |
+|---|---|
+| Aprobado con evidencia ejecutada | T1, T3, T4, T6, T7 |
+| Pendiente físico | T2 (grant SAF real en dispositivo con selección de archivo) |
+| Pendiente del propietario | T5 (revisión humana del baseline P1) |
+| Bloqueado | Ninguno |
+| Hallazgo abierto fuera de E2 | Colisión por `Fuente.nombre` (severidad media; reconciliación por identidad en E4) |
 
 ## 11. Log
 
@@ -1902,16 +1951,73 @@ ejecutado dentro de la importación.
   verificación SAF física y revisión humana del baseline. No se declara cerrada
   ninguna tarea con un criterio obligatorio pendiente.
 
+### L45 — E2: entrada SAF real, concurrencia de CI y baseline P1 corregido
+
+- **Autorización.** Continuación de E2 sobre `feat/e1-bootstrap`; sin autorizar
+  E3, E4 ni E5.
+- **Commits.** `11a77b7` entrada SAF real (`OpenDocument`, botón «Abrir
+  documento», `importarDesdeSaf`, `nombreDeDocumento`); `ecf53c8` pruebas de
+  nombre y de error de permiso; `2b70543` concurrencia de CI por evento;
+  `64f9f3b` filtro de `instrumented-mobile` con `ImportacionSafTest`; `b186c3a`
+  medición de heap con `System.gc()` antes del muestreador.
+- **Defecto real corregido: no había entrada SAF.** La app solo importaba el
+  fixture; `importarDesdeSaf` existía pero ningún camino lo invocaba.
+  `MainActivity` usa `ActivityResultContracts.OpenDocument`
+  (`ACTION_OPEN_DOCUMENT`), el único contrato que produce un grant persistible, y
+  `CatalogoScreen` expone «Abrir documento». `importarDesdeSaf` exige que la URI
+  esté en `persistedUriPermissions`, no solo que `takePersistableUriPermission`
+  no lance.
+- **Defecto real corregido: concurrencia de CI.** El grupo
+  `ci-${{ github.ref }}` hacía que un dispatch cancelara el push en curso (runs
+  `40711006072`/`40711018242` y `40852560679`/`40852620797`). El grupo ahora
+  incluye `github.event_name`; el experimento `40870334073` (push) y
+  `40870356075` (dispatch) convivió sin cancelarse.
+- **Defecto de cobertura corregido: filtro instrumentado.**
+  `instrumented-mobile` usaba una lista explícita y no incluía
+  `ImportacionSafTest`, así que la prueba nueva nunca corría (13 pruebas).
+  Añadida en `64f9f3b`; el run `40877127294` observa 15 pruebas.
+- **Defecto de medición corregido.** El muestreador de heap arrancaba antes de
+  `System.gc()` y capturaba basura previa: `40870356075` registró 228.520 MiB
+  frente a ~30–45 MiB estables. `b186c3a` mueve el GC antes del muestreador.
+- **Evidencia.** Push `40877127294` sobre `b186c3a`: 5/5 verde, `:core` 244
+  (1 ignorada), `:app` 125, `instrumented-mobile` 15, `instrumented-tv` 1.
+  Dispatch `40877200854`: 6/6 verde, p95 10.334 ms, pico 44.836 MiB. Dispatches
+  `40878469399` y `40879581126`: 6/6 verdes, p95 10.421/15.067 ms, pico
+  45.223/45.827 MiB.
+- **Baseline P1.** Reescrito con las tres corridas sobre `b186c3a`; referencia
+  peor valor p95 15.067 ms y pico 45.827 MiB; regresión no evaluada (DC-10 §5).
+  Se descartan `40711018242` (cancelada globalmente), `40857174822` y
+  `40861342045` (procedimiento anterior) y `40870356075` (pico contaminado).
+  Datos crudos en `docs/evidence/p1/medicion-b186c3a-r{1,2,3}.json` y `.csv`.
+- **Hallazgo abierto (severidad media, fuera del arreglo actual).**
+  `Fuente.nombre` no es único y `listaExistente`/`escribirCatalogo` resuelven por
+  nombre (`FuenteDao.porNombre`). Dos documentos SAF distintos con el mismo
+  nombre visible harían un no-op silencioso (`sin_cambios`) o reutilizarían la
+  Fuente equivocada. No se corrige en E2: la reconciliación por identidad es E4.
+  Referencia: `CatalogoRepositorio.listaExistente`, `FuenteDao.porNombre`.
+- **Corrección a «Próximo paso» de L44.** La afirmación «ninguno de los dos es
+  trabajo de código pendiente» era falsa: faltaba la entrada SAF real (código) y
+  el filtro instrumentado no ejecutaba la prueba nueva. Ambos se corrigieron en
+  `11a77b7`/`ecf53c8`/`64f9f3b`.
+- **Veredicto.** E2 sigue **abierta**: T1, T3, T4, T6 y T7 cubiertas; T2
+  pendiente de verificación física del grant real; T5 pendiente de revisión
+  humana del baseline. No se declara cerrada ninguna tarea con criterio
+  obligatorio pendiente.
+
 ### Próximo paso
 
-E1 queda **cerrada** sobre `3140d34` y E2 queda **abierta** sobre `5e13de3` con
-cinco tareas cubiertas y dos pendientes concretos: la verificación física del
-camino SAF con permiso persistido (E2-T2) y la revisión humana del baseline P1
-(E2-T5). Ninguno de los dos es trabajo de código pendiente: el primero necesita
-un dispositivo con selección real de archivo y el segundo una decisión del
-propietario. U0 sigue aprobada documentalmente en L32 sobre
-`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L44.
-DC-01–DC-11 y H-01–H-11 siguen normativos. Las métricas de búsqueda y página 2
-pertenecen a E3, la integración de la caché a E4 y la reproducción a E6; ninguna
-se adelanta sin autorización. Cualquier cambio posterior de requisitos o
-decisiones reabre la aprobación de U0 y exige una nueva entrada L#.
+E1 queda **cerrada** sobre `3140d34` y E2 queda **abierta** sobre `b186c3a` con
+cinco tareas cubiertas (T1, T3, T4, T6, T7) y dos pendientes que no son código:
+(a) la verificación física del grant SAF real en un dispositivo con selección de
+archivo (E2-T2, §10.4); (b) la revisión humana del baseline P1 (E2-T5,
+`docs/evidence/p1/revision-humana-pendiente.md`). La relectura del documento tras
+reinicio se ejecuta en E4. El código de entrada SAF, la concurrencia de CI, el
+filtro instrumentado y la medición de heap ya están corregidos y verificados en
+CI (`40877127294`, `40877200854`, `40878469399`, `40879581126`). U0 sigue
+aprobada documentalmente en L32 sobre
+`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L44 ni
+L45. DC-01–DC-11 y H-01–H-11 siguen normativos. Las métricas de búsqueda y
+página 2 pertenecen a E3, la integración de la caché y la relectura a E4 y la
+reproducción a E6; ninguna se adelanta sin autorización. Cualquier cambio
+posterior de requisitos o decisiones reabre la aprobación de U0 y exige una
+nueva entrada L#.

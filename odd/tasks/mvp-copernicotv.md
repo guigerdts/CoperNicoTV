@@ -1244,13 +1244,15 @@ Una verificación física pendiente se registra con: procedimiento exacto, resul
 | Verificación | Procedimiento exacto | Resultado esperado | Estado | Bloqueo | Qué falta |
 |---|---|---|---|---|---|
 | Importación desde «Importar lista de prueba» en teléfono físico, sobre una instalación previa que conserva datos y clave AES | Instalar el APK del run `40629345381` (artifact `copernicotv-debug-apk`, 10 589 548 bytes) sobre la instalación existente, sin desinstalar ni borrar datos; abrir la app; pulsar «Importar lista de prueba»; esperar a que termine; cerrar completamente la app; volver a abrirla; pulsar de nuevo «Importar lista de prueba» | Tras reabrir, los 3 canales del fixture (`example.invalid`) siguen visibles; la segunda importación no muestra `importacion_fallida` y no duplica canales | **Verificada por el propietario el 2026-10-28**; evidencia de usuario, no automatizada | — (desbloqueada) | — |
-| Importación de una lista desde SAF en teléfono físico (E2-T2) | Instalar el APK del run `40877127294` (artifact `copernicotv-debug-apk`, commit `b186c3a`) sobre la instalación existente, sin desinstalar ni borrar datos; abrir la app; pulsar «Abrir documento»; seleccionar un archivo `.m3u`/`.m3u8` del almacenamiento; comprobar que aparecen sus Canales; ejecutar `adb shell dumpsys activity uri-grants` y anotar el grant de `com.copernicotv.app`; forzar la detención (`adb shell am force-stop com.copernicotv.app`) y volver a abrir la app; repetir el `dumpsys`; anotar fecha, dispositivo y resultado | La Lista se importa con sus Canales; el grant `content://` aparece como permiso de lectura persistido y sigue presente tras el reinicio del proceso; no aparece `permiso_saf_no_persistido`; los datos previos se conservan | Pendiente por bloqueo externo | Requiere dispositivo físico y selección real de archivo: el grant persistible solo lo produce un `ACTION_OPEN_DOCUMENT` resuelto por el usuario | Verificación física del propietario; la relectura del documento tras reinicio se ejecuta en la actualización de E4 |
+| Importación de una lista desde SAF en teléfono físico (E2-T2) | Instalar el APK del run `40882394994` (artifact `copernicotv-debug-apk`, commit `4b3692d`, 10 327 855 bytes) sobre la instalación existente, sin desinstalar ni borrar datos; abrir la app; pulsar «Abrir documento»; seleccionar un archivo `.m3u`/`.m3u8` del almacenamiento; comprobar que aparecen sus Canales; ejecutar `adb shell dumpsys activity uri-grants` y anotar el grant de `com.copernicotv.app`; forzar la detención (`adb shell am force-stop com.copernicotv.app`) y volver a abrir la app; repetir el `dumpsys`; anotar fecha, dispositivo y resultado | La Lista se importa con sus Canales; el grant `content://` aparece como permiso de lectura persistido y sigue presente tras el reinicio del proceso; no aparece `permiso_saf_no_persistido`; los datos previos se conservan | **Aceptada por el propietario el 2026-10-29**; prueba física ejecutada sin `dumpsys`; verificación técnica del grant no realizada | — (aceptada con limitación) | Modelo/versión del dispositivo y grant antes/después no registrados; la relectura del documento tras reinicio se ejecuta en la actualización de E4 |
 
-**Campos obligatorios al ejecutar la verificación SAF (E2-T2):** fecha, dispositivo (modelo y versión de Android), run y commit del APK, nombre visible del documento, presencia del grant antes y después del reinicio, resultado (`verificado`/`fallido`) y observaciones. Sin esos campos la verificación queda `Pendiente por bloqueo externo`, no `Verificada`.
+**Campos obligatorios al ejecutar la verificación SAF (E2-T2):** fecha, dispositivo (modelo y versión de Android), run y commit del APK, nombre visible del documento, presencia del grant antes y después del reinicio, resultado (`verificado`/`fallido`) y observaciones. Sin esos campos la verificación queda `Pendiente por bloqueo externo`, no `Verificada`. La aceptación explícita del propietario del 2026-10-29 se registra aparte y no sustituye esos campos ni convierte la fila en `Verificada`.
 
 La relectura del documento tras reinicio no se ejecuta en E2: la app todavía no tiene un camino de reimportación/actualización. E2 verifica que el grant persistible se solicite, se conserve y sobreviva al reinicio; la relectura pertenece a E4.
 
 **Confirmación del propietario (2026-10-28, dispositivo Android físico, APK del run `40629345381`, commit `ee443b8`, rama `feat/e1-bootstrap`):** (1) los tres canales del fixture aparecen automáticamente al abrir la aplicación; (2) una segunda importación no provoca `importacion_fallida` ni elimina los canales; (3) los tres canales continúan visibles después de cerrar completamente y volver a abrir la aplicación. Es **evidencia de usuario**: se registra por declaración del propietario, sin `adb` ni captura automatizada, y no sustituye ni se suma como prueba de CI. Resuelve las verificaciones físicas pendientes de L39 (clave AES heredada) y L40 (persistencia del catálogo).
+
+**Aceptación del propietario de la verificación SAF (2026-10-29, dispositivo Android físico, APK del run `40882394994`, commit `4b3692d`, rama `feat/e1-bootstrap`):** el propietario ejecutó la prueba con el APK del artifact `copernicotv-debug-apk` del run `40882394994` (10 327 855 bytes). Pulsó «Abrir documento», seleccionó `Prueba.m3u`; la importación mostró «Canal de prueba» y, tras cerrar completamente y volver a abrir la aplicación, el canal seguía presente. **No se comprobó directamente** que el grant apareciera en `persistedUriPermissions` ni se ejecutó `adb shell dumpsys activity uri-grants`; tampoco se registraron modelo del dispositivo ni versión de Android. Por eso la verificación **no se marca como técnicamente verificada**: se registra como prueba ejecutada más aceptación explícita del propietario del criterio pendiente de E2-T2, con esa limitación. El vínculo run→commit→artifact está confirmado; los bytes instalados en el dispositivo no son verificables desde el repositorio. La relectura del documento tras reinicio sigue siendo E4.
 
 ### 10.5 Evidencia E0 (auditoría previa a E1, ejecutada)
 
@@ -1325,7 +1327,7 @@ omitido por diseño. Conteos observados en los artefactos: `:core` 244 pruebas
 | Tarea | Criterio de §8.2 | Implementación | Evidencia ejecutada | Estado |
 |---|---|---|---|---|
 | E2-T1 | Parser M3U streaming | `core/src/main/kotlin/com/copernicotv/core/m3u/ParserM3U.kt` | `ParserM3UTest`, `ParserM3U10kTest` en `jvm-tests` | Cubierta |
-| E2-T2 | Alta de Fuente y Lista (URL y SAF `content://`), errores tipados, Estado de Actualización | `app/.../data/CatalogoRepositorio.kt` (`importarDesdeUrl`, `importarDesdeSaf`, `nombreDeDocumento`, `registrarIntento`, `registrarFallo`); `MainActivity` (`OpenDocument`); `CatalogoScreen` («Abrir documento»); `CatalogoViewModel.importarDesdeSaf` | `ImportacionE2Test` 11 casos; `NombreDocumentoTest` 5 JVM; `ImportacionSafTest` 2 instrumentados en `instrumented-mobile` 15; `CredencialesEnReposoTest` expuso la falta de `INTERNET`, corregida en `6d26566` | Parcial: falta el camino feliz SAF con permiso persistido real (§10.9.1) |
+| E2-T2 | Alta de Fuente y Lista (URL y SAF `content://`), errores tipados, Estado de Actualización | `app/.../data/CatalogoRepositorio.kt` (`importarDesdeUrl`, `importarDesdeSaf`, `nombreDeDocumento`, `registrarIntento`, `registrarFallo`); `MainActivity` (`OpenDocument`); `CatalogoScreen` («Abrir documento»); `CatalogoViewModel.importarDesdeSaf` | `ImportacionE2Test` 11 casos; `NombreDocumentoTest` 5 JVM; `ImportacionSafTest` 2 instrumentados en `instrumented-mobile` 15; `CredencialesEnReposoTest` expuso la falta de `INTERNET`, corregida en `6d26566` | Aceptada por el propietario el 2026-10-29 con limitación: prueba SAF ejecutada; `persistedUriPermissions` no comprobado directamente (§10.9.1, §10.4) |
 | E2-T3 | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; Hilt | `app/.../db/entities/CatalogoEntities.kt`, `CatalogoRepositorio.kt`, `AppModule.kt` | `CatalogoAmbitoTest` 2 casos; `CatalogoRepositorioTest` (orden por Apariencia); `CatalogoPersistenciaTest` 5 casos | Cubierta |
 | E2-T4 | Logo, nombre y atributos persistidos; ausencia no rompe | `core/.../m3u/ImportadorM3U.kt`, `CodecAtributosExtra.kt`; `CatalogoRepositorio.cifrarLogo` | `CodecAtributosExtraTest`, `ImportadorM3UTest`, `ImportacionE2Test` («persiste logo cifrado y atributos extra deterministas»); el fixture sin `tvg-logo` importa 3 Canales con logo nulo | Cubierta |
 | E2-T5 | 10 000 entradas con P1 conforme a §7; timeout y 4xx/5xx sin destruir catálogo | `tools/fixtures/generar_f_p1_10k.py`, `FixtureP1`, `TiemposHttp`, `CatalogoRepositorio.descargar` | `ParserM3U10kTest`, `MedicionP1Test`, job `p1-performance`; baseline de 3 corridas verdes sobre `b186c3a` en `docs/evidence/p1/p1-baseline.json` (p95 15.067 ms, pico 45.827 MiB); `ImportacionE2Test` («un 404…», «un 500…», «un timeout conserva el catalogo previo») | Parcial: baseline registrado, **revisión humana pendiente**; métricas de búsqueda y página 2 son de E3 (§10.9.2) |
@@ -1347,11 +1349,15 @@ conserva los 3 Canales y la Fuente previos, y que el nombre visible cae al
 cubre la selección pura del nombre (5 casos JVM). `ImportacionE2Test` cubre los
 rechazos de esquema y los errores HTTP.
 
-Pendiente: el camino feliz con un grant real. Solo lo produce una selección
-humana de archivo, así que no se fabrica en Robolectric ni en una prueba
-instrumentada sin interacción. Estado: `Pendiente por bloqueo externo`, con
-procedimiento y campos obligatorios en §10.4. La relectura tras reinicio se
-ejecuta en E4.
+Ejecutado por el propietario el 2026-10-29 en un dispositivo Android físico con
+el APK del run `40882394994` (commit `4b3692d`): «Abrir documento» abrió el
+selector, `Prueba.m3u` se importó y mostró «Canal de prueba», y el canal siguió
+presente tras cerrar y volver a abrir la aplicación. **No verificado
+técnicamente:** no se inspeccionó `persistedUriPermissions` ni se ejecutó
+`dumpsys`; no se registraron modelo ni versión de Android. El propietario aceptó
+dar por aprobado el criterio de E2-T2 con esa limitación explícita, que no
+equivale a una comprobación del grant. Detalle en §10.4. La relectura tras
+reinicio se ejecuta en E4.
 
 #### 10.9.2 E2-T5: alcance de la medición
 
@@ -1388,7 +1394,7 @@ ejecutado dentro de la importación.
 | Seguridad y cifrado | Columnas URL cifradas con AES-256-GCM y Keystore; HMAC separado; sin URL en logs, diagnóstico ni textos copiables; `allowBackup=false` | `CifradoAesTest`, `HmacUrlTest`, `CredencialesEnReposoTest` 6/6 y `ClavesKeystoreTest` 5/5 en `instrumented-mobile`; `IndiceHmacRepositorioTest` 11, `ReconstructorIndiceHmacTest` 10; run `40877127294` | Aprobado en CI |
 | Errores tipados | `ubicacion_invalida`, `esquema_no_admitido`, `permiso_saf_no_persistido`, `archivo_inaccesible`, `sin_conexion`, `timeout`, `http_4xx`, `http_5xx`, `sin_canales`; un fallo no destruye el catálogo | `ImportacionE2Test` (404, 500, timeout, ubicación inválida, lista vacía, esquema); `ImportacionSafTest` (permiso) | Aprobado en CI |
 | HTTP | URL http/https validada; timeout; 4xx/5xx sin escribir; `INTERNET` declarado | `ImportacionE2Test`; `DescargadorHttpTest` 3; corrección `6d26566` | Aprobado en CI |
-| SAF | `OpenDocument` (`ACTION_OPEN_DOCUMENT`); grant persistible; comprobación en `persistedUriPermissions`; nombre visible con fallback; error de permiso conserva datos | `MainActivity`; `CatalogoRepositorio.importarDesdeSaf`; `NombreDocumentoTest` 5; `ImportacionSafTest` 2 en `instrumented-mobile` 15 | Parcial: camino feliz pendiente de verificación física (§10.4) |
+| SAF | `OpenDocument` (`ACTION_OPEN_DOCUMENT`); grant persistible; comprobación en `persistedUriPermissions`; nombre visible con fallback; error de permiso conserva datos | `MainActivity`; `CatalogoRepositorio.importarDesdeSaf`; `NombreDocumentoTest` 5; `ImportacionSafTest` 2 en `instrumented-mobile` 15; prueba física del propietario 2026-10-29 | Aceptada por el propietario el 2026-10-29 con limitación; grant real no inspeccionado (§10.4) |
 | Persistencia e idempotencia | Sin duplicar Canales entre Listas; Grupo con ámbito de Lista; orden por Apariencia; segunda importación no duplica ni borra | `CatalogoAmbitoTest` 2; `CatalogoPersistenciaTest` 5; `ImportacionE2Test` («repetir la importacion no duplica…»); `CatalogoRepositorioTest` | Aprobado en CI |
 | Caché | DC-09: presupuesto, temp+fsync+rename, invalidación, `stale`; no integrada en la primera importación | `PoliticaCacheTest` 21; `RepositorioCacheTest` 16; `DescargadorHttpTest` 3 | Aprobado como subsistema; integración E4 (§10.9.3) |
 | P1 | 10 000 entradas; p95 15.067 ms ≤ 1200 ms; pico 45.827 MiB ≤ 256 MiB; tres corridas verdes | `ParserM3U10kTest`; `MedicionP1Test`; runs `40877200854`, `40878469399`, `40879581126` | Aprobado técnicamente; revisión humana pendiente |
@@ -1397,7 +1403,7 @@ ejecutado dentro de la importación.
 | Estado | Tareas |
 |---|---|
 | Aprobado con evidencia ejecutada | T1, T3, T4, T6, T7 |
-| Pendiente físico | T2 (grant SAF real en dispositivo con selección de archivo) |
+| Aceptada por el propietario con limitación | T2 (prueba SAF ejecutada el 2026-10-29; grant no inspeccionado directamente) |
 | Pendiente del propietario | T5 (revisión humana del baseline P1) |
 | Bloqueado | Ninguno |
 | Hallazgo abierto fuera de E2 | Colisión por `Fuente.nombre` (severidad media; reconciliación por identidad en E4) |
@@ -2004,19 +2010,48 @@ ejecutado dentro de la importación.
   humana del baseline. No se declara cerrada ninguna tarea con criterio
   obligatorio pendiente.
 
+### L46 — E2: aceptación del propietario de la verificación SAF y estado de P1
+
+- **Autorización.** Continuación de E2 sobre `feat/e1-bootstrap`; sin autorizar
+  E3, E4 ni E5.
+- **Verificación SAF ejecutada (2026-10-29).** Dispositivo Android físico, APK
+  del artifact `copernicotv-debug-apk` del run `40882394994` (commit `4b3692d`,
+  10 327 855 bytes). «Abrir documento» abrió el selector; se seleccionó
+  `Prueba.m3u`; la importación mostró «Canal de prueba»; tras cerrar
+  completamente y volver a abrir la aplicación, el canal seguía presente.
+- **Limitación explícita.** No se comprobó directamente
+  `persistedUriPermissions` ni se ejecutó `adb shell dumpsys activity uri-grants`;
+  no se registraron modelo del dispositivo ni versión de Android. La prueba
+  ejecutada no equivale a la verificación técnica del grant.
+- **Decisión del propietario.** Acepta dar por aprobado el criterio pendiente de
+  E2-T2 con esa limitación. Se registra como prueba ejecutada más aceptación
+  explícita, no como grant verificado. No se reescribe la evidencia histórica.
+- **Estado de E2.** T2 queda aceptada por el propietario con limitación. T5
+  (revisión humana del baseline P1) sigue pendiente: DC-10 §5 exige esa revisión
+  para versionar el baseline, así que E2 permanece **abierta** hasta recibirla.
+  T1, T3, T4, T6 y T7 siguen aprobadas con evidencia ejecutada.
+- **Frontera con E4.** La relectura/actualización del documento tras reinicio y
+  la reconciliación de identidad por `Fuente.nombre` son E4; no se implementan
+  en E2.
+- **Veredicto.** E2 no se declara cerrada. SAF ya está aceptado; el único
+  pendiente obligatorio es la revisión humana del baseline P1.
+
 ### Próximo paso
 
-E1 queda **cerrada** sobre `3140d34` y E2 queda **abierta** sobre `b186c3a` con
-cinco tareas cubiertas (T1, T3, T4, T6, T7) y dos pendientes que no son código:
-(a) la verificación física del grant SAF real en un dispositivo con selección de
-archivo (E2-T2, §10.4); (b) la revisión humana del baseline P1 (E2-T5,
-`docs/evidence/p1/revision-humana-pendiente.md`). La relectura del documento tras
-reinicio se ejecuta en E4. El código de entrada SAF, la concurrencia de CI, el
-filtro instrumentado y la medición de heap ya están corregidos y verificados en
-CI (`40877127294`, `40877200854`, `40878469399`, `40879581126`). U0 sigue
-aprobada documentalmente en L32 sobre
-`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L44 ni
-L45. DC-01–DC-11 y H-01–H-11 siguen normativos. Las métricas de búsqueda y
+E1 queda **cerrada** sobre `3140d34`. E2 queda **abierta** sobre `4b3692d`: T2
+está **aceptada por el propietario el 2026-10-29 con limitación** (prueba SAF
+ejecutada; `persistedUriPermissions` no inspeccionado directamente, §10.4 y
+§10.9.1), T1, T3, T4, T6 y T7 están cubiertas, y el único pendiente obligatorio
+es la revisión humana del baseline P1 (E2-T5,
+`docs/evidence/p1/revision-humana-pendiente.md`), que DC-10 §5 exige para
+versionar el baseline. La relectura del documento tras reinicio y la
+reconciliación por `Fuente.nombre` se ejecutan en E4. El código de entrada SAF,
+la concurrencia de CI, el filtro instrumentado y la medición de heap están
+corregidos y verificados en CI (`40877127294`, `40877200854`, `40878469399`,
+`40879581126`); el commit `4b3692d` tiene el run `40882394994`, 5/5 verde con
+`p1-performance` omitido. U0 sigue aprobada documentalmente en L32 sobre
+`18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 no se modificaron en L44, L45
+ni L46. DC-01–DC-11 y H-01–H-11 siguen normativos. Las métricas de búsqueda y
 página 2 pertenecen a E3, la integración de la caché y la relectura a E4 y la
 reproducción a E6; ninguna se adelanta sin autorización. Cualquier cambio
 posterior de requisitos o decisiones reabre la aprobación de U0 y exige una

@@ -68,6 +68,7 @@ Límites DC-10: p95 ≤ 1200 ms y pico ≤ 256 MiB.
 
 - No marca la revisión como hecha ni registra una aprobación en nombre del
   propietario.
-- No declara E2 cerrada: el camino feliz SAF con permiso persistido real sigue
-  pendiente de verificación física (§10.4).
+- No declara E2 cerrada: la verificación SAF fue ejecutada y aceptada por el
+  propietario el 2026-10-29 con limitación (grant no inspeccionado, §10.4); la
+  revisión humana del baseline P1 sigue pendiente.
 - No sustituye la decisión del propietario.

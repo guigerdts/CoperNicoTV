@@ -186,3 +186,64 @@ jobs:
       - name: Resumen de la medicion
         if: always()
         run: cat core/build/p1/medicion.json || true
+
+  p1-android:
+    name: p1-android
+    # La medición P1 de Android de DC-10 no corre en cada PR: se ejecuta en el
+    # emulador de referencia mediante workflow_dispatch.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Medicion P1 de parseo en Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          # DC-10 §1: 4 GB de RAM, 1080p y 320 dpi. El tamaño y la densidad se
+          # fijan en el dispositivo porque el perfil del AVD no los garantiza.
+          ram-size: 4096M
+          disable-animations: true
+          script: |
+            set +e
+            adb shell wm size 1080x1920
+            adb shell wm density 320
+            ./gradlew :app:connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.p1.MedicionP1AndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.p1.commit="$GITHUB_SHA"
+            codigo=$?
+            mkdir -p app/build/p1-android
+            adb pull /sdcard/Android/data/com.copernicotv.app/files/p1/. app/build/p1-android/ || true
+            exit $codigo
+      - name: Publicar evidencia P1 Android
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-android-medicion
+          path: app/build/p1-android/
+          if-no-files-found: ignore
+      - name: Publicar reportes instrumentados P1 Android
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-instrumented-p1-android
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
+          if-no-files-found: ignore
+      - name: Resumen de la medicion Android
+        if: always()
+        run: cat app/build/p1-android/medicion.json || true

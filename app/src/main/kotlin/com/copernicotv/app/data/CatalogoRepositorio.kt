@@ -174,7 +174,12 @@ class CatalogoRepositorio
                             uri,
                             Intent.FLAG_GRANT_READ_URI_PERMISSION,
                         )
-                        true
+                        // Tomar el permiso sin excepción no basta: se comprueba
+                        // que el grant esté realmente en la tabla persistida del
+                        // sistema, que es lo que sobrevive al reinicio.
+                        contexto.contentResolver.persistedUriPermissions.any {
+                            it.uri == uri && it.isReadPermission
+                        }
                     } catch (error: SecurityException) {
                         false
                     }

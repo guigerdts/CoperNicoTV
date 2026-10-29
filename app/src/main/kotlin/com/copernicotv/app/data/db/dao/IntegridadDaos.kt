@@ -18,6 +18,28 @@ interface HistorialDao {
     @Query("SELECT * FROM Historial WHERE canalId = :canalId")
     suspend fun porCanal(canalId: Long): HistorialEntity?
 
+    @Query("UPDATE Historial SET fecha = :fecha WHERE canalId = :canalId")
+    suspend fun actualizarFecha(
+        canalId: Long,
+        fecha: Instant,
+    ): Int
+
+    /**
+     * Recorta el Historial persistido a los [limite] Canales más recientes.
+     *
+     * El orden del subconsulta es el mismo de `ultimos` y del índice
+     * `(fecha, canalId)`, para que el recorte no dependa de un orden distinto.
+     */
+    @Query(
+        """
+        DELETE FROM Historial
+        WHERE id NOT IN (
+            SELECT id FROM Historial ORDER BY fecha DESC, canalId DESC LIMIT :limite
+        )
+        """,
+    )
+    suspend fun recortar(limite: Int): Int
+
     @Query("SELECT COUNT(*) FROM Historial")
     suspend fun contar(): Int
 

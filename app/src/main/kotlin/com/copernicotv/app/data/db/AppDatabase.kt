@@ -11,11 +11,14 @@ import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
 import com.copernicotv.app.data.db.dao.EstadoActualizacionDao
 import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
+import com.copernicotv.app.data.db.dao.FavoritoDao
 import com.copernicotv.app.data.db.dao.FuenteDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
 import com.copernicotv.app.data.db.dao.ListaDao
+import com.copernicotv.app.data.db.dao.OcultacionCanalDao
+import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.db.entities.AparienciaClavePendienteEntity
@@ -112,6 +115,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun coleccionCanalDao(): ColeccionCanalDao
 
     abstract fun historialDao(): HistorialDao
+
+    abstract fun favoritoDao(): FavoritoDao
+
+    abstract fun ocultacionCanalDao(): OcultacionCanalDao
+
+    abstract fun ocultacionGrupoDao(): OcultacionGrupoDao
 
     abstract fun perfilDao(): PerfilDao
 

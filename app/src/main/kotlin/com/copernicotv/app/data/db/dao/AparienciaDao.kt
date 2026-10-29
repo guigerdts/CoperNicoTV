@@ -14,6 +14,9 @@ interface AparienciaDao {
     @Insert
     suspend fun insertar(apariencia: AparienciaEntity): Long
 
+    @Insert
+    suspend fun insertarTodas(apariencias: List<AparienciaEntity>): List<Long>
+
     @Query("SELECT * FROM Apariencia WHERE listaId = :listaId ORDER BY orden, id")
     suspend fun porLista(listaId: Long): List<AparienciaEntity>
 

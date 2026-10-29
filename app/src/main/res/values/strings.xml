@@ -6,4 +6,11 @@
     <string name="catalogo_abrir_documento">Abrir documento</string>
     <string name="catalogo_vacio">Todavía no hay canales en esta lista.</string>
     <string name="catalogo_error">No se pudo importar: %1$s</string>
+    <string name="catalogo_buscar">Buscar por nombre</string>
+    <string name="catalogo_limpiar">Limpiar</string>
+    <string name="catalogo_todos">Todos</string>
+    <string name="catalogo_favoritos">Favoritos</string>
+    <string name="catalogo_sin_resultados">No hay canales que coincidan con la búsqueda.</string>
+    <string name="catalogo_error_carga">No se pudo cargar el catálogo.</string>
+    <string name="catalogo_sin_nombre">Sin nombre</string>
 </resources>

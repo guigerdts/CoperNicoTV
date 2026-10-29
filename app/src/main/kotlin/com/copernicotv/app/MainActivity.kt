@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.copernicotv.app.ui.CatalogoScreen
 import com.copernicotv.app.ui.CatalogoViewModel
 import com.copernicotv.app.ui.CoperNicoTheme
@@ -22,6 +23,9 @@ class MainActivity : ComponentActivity() {
             CoperNicoTheme {
                 val viewModel: CatalogoViewModel = hiltViewModel()
                 val estado by viewModel.estado.collectAsStateWithLifecycle()
+                val criterios by viewModel.criterios.collectAsStateWithLifecycle()
+                val grupos by viewModel.grupos.collectAsStateWithLifecycle()
+                val resultados = viewModel.resultados.collectAsLazyPagingItems()
                 // `ACTION_OPEN_DOCUMENT` es el único mecanismo que produce un
                 // grant persistible; `GET_CONTENT` no lo hace y rompería la
                 // reapertura de la Lista tras reiniciar el proceso.
@@ -31,8 +35,16 @@ class MainActivity : ComponentActivity() {
                     }
                 CatalogoScreen(
                     estado = estado,
+                    criterios = criterios,
+                    grupos = grupos,
+                    resultados = resultados,
                     onImportar = viewModel::importarFixture,
                     onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
+                    onTexto = viewModel::actualizarTexto,
+                    onGrupo = viewModel::seleccionarGrupo,
+                    onFavoritos = viewModel::alternarFavoritos,
+                    onTodos = viewModel::limpiarFiltros,
+                    onLimpiar = viewModel::limpiarCriterios,
                 )
             }
         }

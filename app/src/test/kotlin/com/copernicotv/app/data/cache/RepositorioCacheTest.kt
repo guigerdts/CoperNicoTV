@@ -290,10 +290,12 @@ class RepositorioCacheTest {
                     claves,
                     PresupuestoCache(m3uPorArchivo = 50, m3uPorLista = 1_000, m3uTotal = 1_000, global = 10_000),
                 )
+            descargador.contenido = ByteArray(40) { 0x41 }
 
             val resultado = ajustado.actualizar(claveM3U(listaId = 1), URL_M3U, UNA_HORA, t0)
 
             assertEquals(ResultadoActualizacion.Omitida("cache_omitida_por_tamano"), resultado)
+            assertEquals(1, descargador.descargas)
             assertEquals(0L, db.cacheM3UDao().contar())
             assertTrue(almacen.nombres().isEmpty())
         }

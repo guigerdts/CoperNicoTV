@@ -960,13 +960,13 @@ P1 y P2 están aprobadas como políticas; sus límites, procedimiento y criterio
 
 ### P1 — Rendimiento de listas y catálogo (P1 aprobada; límites y procedimiento en DC-10)
 
-- **Estado:** **P1 aprobada como política híbrida**; los límites absolutos, el criterio de regresión y el procedimiento p95 se fijan en **DC-10**. La calibración JVM se ejecutó y su baseline quedó **aprobado por el propietario el 2026-10-29** (L47; `docs/evidence/p1/`). La medición P1 en Android se ejecutó el 2026-10-29 sobre el commit `a28971a` (run `40929318245`; L48) como primera calibración: cumple los límites absolutos y no versiona baseline Android (DC-10 §5). **No se declara rendimiento validado** fuera del baseline JVM aprobado y de esa medición Android.
+- **Estado:** **P1 aprobada como política híbrida**; los límites absolutos, el criterio de regresión y el procedimiento p95 se fijan en **DC-10**. La calibración JVM se ejecutó y su baseline quedó **aprobado por el propietario el 2026-10-29** (L47; `docs/evidence/p1/`). La medición P1 en Android se ejecutó el 2026-10-29 sobre el commit `a28971a` (run `40929318245`; L48) como primera calibración: cumple los límites absolutos y no versiona baseline Android (DC-10 §5). La medición P1 de búsqueda y página 2 se ejecutó el 2026-10-30 sobre `418c33f` (runs `40987152414`, `40987957054` y `40988640006`; L51): cumple los límites absolutos y deja un baseline candidato **pendiente de revisión humana**. **No se declara rendimiento validado** fuera del baseline JVM aprobado, de la medición Android de parseo y de esa medición de búsqueda; E3-T1 no se cierra hasta aprobar el baseline de búsqueda.
 - **Métricas:** (1) tiempo de parseo de 10 000 entradas; (2) primera página de búsqueda; (3) consulta paginada; (4) memoria máxima del proceso/heap.
 - **Límites absolutos (DC-10):** JVM 1200 ms / 150 ms / 80 ms / heap 256 MiB; Android 2500 ms / 300 ms / 150 ms / heap Java 384 MiB.
 - **Regresión (DC-10):** p95 de tiempo ≤ baseline ×1.20; p95 de memoria ≤ baseline ×1.15; además, límite absoluto. Baseline versionado solo tras 3 corridas verdes y revisión humana; nunca se actualiza para ocultar una regresión.
 - **Procedimiento (DC-10):** 10 calentamientos + 30 mediciones en JVM; 5 + 20 en Android; p95 nearest-rank; mediana/p95/máximo; fixture determinista `F-P1-10k.m3u` con SHA-256; se descarta una corrida solo por falla de entorno documentada.
 - **Evidencia:** comando, JDK/AGP, runner, fixture/hash, fecha, commit, salida cruda, baseline comparado y conclusión; `docs/evidence/p1/`. Job `performance` obligatorio para cerrar P1, no para cada PR.
-- **Límite:** S5, S9, S52 y E3-T1 no se declaran cerradas hasta ejecutar la medición, registrar el baseline y cumplir los límites. E2-T5 cumple la medición JVM, el baseline aprobado y la medición P1 en Android del 2026-10-29 (límites absolutos; primera calibración sin baseline Android). La aprobación de DC-10 no es una medición.
+- **Límite:** S5, S9, S52 y E3-T1 no se declaran cerradas hasta ejecutar la medición, registrar el baseline y cumplir los límites. E2-T5 cumple la medición JVM, el baseline aprobado y la medición P1 en Android del 2026-10-29 (límites absolutos; primera calibración sin baseline Android). E3-T1 ejecutó la medición de búsqueda y página 2 y cumple los límites absolutos, pero su baseline sigue **candidato y pendiente de revisión humana**; no se declara cerrada. La aprobación de DC-10 no es una medición.
 
 ### P2 — Legibilidad y navegación en TV (P2 aprobada; umbrales y procedimiento en DC-11)
 
@@ -1025,7 +1025,7 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 
 | ID | Objetivo | Criterio de aceptación |
 |---|---|---|
-| E3-T1 | Búsqueda y filtros | Búsqueda paginada y filtros combinables con 10 000 Canales; medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10; la búsqueda paginada y los filtros están implementados en E3-U2 (2026-10-29); la medición P1 de búsqueda/página 2 no se ejecutó; no se declara cerrada hasta medir, registrar baseline y cumplir los límites. |
+| E3-T1 | Búsqueda y filtros | Búsqueda paginada y filtros combinables con 10 000 Canales; medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10; la búsqueda paginada y los filtros están implementados en E3-U2 (2026-10-29); la medición P1 de búsqueda/página 2 se ejecutó el 2026-10-30 sobre `418c33f` (runs `40987152414`, `40987957054` y `40988640006`; L51) y cumple los límites absolutos; el baseline candidato está pendiente de revisión humana, así que no se declara cerrada hasta esa aprobación. |
 | E3-T2 | Favoritos | Único por Canal; sobrevive a Actualización |
 | E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación futura con `EXPLAIN QUERY PLAN`; acceso rápido; base de S14g; S11 |
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas |
@@ -1181,6 +1181,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E2-T3 (ámbito de Canal y Grupo) | 2026-10-29 | `app/src/test/kotlin/com/copernicotv/app/data/CatalogoAmbitoTest.kt` | Commit `5e13de3` | CI `jvm-tests` | 2 casos; `:app` 120 verdes | `40858929094` | Cubierta |
 | E3-U1 (datos de Favoritos, Historial y Ocultaciones) | 2026-10-29 | `app/.../data/db/dao/{EstadoUsuarioDaos,IntegridadDaos}.kt`, `app/.../data/db/AppDatabase.kt`, `app/.../di/AppModule.kt`, `app/.../data/{Favoritos,Historial,Ocultaciones}Repositorio.kt`, `app/src/test/.../data/EstadoUsuarioPersistenciaTest.kt` | Commit `9781bf2`; 8 archivos, +758 | Local: `:core:test`, `ktlintCheck`, `detekt`, `:app:ktlintCheck` y `:app:detekt` verdes; `:app:testDebugUnitTest` no ejecutable local por SDK ausente. CI: `jvm-tests` | `:app` 137 pruebas, 0 fallos; `EstadoUsuarioPersistenciaTest` 12/12 (incluye atomicidad); `TV emulator trial` verde | `40950814485` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `40950814041` | Parcial: E3-T2/T3 con capa de datos; E3-T4 cubierta en datos (UI en E3-T6); E3 abierta |
 | E3-U2 (búsqueda y filtros) | 2026-10-29 | `app/build.gradle.kts`, `app/.../data/BusquedaCatalogoRepositorio.kt`, `app/.../data/db/dao/{CanalDao,AparienciaDao,GrupoDao}.kt`, `app/.../ui/{CatalogoViewModel,CatalogoScreen}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{BusquedaCatalogoPersistenciaTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../{BusquedaFiltrosTest,CanarioMovilTest,CanarioTvTest}.kt`, `.github/workflows/ci.yml` | Commits `e45101f` (15 archivos, +893/−28) y `025477e` (1 archivo, +2/−2) | Local: `:core:test`, `ktlintCheck` y `detekt` verdes; `:app:testDebugUnitTest` no ejecutable local por SDK ausente. CI: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` | `:core` 244 pruebas (1 ignorada); `:app` 144 pruebas, 0 fallos; `BusquedaCatalogoPersistenciaTest` 7/7; `instrumented-mobile` 16 (incluye `BusquedaFiltrosTest` 1/1); `instrumented-tv` 1/1; P1 de búsqueda/página 2 no ejecutada | `40969314617` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `40969314701` | Implementada y verificada en CI; E3-T1 pendiente de medición P1 y baseline; E3 abierta |
+| E3-T1 (medición P1 de búsqueda) | 2026-10-30 | `app/src/test/kotlin/com/copernicotv/app/p1/MedicionP1BusquedaTest.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/p1/MedicionP1BusquedaAndroidTest.kt`, `app/build.gradle.kts`, `.github/scripts/p1-android.sh`, `.github/workflows/ci.yml`, `docs/evidence/p1/busqueda/**` | Commits `f07e5e1` y `418c33f`; evidencia nueva en `docs/evidence/p1/busqueda/`; sin cambios de producción | `workflow_dispatch` sobre `418c33f`: runs `40987152414`, `40987957054` y `40988640006`; verificación Python de p95 nearest-rank y de CSV contra JSON | JVM búsqueda: p95 24.460/18.696, 34.429/19.296 y 34.428/22.528 ms; heap 70.535/72.225/71.397 MiB. Android: p95 17.177/8.209, 38.892/15.347 y 30.651/16.281 ms; heap 13.920/19.102/11.941 MiB. Las tres corridas 7/7 verdes; `cumple: true`; baseline candidato con referencias JVM 34.429/22.528 ms y 72.225 MiB, Android 38.892/16.281 ms y 19.102 MiB | `40987152414`, `40987957054`, `40988640006` (7/7 verdes cada uno) | Baseline candidato pendiente de revisión humana; E3-T1 abierta |
 
 ### 10.2 Evidencia de CI
 
@@ -1236,6 +1237,9 @@ Cada unidad que use CI registra: workflow, job, URL o ID del run, SHA, artifact 
 | `40968107756` (`TV emulator trial`) | `e45101f` | **verde**: emulador arrancado, canario de TV 1/1 | `reporte-tv-trial` |
 | `40969314617` (CI) | `025477e` | **5/5 verdes**: `jvm-tests` (`:core` 244, 1 ignorada; `:app` 144 = 137 + 7 de `BusquedaCatalogoPersistenciaTest`), `static-analysis`, `apk`, `instrumented-mobile` (16 = 15 + 1 de `BusquedaFiltrosTest`), `instrumented-tv` (1); `p1-performance` y `p1-android` omitidos por diseño en `push` | `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv` |
 | `40969314701` (`TV emulator trial`) | `025477e` | **verde**: emulador arrancado, canario de TV 1/1 | `reporte-tv-trial` |
+| `40987152414` (CI, dispatch) | `418c33f` | **7/7 verdes**: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile`, `instrumented-tv`, `p1-performance` y `p1-android`; búsqueda JVM p95 24.460/18.696 ms y heap 70.535 MiB; Android p95 17.177/8.209 ms y heap 13.920 MiB | `p1-medicion`, `p1-android-medicion`, `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `copernicotv-debug-apk` |
+| `40987957054` (CI, dispatch) | `418c33f` | **7/7 verdes**: mismos jobs; búsqueda JVM p95 34.429/19.296 ms y heap 72.225 MiB; Android p95 38.892/15.347 ms y heap 19.102 MiB | `p1-medicion`, `p1-android-medicion`, `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `copernicotv-debug-apk` |
+| `40988640006` (CI, dispatch) | `418c33f` | **7/7 verdes**: mismos jobs; búsqueda JVM p95 34.428/22.528 ms y heap 71.397 MiB; Android p95 30.651/16.281 ms y heap 11.941 MiB | `p1-medicion`, `p1-android-medicion`, `reportes-jvm`, `reportes-instrumented-mobile`, `reportes-instrumented-tv`, `copernicotv-debug-apk` |
 
 ### 10.3 Límites de Termux
 
@@ -1369,8 +1373,9 @@ reinicio se ejecuta en E4.
 #### 10.9.2 E2-T5: alcance de la medición
 
 DC-10 fija 1200 ms de parseo, 150 ms de búsqueda y 80 ms de página 2 en JVM. Las
-dos últimas miden la consulta de E3, que existe desde E3-U2: no se miden ni se
-declaran cumplidas. La medición P1 cubre parseo y pico de heap en JVM y en
+dos últimas miden la consulta de E3, que existe desde E3-U2: se midieron el
+2026-10-30 sobre `418c33f` (L51) y su baseline es candidato, pendiente de
+revisión humana. La medición P1 cubre parseo y pico de heap en JVM y en
 Android.
 
 El baseline se apoya en tres corridas verdes consecutivas sobre `b186c3a`:
@@ -1440,6 +1445,85 @@ absolutos cumplidos, baseline registrado y revisión humana aprobada el
 mediciones—. La primera calibración Android no versiona baseline (DC-10 §5). No
 queda ninguna cláusula obligatoria pendiente de E2; el hallazgo de
 `Fuente.nombre` pertenece a E4.
+
+### 10.10 Evidencia E3 (organización y estado de usuario)
+
+#### 10.10.1 E3-T1: medición P1 de búsqueda y página 2
+
+**Estado: baseline candidato, pendiente de revisión humana.** La medición se
+ejecutó; E3-T1 no se declara cerrada hasta que el propietario apruebe el
+baseline. No se simula aprobación.
+
+- **Commit medido:** `418c33f6745ad4667c7e77a77dfc609ecf4f0d5b` (`418c33f`).
+- **Corridas verdes consecutivas:** `40987152414`, `40987957054` y
+  `40988640006`, las tres con `workflow_dispatch`, 7/7 jobs verdes y el mismo
+  commit. No se descartó ninguna corrida.
+- **Workflow y jobs:** `.github/workflows/ci.yml`; `p1-performance` (JVM) y
+  `p1-android` (Android). El protocolo completo de cada corrida incluyó parseo
+  JVM, búsqueda JVM, parseo Android y búsqueda Android.
+- **Fixture:** `F-P1-10k.m3u`, 10 000 entradas, 1 940 008 bytes, SHA-256
+  `45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c`.
+  JVM la lee desde `core/src/test/resources/fixtures/`; Android desde
+  `app/src/androidTest/assets/`.
+- **Entorno JVM:** `ubuntu24`, `X64`, JDK 17.0.21 Temurin, Robolectric SDK 34,
+  heap máximo 512 MiB.
+- **Entorno Android:** emulador API 34, Android 14, `sdk_gphone64_x86_64`,
+  `emu64xa`, `ranchu`, 1080x1920, 320 dpi, 4 GB de RAM, heap Java máximo
+  201 326 592 bytes.
+- **Procedimiento:** texto `Canal P1`; tamaño de página 50; ruta real
+  `CanalDao.buscarEnListaActiva -> PagingSource -> Room` sobre Room ya poblado
+  con 10 000 Canales; primera página con `load(Refresh)` y página 2 con
+  `load(Append)` después de precargar la página 1 fuera del cronómetro; JVM
+  10 calentamientos + 30 mediciones; Android 5 + 20; p95 nearest-rank; mediana,
+  p95 y máximo; pico de heap Java con muestreo y `System.gc()` previo.
+- **Muestras:** cada escenario tiene 30 muestras JVM y 20 Android; los CSV
+  contienen las muestras individuales y coinciden con los `muestrasMs` de los
+  JSON. Cada página se verificó con 50 resultados y sin IDs duplicados.
+
+| Entorno | Corrida | Primera página p95 | Página 2 p95 | Pico heap |
+|---|---|---|---|---|
+| JVM | `40987152414` | 24.460 ms | 18.696 ms | 70.535 MiB |
+| JVM | `40987957054` | 34.429 ms | 19.296 ms | 72.225 MiB |
+| JVM | `40988640006` | 34.428 ms | 22.528 ms | 71.397 MiB |
+| Android | `40987152414` | 17.177 ms | 8.209 ms | 13.920 MiB |
+| Android | `40987957054` | 38.892 ms | 15.347 ms | 19.102 MiB |
+| Android | `40988640006` | 30.651 ms | 16.281 ms | 11.941 MiB |
+
+**Límites y cumplimiento.** JVM: primera página ≤150 ms, página 2 ≤80 ms, heap
+≤256 MiB. Android: primera página ≤300 ms, página 2 ≤150 ms, heap Java
+≤384 MiB. Las tres corridas reportan `cumple: true`; el peor valor de cada
+métrica está muy por debajo del límite.
+
+**Referencia candidata para regresión.** Se toma el peor valor de las tres
+corridas, no el promedio ni la mediana:
+
+- JVM: primera página 34.429 ms (regresión ×1.20 → 41.315 ms); página 2
+  22.528 ms (→ 27.034 ms); heap 72.225 MiB (×1.15 → 83.059 MiB).
+- Android: primera página 38.892 ms (→ 46.670 ms); página 2 16.281 ms
+  (→ 19.537 ms); heap 19.102 MiB (→ 21.967 MiB).
+
+La regresión no se evalúa en esta primera calibración; se evaluará desde la
+primera medición posterior a la aprobación humana.
+
+**Parseo del protocolo completo.** Las mismas tres corridas ejecutaron parseo
+JVM y Android y cumplieron sus límites: JVM p95 30.361/38.273/46.130 ms y heap
+48.444/46.289/45.419 MiB; Android p95 124.213/199.138/204.859 ms y heap
+36.798/35.194/29.578 MiB. Los límites son JVM 1200 ms/256 MiB y Android
+2500 ms/384 MiB.
+
+**Artefactos.** Baseline máquina y explicación en
+`docs/evidence/p1/busqueda/p1-baseline-busqueda.json` y
+`p1-baseline-busqueda.md`; registro en `registro.md`; evidencia cruda en
+`docs/evidence/p1/busqueda/corridas/418c33f-r1/`, `...-r2/` y `...-r3/`.
+Cada corrida contiene JSON y CSV de búsqueda y parseo para JVM y Android, más
+`run.json`. En GitHub Actions: artifacts `p1-medicion` y `p1-android-medicion`
+de los tres runs. No se modificaron `docs/evidence/p1/p1-baseline.json`,
+`docs/evidence/p1/android/` ni `docs/evidence/u0-manifest.md`.
+
+**Estado exacto de E3-T1:** implementación y pruebas funcionales de E3-U2
+verificadas en CI; medición P1 de búsqueda y página 2 ejecutada y conforme a los
+límites absolutos; baseline **candidato** pendiente de revisión humana. E3-T1
+sigue **abierta** y E3 sigue **abierta**.
 
 ## 11. Log
 
@@ -2254,6 +2338,64 @@ queda ninguna cláusula obligatoria pendiente de E2; el hallazgo de
   commit documental se verifica al publicarlo; no se declara verde antes de
   observar el run.
 
+### L51 — E3-T1: medición P1 de búsqueda y página 2
+
+- **Autorización.** Ejecutar E3-T1 de principio a fin: medir la primera página
+  de búsqueda y la página 2 en JVM y Android, con el protocolo de DC-10 y §7,
+  generar evidencia, preparar el baseline para aprobación humana y actualizar
+  U0. No se implementan E3-U3/E4, CRUD, reordenamiento, Colecciones, Perfiles
+  ni ordenación A/B/C.
+- **Contrato.** E3-T1, S9, K13 y DC-10. JVM: primera página ≤150 ms, página 2
+  ≤80 ms, heap ≤256 MiB, 10+30 mediciones. Android: primera página ≤300 ms,
+  página 2 ≤150 ms, heap Java ≤384 MiB, 5+20 mediciones. p95 nearest-rank;
+  baseline versionado solo tras 3 corridas verdes consecutivas sobre el mismo
+  commit y revisión humana. La regresión se evalúa desde la primera medición
+  posterior a la aprobación.
+- **Implementación.** Se añadió `MedicionP1BusquedaTest` en `:app` (Robolectric
+  + Room real) y `MedicionP1BusquedaAndroidTest` en `androidTest`. Ambos usan el
+  `PagingSource` real de `CanalDao.buscarEnListaActiva`, `pageSize = 50`, texto
+  `Canal P1`, 10+30 o 5+20 mediciones, p95 nearest-rank, muestreo de heap y
+  evidencia JSON/CSV. La primera página mide `load(Refresh)`; la página 2
+  precarga la página 1 fuera del cronómetro y mide `load(Append)`. La tarea JVM
+  se activa con `-Pp1.busqueda=true` sobre `:app:testDebugUnitTest`, con
+  `-Xmx512m` y filtro al medidor; sin la propiedad, la tarea funcional no
+  cambia. `.github/scripts/p1-android.sh` ejecuta ambos tests P1 Android y exige
+  `medicion.json` y `busqueda-medicion.json`. El job `p1-performance` ejecuta
+  `:core:p1Performance` y `:app:testDebugUnitTest` con `--no-parallel`.
+- **Fixture y entornos.** `F-P1-10k.m3u`, 10 000 entradas, 1 940 008 bytes,
+  SHA-256 `45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c`.
+  JVM: `ubuntu24`, `X64`, JDK 17.0.21, Robolectric SDK 34, heap máximo 512 MiB.
+  Android: emulador API 34, Android 14, `sdk_gphone64_x86_64`, `emu64xa`,
+  1080x1920, 320 dpi, 4 GB de RAM, heap Java máximo 192 MiB.
+- **Ejecución.** Commits `f07e5e1` (medidores e infraestructura) y `418c33f`
+  (corrección de compilación del medidor JVM). Tres corridas consecutivas
+  `workflow_dispatch` sobre `418c33f`: `40987152414`, `40987957054` y
+  `40988640006`, las tres 7/7 verdes. No se descartó ninguna corrida.
+- **Resultados.** JVM búsqueda: p95 primera/página 2 = 24.460/18.696,
+  34.429/19.296 y 34.428/22.528 ms; heap 70.535/72.225/71.397 MiB. Android:
+  p95 17.177/8.209, 38.892/15.347 y 30.651/16.281 ms; heap
+  13.920/19.102/11.941 MiB. Las tres corridas reportan `cumple: true`. El
+  protocolo completo también ejecutó parseo JVM y Android, con `cumple: true`.
+- **Baseline candidato.** Se toma el peor valor de las tres corridas: JVM
+  34.429/22.528 ms y 72.225 MiB; Android 38.892/16.281 ms y 19.102 MiB. Las
+  referencias de regresión son JVM 41.315/27.034 ms y 83.059 MiB; Android
+  46.670/19.537 ms y 21.967 MiB. El baseline está en
+  `docs/evidence/p1/busqueda/p1-baseline-busqueda.json` y
+  `p1-baseline-busqueda.md`, con evidencia cruda en
+  `docs/evidence/p1/busqueda/corridas/418c33f-r{1,2,3}/`. Queda **candidato,
+  pendiente de revisión humana**; no se declara aprobado.
+- **Estado de E3.** E3-T1 **no se cierra**: falta la aprobación humana del
+  baseline. E3-T2/T3 siguen parciales; E3-T4 cubierta en datos; E3 abierta.
+- **Frontera.** Sin cambios de código de producción, sin cambios de esquema
+  Room v1, sin modificar `main`, `origin/main`, `docs/evidence/u0-manifest.md`,
+  `docs/evidence/p1/p1-baseline.json`, `docs/evidence/p1/android/` ni la
+  evidencia histórica de E2. La evidencia nueva vive en
+  `docs/evidence/p1/busqueda/`.
+- **Validación de esta entrada.** Documental y de evidencia: sin cambios de
+  código de producción. Se verifica CRLF de U0 y `git diff --check` con
+  `core.whitespace=cr-at-eol`. La CI del commit documental se verifica al
+  publicarlo; no se declara verde antes de observar el run.
+
 ### Próximo paso
 
 E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
@@ -2289,10 +2431,14 @@ paginada en la UI existente. Commits `e45101f` y `025477e`; run `40969314617`
 con 5/5 jobs verdes (`p1-performance` y `p1-android` omitidos por diseño) y
 `TV emulator trial` `40969314701` verde. `:app` quedó en 144 pruebas, 0 fallos;
 `BusquedaCatalogoPersistenciaTest` 7/7; `instrumented-mobile` 16, con
-`BusquedaFiltrosTest` 1/1; `instrumented-tv` 1/1. E3-T1 sigue **pendiente de
-cierre**: la medición P1 de búsqueda y página 2 no se ejecutó y no hay baseline
-de esas métricas; DC-10 exige 10+30 mediciones JVM, 5+20 Android, p95 y tres
-corridas verdes con revisión humana. E3 sigue **abierta**.
+`BusquedaFiltrosTest` 1/1; `instrumented-tv` 1/1. E3-T1 sigue **abierta**:
+la medición P1 de búsqueda y página 2 se ejecutó el 2026-10-30 sobre `418c33f`
+con tres corridas verdes consecutivas (`40987152414`, `40987957054` y
+`40988640006`, 7/7 jobs cada una) y cumple los límites absolutos. Los peores
+valores son JVM 34.429/22.528 ms y 72.225 MiB; Android 38.892/16.281 ms y
+19.102 MiB. El baseline quedó **candidato, pendiente de revisión humana**; no
+se declara aprobado ni se cierra E3-T1 hasta esa aprobación. E3 sigue
+**abierta**.
 
 La secuencia propuesta para el resto de E3 es: U3 catálogo móvil y
 reordenamiento (E3-T6, E3-T8); U4 ordenación A/B/C y DataStore (E3-T7); U5

@@ -342,12 +342,6 @@ private fun Controles(
             listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
         },
     )
-    SelectorOrden(
-        modo = criterios.modo,
-        direccion = criterios.direccion,
-        onModo = acciones.onModo,
-        onDireccion = acciones.onDireccion,
-    )
     estado.mensaje?.let { codigo ->
         Text(
             text = stringResource(R.string.catalogo_error, codigo),
@@ -376,13 +370,15 @@ private fun Controles(
             Text(stringResource(R.string.catalogo_limpiar))
         }
     }
-    Filtros(
+    FiltrosYOrden(
         criterios = criterios,
         grupos = grupos,
         onGrupo = acciones.onGrupo,
         onFavoritos = acciones.onFavoritos,
         onTodos = acciones.onTodos,
         onMostrarOcultos = acciones.onMostrarOcultos,
+        onModo = acciones.onModo,
+        onDireccion = acciones.onDireccion,
     )
     Button(
         onClick = { onDialogo(DialogoCatalogo.NuevoCanal) },
@@ -566,11 +562,7 @@ private fun SelectorOrden(
     onDireccion: () -> Unit,
 ) {
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .testTag(TAG_MODO),
+        modifier = Modifier.testTag(TAG_MODO),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -609,17 +601,20 @@ private fun textoModo(modo: ModoOrden): Int =
     }
 
 @Composable
-private fun Filtros(
+private fun FiltrosYOrden(
     criterios: CriteriosBusqueda,
     grupos: List<GrupoOpcion>,
     onGrupo: (Long?) -> Unit,
     onFavoritos: () -> Unit,
     onTodos: () -> Unit,
     onMostrarOcultos: () -> Unit,
+    onModo: (ModoOrden) -> Unit,
+    onDireccion: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         FilterChip(
             selected = criterios.grupoId == null && !criterios.soloFavoritos,
@@ -647,6 +642,12 @@ private fun Filtros(
                 modifier = Modifier.testTag(PREFIJO_TAG_GRUPO + grupo.id),
             )
         }
+        SelectorOrden(
+            modo = criterios.modo,
+            direccion = criterios.direccion,
+            onModo = onModo,
+            onDireccion = onDireccion,
+        )
     }
 }
 

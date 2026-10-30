@@ -33,12 +33,12 @@ class ReordenamientoAparienciasTest {
     private lateinit var db: AppDatabase
     private val claves = ClavesEnMemoria()
     private val contexto: Context = ApplicationProvider.getApplicationContext()
-    private lateinit var lista1: Long
-    private lateinit var lista2: Long
-    private lateinit var canal1: Long
-    private lateinit var canal2: Long
-    private lateinit var canal3: Long
-    private lateinit var coleccion: Long
+    private var lista1: Long = 0L
+    private var lista2: Long = 0L
+    private var canal1: Long = 0L
+    private var canal2: Long = 0L
+    private var canal3: Long = 0L
+    private var coleccion: Long = 0L
 
     @Before
     fun abrir() {

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
@@ -65,7 +66,7 @@ class BusquedaFiltrosTest {
 
         composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performClick()
         esperarTexto(indice = 0, texto = TEXTO)
-        composeRule.onNodeWithTag(PREFIJO_TAG_GRUPO + grupoUno).performClick()
+        composeRule.onNodeWithTag(PREFIJO_TAG_GRUPO + grupoUno).performScrollTo().performClick()
         esperarTexto(indice = 0, texto = TEXTO)
         composeRule.waitUntil(TIEMPO_ESPERA) {
             composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isEmpty()

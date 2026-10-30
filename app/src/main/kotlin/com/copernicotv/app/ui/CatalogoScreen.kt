@@ -7,15 +7,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -38,8 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -196,99 +198,70 @@ fun CatalogoScreen(
     val listaActiva = listas.firstOrNull { it.activa }
     val focoInicial = remember { FocusRequester() }
     LaunchedEffect(Unit) { focoInicial.requestFocus() }
+    val hayFiltros =
+        criterios.texto.isNotEmpty() ||
+            criterios.grupoId != null ||
+            criterios.soloFavoritos ||
+            criterios.mostrarOcultos
+    val configuracion = LocalConfiguration.current
+    val horizontal = configuracion.screenWidthDp > configuracion.screenHeightDp
 
     Surface(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.catalogo_titulo),
-                style = MaterialTheme.typography.headlineMedium,
-            )
-            Button(
-                onClick = acciones.onAbrirDocumento,
-                enabled = !estado.importando,
-                modifier =
-                    Modifier
-                        .focusRequester(focoInicial)
-                        .testTag(TAG_ABRIR_DOCUMENTO),
+        if (horizontal) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
             ) {
-                Text(stringResource(R.string.catalogo_abrir_documento))
-            }
-            Button(
-                onClick = acciones.onImportar,
-                enabled = !estado.importando,
-                modifier = Modifier.testTag(TAG_IMPORTAR),
-            ) {
-                Text(stringResource(R.string.catalogo_importar))
-            }
-            SelectorLista(
-                listas = listas,
-                listaActiva = listaActiva,
-                onSeleccionar = acciones.onSeleccionarLista,
-                onNueva = { dialogo = DialogoCatalogo.NuevaLista },
-                onRenombrar = {
-                    listaActiva?.let { dialogo = DialogoCatalogo.RenombrarLista(it) }
-                },
-                onEliminar = {
-                    listaActiva?.let { dialogo = DialogoCatalogo.EliminarLista(it) }
-                },
-            )
-            estado.mensaje?.let { codigo ->
-                Text(
-                    text = stringResource(R.string.catalogo_error, codigo),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            estado.mensajeAccion?.let { codigo ->
-                Text(
-                    text = stringResource(R.string.catalogo_accion_error, codigo),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.testTag(TAG_ERROR_ACCION),
-                )
-            }
-            OutlinedTextField(
-                value = criterios.texto,
-                onValueChange = acciones.onTexto,
-                label = { Text(stringResource(R.string.catalogo_buscar)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag(TAG_BUSCAR),
-            )
-            if (criterios.texto.isNotEmpty() || criterios.grupoId != null || criterios.soloFavoritos) {
-                TextButton(
-                    onClick = acciones.onLimpiar,
-                    modifier = Modifier.testTag(TAG_LIMPIAR),
+                Column(
+                    modifier =
+                        Modifier
+                            .width(420.dp)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(stringResource(R.string.catalogo_limpiar))
+                    Controles(
+                        estado = estado,
+                        criterios = criterios,
+                        grupos = grupos,
+                        listas = listas,
+                        listaActiva = listaActiva,
+                        acciones = acciones,
+                        focoInicial = focoInicial,
+                        onDialogo = { dialogo = it },
+                    )
                 }
+                Resultados(
+                    resultados = resultados,
+                    hayFiltros = hayFiltros,
+                    onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
+                    onReintentar = { resultados.retry() },
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
             }
-            Filtros(
-                criterios = criterios,
-                grupos = grupos,
-                onGrupo = acciones.onGrupo,
-                onFavoritos = acciones.onFavoritos,
-                onTodos = acciones.onTodos,
-                onMostrarOcultos = acciones.onMostrarOcultos,
-            )
-            Button(
-                onClick = { dialogo = DialogoCatalogo.NuevoCanal },
-                enabled = listaActiva != null,
-                modifier = Modifier.testTag(TAG_NUEVO_CANAL),
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.catalogo_nuevo_canal))
+                Controles(
+                    estado = estado,
+                    criterios = criterios,
+                    grupos = grupos,
+                    listas = listas,
+                    listaActiva = listaActiva,
+                    acciones = acciones,
+                    focoInicial = focoInicial,
+                    onDialogo = { dialogo = it },
+                )
+                Resultados(
+                    resultados = resultados,
+                    hayFiltros = hayFiltros,
+                    onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
+                    onReintentar = { resultados.retry() },
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Resultados(
-                resultados = resultados,
-                hayFiltros =
-                    criterios.texto.isNotEmpty() ||
-                        criterios.grupoId != null ||
-                        criterios.soloFavoritos ||
-                        criterios.mostrarOcultos,
-                onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
-                onReintentar = { resultados.retry() },
-                modifier = Modifier.weight(1f),
-            )
         }
     }
 
@@ -297,6 +270,95 @@ fun CatalogoScreen(
         acciones = acciones,
         onDialogo = { dialogo = it },
     )
+}
+
+@Composable
+private fun Controles(
+    estado: CatalogoUiState,
+    criterios: CriteriosBusqueda,
+    grupos: List<GrupoOpcion>,
+    listas: List<ListaResumen>,
+    listaActiva: ListaResumen?,
+    acciones: CatalogoAcciones,
+    focoInicial: FocusRequester,
+    onDialogo: (DialogoCatalogo) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.catalogo_titulo),
+        style = MaterialTheme.typography.headlineMedium,
+    )
+    Button(
+        onClick = acciones.onAbrirDocumento,
+        enabled = !estado.importando,
+        modifier =
+            Modifier
+                .focusRequester(focoInicial)
+                .testTag(TAG_ABRIR_DOCUMENTO),
+    ) {
+        Text(stringResource(R.string.catalogo_abrir_documento))
+    }
+    Button(
+        onClick = acciones.onImportar,
+        enabled = !estado.importando,
+        modifier = Modifier.testTag(TAG_IMPORTAR),
+    ) {
+        Text(stringResource(R.string.catalogo_importar))
+    }
+    SelectorLista(
+        listas = listas,
+        listaActiva = listaActiva,
+        onSeleccionar = acciones.onSeleccionarLista,
+        onNueva = { onDialogo(DialogoCatalogo.NuevaLista) },
+        onRenombrar = {
+            listaActiva?.let { onDialogo(DialogoCatalogo.RenombrarLista(it)) }
+        },
+        onEliminar = {
+            listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
+        },
+    )
+    estado.mensaje?.let { codigo ->
+        Text(
+            text = stringResource(R.string.catalogo_error, codigo),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
+    estado.mensajeAccion?.let { codigo ->
+        Text(
+            text = stringResource(R.string.catalogo_accion_error, codigo),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.testTag(TAG_ERROR_ACCION),
+        )
+    }
+    OutlinedTextField(
+        value = criterios.texto,
+        onValueChange = acciones.onTexto,
+        label = { Text(stringResource(R.string.catalogo_buscar)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().testTag(TAG_BUSCAR),
+    )
+    if (criterios.texto.isNotEmpty() || criterios.grupoId != null || criterios.soloFavoritos) {
+        TextButton(
+            onClick = acciones.onLimpiar,
+            modifier = Modifier.testTag(TAG_LIMPIAR),
+        ) {
+            Text(stringResource(R.string.catalogo_limpiar))
+        }
+    }
+    Filtros(
+        criterios = criterios,
+        grupos = grupos,
+        onGrupo = acciones.onGrupo,
+        onFavoritos = acciones.onFavoritos,
+        onTodos = acciones.onTodos,
+        onMostrarOcultos = acciones.onMostrarOcultos,
+    )
+    Button(
+        onClick = { onDialogo(DialogoCatalogo.NuevoCanal) },
+        enabled = listaActiva != null,
+        modifier = Modifier.testTag(TAG_NUEVO_CANAL),
+    ) {
+        Text(stringResource(R.string.catalogo_nuevo_canal))
+    }
 }
 
 @Composable
@@ -473,32 +535,29 @@ private fun Filtros(
     onTodos: () -> Unit,
     onMostrarOcultos: () -> Unit,
 ) {
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        item {
-            FilterChip(
-                selected = criterios.grupoId == null && !criterios.soloFavoritos,
-                onClick = onTodos,
-                label = { Text(stringResource(R.string.catalogo_todos)) },
-                modifier = Modifier.testTag(TAG_FILTRO_TODOS),
-            )
-        }
-        item {
-            FilterChip(
-                selected = criterios.soloFavoritos,
-                onClick = onFavoritos,
-                label = { Text(stringResource(R.string.catalogo_favoritos)) },
-                modifier = Modifier.testTag(TAG_FILTRO_FAVORITOS),
-            )
-        }
-        item {
-            FilterChip(
-                selected = criterios.mostrarOcultos,
-                onClick = onMostrarOcultos,
-                label = { Text(stringResource(R.string.catalogo_mostrar_ocultos)) },
-                modifier = Modifier.testTag(TAG_FILTRO_OCULTOS),
-            )
-        }
-        items(grupos, key = { grupo -> grupo.id }) { grupo ->
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = criterios.grupoId == null && !criterios.soloFavoritos,
+            onClick = onTodos,
+            label = { Text(stringResource(R.string.catalogo_todos)) },
+            modifier = Modifier.testTag(TAG_FILTRO_TODOS),
+        )
+        FilterChip(
+            selected = criterios.soloFavoritos,
+            onClick = onFavoritos,
+            label = { Text(stringResource(R.string.catalogo_favoritos)) },
+            modifier = Modifier.testTag(TAG_FILTRO_FAVORITOS),
+        )
+        FilterChip(
+            selected = criterios.mostrarOcultos,
+            onClick = onMostrarOcultos,
+            label = { Text(stringResource(R.string.catalogo_mostrar_ocultos)) },
+            modifier = Modifier.testTag(TAG_FILTRO_OCULTOS),
+        )
+        grupos.forEach { grupo ->
             FilterChip(
                 selected = criterios.grupoId == grupo.id,
                 onClick = { onGrupo(if (criterios.grupoId == grupo.id) null else grupo.id) },
@@ -592,6 +651,8 @@ private fun CanalFila(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .onFocusChanged { enfocado = it.isFocused }
+                .clickable(onClick = onClick)
                 .border(
                     width = if (enfocado) 2.dp else 1.dp,
                     color =
@@ -602,7 +663,16 @@ private fun CanalFila(
                         },
                     shape = RoundedCornerShape(8.dp),
                 )
-                .padding(horizontal = 12.dp, vertical = 4.dp),
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .testTag(PREFIJO_TAG_CANAL + indice)
+                .semantics {
+                    contentDescription =
+                        if (canal.esFavorito) {
+                            "$nombre, favorito"
+                        } else {
+                            nombre
+                        }
+                },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -610,27 +680,13 @@ private fun CanalFila(
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .onFocusChanged { enfocado = it.isFocused }
-                    .clickable(onClick = onClick)
-                    .padding(vertical = 12.dp)
-                    .testTag(PREFIJO_TAG_CANAL + indice)
-                    .semantics {
-                        contentDescription =
-                            if (canal.esFavorito) {
-                                "$nombre, favorito"
-                            } else {
-                                nombre
-                            }
-                    },
+            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
         )
         if (canal.esFavorito) {
             Text(
                 text = "★",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(start = 8.dp),
+                modifier = Modifier.padding(start = 8.dp).clearAndSetSemantics {},
             )
         }
         if (canal.estaOculto) {

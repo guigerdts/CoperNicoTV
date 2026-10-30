@@ -75,6 +75,8 @@ Todos los valores están muy por debajo de los límites absolutos de DC-10
 - El defecto era exclusivamente documental: no afectaba la ruta, el fixture, los
   parámetros ni el medidor. No se repitieron las mediciones; las tres corridas
   sobre `418c33f` siguen siendo la evidencia válida.
+- Commit de corrección documental y aprobación: `7c3483d`
+  (`7c3483d60c70c2ae1ac76d0e10d475b09415833f`).
 
 ## Estado
 

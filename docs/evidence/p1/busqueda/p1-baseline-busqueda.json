@@ -2,6 +2,7 @@
   "esquema": "p1-baseline-busqueda/v1",
   "fecha": "2026-10-30T02:01:51Z",
   "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
+  "commitCorreccionDocumental": "7c3483d60c70c2ae1ac76d0e10d475b09415833f",
   "estado": "aprobado",
   "entornos": {
     "jvm": {

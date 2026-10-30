@@ -49,6 +49,8 @@ sobre el mismo commit:
 - Commit: `418c33f6745ad4667c7e77a77dfc609ecf4f0d5b` (`418c33f`)
 - La corrección documental posterior no cambia la ruta, el fixture, los
   parámetros ni el medidor; por eso el commit medido sigue siendo `418c33f`.
+- Commit de corrección documental y aprobación: `7c3483d`
+  (`7c3483d60c70c2ae1ac76d0e10d475b09415833f`).
 - Workflow: `.github/workflows/ci.yml`
 - Jobs de medición: `p1-performance` (JVM) y `p1-android` (Android)
 - Fecha: 2026-10-30

@@ -53,6 +53,30 @@ android {
 
     sourceSets {
         getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        // La medición JVM de búsqueda reutiliza la misma fixture versionada de
+        // `:core`; no se crea una tercera copia con hash potencialmente distinto.
+        getByName("test").resources.srcDir(rootProject.file("core/src/test/resources"))
+    }
+}
+
+/**
+ * Medición P1 de E3-T1 (DC-10): primera página de búsqueda y página 2.
+ *
+ * Se activa con `-Pp1.busqueda=true` sobre `:app:testDebugUnitTest`; sin esa
+ * propiedad la tarea conserva su comportamiento funcional y su heap habitual.
+ * La medición necesita `-Xmx512m`, filtra solo el medidor y publica evidencia
+ * en `app/build/p1-busqueda/` para el workflow `p1-performance`.
+ */
+tasks.withType<Test>().configureEach {
+    if (name == "testDebugUnitTest" && providers.gradleProperty("p1.busqueda").isPresent) {
+        maxHeapSize = "512m"
+        systemProperty("p1.medir", "true")
+        systemProperty("p1.commit", providers.gradleProperty("p1.commit").getOrElse("desconocido"))
+        systemProperty("repoRoot", rootProject.projectDir.absolutePath)
+        filter {
+            includeTestsMatching("com.copernicotv.app.p1.MedicionP1BusquedaTest")
+        }
+        outputs.upToDateWhen { false }
     }
 }
 

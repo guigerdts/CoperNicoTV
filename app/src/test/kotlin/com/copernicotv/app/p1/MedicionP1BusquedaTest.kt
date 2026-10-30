@@ -58,8 +58,8 @@ class MedicionP1BusquedaTest {
     @Before
     fun exigirModoMedicion() {
         assumeTrue(
-            System.getProperty("p1.medir") == "true",
             "medición P1 de búsqueda desactivada; usar la tarea :app:p1BusquedaPerformance",
+            System.getProperty("p1.medir") == "true",
         )
     }
 
@@ -118,11 +118,11 @@ class MedicionP1BusquedaTest {
         )
 
         assertTrue(
-            "p95 de primera página ${formatear(primera.p95Ms)} ms excede ${formatear(LIMITE_PRIMERA_PAGINA_MS)} ms",
+            "p95 de primera página ${formatear(metricasPrimera.p95Ms)} ms excede ${formatear(LIMITE_PRIMERA_PAGINA_MS)} ms",
             metricasPrimera.cumple,
         )
         assertTrue(
-            "p95 de página 2 ${formatear(pagina2.p95Ms)} ms excede ${formatear(LIMITE_PAGINA_2_MS)} ms",
+            "p95 de página 2 ${formatear(metricasPagina2.p95Ms)} ms excede ${formatear(LIMITE_PAGINA_2_MS)} ms",
             metricasPagina2.cumple,
         )
         assertTrue(

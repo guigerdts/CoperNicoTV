@@ -42,4 +42,10 @@
     <string name="catalogo_reintentar">Reintentar</string>
     <string name="catalogo_cargando">Cargando catálogo</string>
     <string name="catalogo_sin_grupo">Sin grupo</string>
+    <string name="catalogo_modo_manual">Manual</string>
+    <string name="catalogo_modo_nombre">Nombre</string>
+    <string name="catalogo_modo_grupo">Grupo</string>
+    <string name="catalogo_modo_recientes">Recientes</string>
+    <string name="catalogo_ascendente">Ascendente</string>
+    <string name="catalogo_descendente">Descendente</string>
 </resources>

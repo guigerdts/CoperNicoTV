@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
                             onAlternarFavorito = viewModel::alternarFavorito,
                             onAlternarOculto = viewModel::alternarOculto,
                             onMoverCanal = viewModel::moverCanal,
+                            onModo = viewModel::seleccionarModo,
+                            onDireccion = viewModel::alternarDireccion,
                         ),
                 )
             }

@@ -5,11 +5,15 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.core.orden.DireccionOrden
+import com.copernicotv.core.orden.ModoOrden
+import com.copernicotv.core.orden.PreferenciaOrden
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -26,6 +30,7 @@ import org.robolectric.annotation.Config
 class CatalogoCrudPersistenciaTest {
     private lateinit var db: AppDatabase
     private val claves = ClavesEnMemoria()
+    private val preferencias = PreferenciasOrdenEnMemoria()
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -43,7 +48,7 @@ class CatalogoCrudPersistenciaTest {
     @Test
     fun `crea lista y canal y sobrevive a reabrir la base`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves)
+            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
             assertEquals(ResultadoAccion.Ok, repositorio.crearLista("Mi lista"))
 
             val listas = repositorio.listas().first()
@@ -74,7 +79,7 @@ class CatalogoCrudPersistenciaTest {
     @Test
     fun `renombra canal y alterna favorito y ocultacion`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves)
+            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
             repositorio.crearLista("Lista")
             repositorio.crearCanal("Original", "https://example.com/a.m3u8")
             val canal = db.canalDao().porFuente(db.fuenteDao().todas().single().id).single()
@@ -97,7 +102,7 @@ class CatalogoCrudPersistenciaTest {
     @Test
     fun `selecciona la lista activa y elimina canal y lista`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves)
+            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
             repositorio.crearLista("Primera")
             val primera = requireNotNull(db.listaDao().activa())
             repositorio.crearLista("Segunda")
@@ -121,7 +126,7 @@ class CatalogoCrudPersistenciaTest {
     @Test
     fun `rechaza una url invalida sin crear filas`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves)
+            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
             repositorio.crearLista("Lista")
             assertEquals(
                 ResultadoAccion.Error("url_invalida"),
@@ -129,6 +134,43 @@ class CatalogoCrudPersistenciaTest {
             )
             assertEquals(0, db.canalDao().contar())
             assertEquals(0, db.aparienciaDao().todas().size)
+        }
+    }
+
+    @Test
+    fun `eliminar lista limpia su preferencia de orden`() {
+        runBlocking {
+            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
+            repositorio.crearLista("Primera")
+            val primera = requireNotNull(db.listaDao().activa())
+            repositorio.crearLista("Segunda")
+            val segunda = requireNotNull(db.listaDao().activa())
+            val preferenciaPrimera = PreferenciaOrden(ModoOrden.NOMBRE, DireccionOrden.DESCENDENTE)
+            val preferenciaSegunda = PreferenciaOrden(ModoOrden.GRUPO, DireccionOrden.ASCENDENTE)
+            preferencias.guardar(primera.id, preferenciaPrimera)
+            preferencias.guardar(segunda.id, preferenciaSegunda)
+
+            assertEquals(ResultadoAccion.Ok, repositorio.eliminarLista(primera.id))
+
+            assertNull(preferencias.valor(primera.id))
+            assertEquals(preferenciaSegunda, preferencias.valor(segunda.id))
+        }
+    }
+
+    @Test
+    fun `barre preferencias de listas que ya no existen`() {
+        runBlocking {
+            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
+            repositorio.crearLista("Vigente")
+            val vigente = requireNotNull(db.listaDao().activa())
+            val preferenciaVigente = PreferenciaOrden(ModoOrden.RECIENTES, DireccionOrden.DESCENDENTE)
+            preferencias.guardar(vigente.id, preferenciaVigente)
+            preferencias.guardar(999_999L, PreferenciaOrden(ModoOrden.NOMBRE))
+
+            repositorio.sincronizarPreferenciasDeOrden()
+
+            assertNull(preferencias.valor(999_999L))
+            assertEquals(preferenciaVigente, preferencias.valor(vigente.id))
         }
     }
 

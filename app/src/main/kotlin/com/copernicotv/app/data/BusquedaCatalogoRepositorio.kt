@@ -3,7 +3,11 @@ package com.copernicotv.app.data
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
+import androidx.room.InvalidationTracker
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.core.orden.CanalOrdenable
+import com.copernicotv.core.orden.DireccionOrden
+import com.copernicotv.core.orden.ModoOrden
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -15,6 +19,8 @@ data class CriteriosBusqueda(
     val grupoId: Long? = null,
     val soloFavoritos: Boolean = false,
     val mostrarOcultos: Boolean = false,
+    val modo: ModoOrden = ModoOrden.MANUAL,
+    val direccion: DireccionOrden = DireccionOrden.ASCENDENTE,
 )
 
 /** Opción de filtro por Grupo, limitada a la Lista activa. */
@@ -26,10 +32,15 @@ data class GrupoOpcion(
 /** Resultado paginado de la búsqueda; un Canal aparece una sola vez. */
 data class CanalBusqueda(
     val id: Long,
-    val nombre: String?,
+    override val nombre: String?,
     val esFavorito: Boolean,
     val estaOculto: Boolean,
-)
+    val grupoId: Long? = null,
+    override val grupoNombre: String? = null,
+    override val ultimaReproduccionEpochMs: Long? = null,
+    override val aparienciaId: Long = 0,
+    override val ordenManual: Int = 0,
+) : CanalOrdenable
 
 /**
  * Búsqueda paginada del catálogo de la Lista activa.
@@ -45,6 +56,29 @@ class BusquedaCatalogoRepositorio
     constructor(
         private val db: AppDatabase,
     ) {
+        @Volatile
+        private var fuenteOrdenada: CatalogoOrdenadoPagingSource? = null
+
+        private val observador =
+            object : InvalidationTracker.Observer(
+                "Canal",
+                "Apariencia",
+                "Grupo",
+                "Historial",
+                "Favorito",
+                "OcultacionCanal",
+                "OcultacionGrupo",
+                "Lista",
+            ) {
+                override fun onInvalidated(tables: Set<String>) {
+                    fuenteOrdenada?.invalidate()
+                }
+            }
+
+        init {
+            db.invalidationTracker.addObserver(observador)
+        }
+
         fun gruposDeListaActiva(): Flow<List<GrupoOpcion>> =
             db.grupoDao().gruposDeListaActiva().map { grupos ->
                 grupos.map { grupo -> GrupoOpcion(id = grupo.id, nombre = grupo.nombre) }
@@ -60,13 +94,24 @@ class BusquedaCatalogoRepositorio
                         enablePlaceholders = false,
                     ),
                 pagingSourceFactory = {
-                    db.canalDao().buscarEnListaActiva(
-                        texto = texto,
-                        patron = patronBusqueda(texto),
-                        grupoId = criterios.grupoId,
-                        soloFavoritos = criterios.soloFavoritos,
-                        incluirOcultos = criterios.mostrarOcultos,
-                    )
+                    if (criterios.modo == ModoOrden.MANUAL &&
+                        criterios.direccion == DireccionOrden.ASCENDENTE
+                    ) {
+                        db.canalDao().buscarEnListaActiva(
+                            texto = texto,
+                            patron = patronBusqueda(texto),
+                            grupoId = criterios.grupoId,
+                            soloFavoritos = criterios.soloFavoritos,
+                            incluirOcultos = criterios.mostrarOcultos,
+                        )
+                    } else {
+                        CatalogoOrdenadoPagingSource(
+                            db = db,
+                            criterios = criterios,
+                            texto = texto,
+                            patron = patronBusqueda(texto),
+                        ).also { fuente -> fuenteOrdenada = fuente }
+                    }
                 },
             ).flow
         }

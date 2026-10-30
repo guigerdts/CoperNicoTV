@@ -97,7 +97,14 @@ class CatalogoPersistenciaTest {
             db.close()
             db = abrirBase()
             val repositorioNuevo = CatalogoRepositorio(db, claves, contexto)
-            val viewModel = CatalogoViewModel(repositorioNuevo, BusquedaCatalogoRepositorio(db), CatalogoCrudRepositorio(db, claves))
+            val preferencias = PreferenciasOrdenEnMemoria()
+            val viewModel =
+                CatalogoViewModel(
+                    repositorioNuevo,
+                    BusquedaCatalogoRepositorio(db),
+                    CatalogoCrudRepositorio(db, claves, preferencias),
+                    preferencias,
+                )
             val estado = withTimeout(TIEMPO_ESPERA) { viewModel.estado.first { it.canales.size == 3 } }
 
             assertEquals(listOf("Canario Uno", "Canario Dos", "Canario Tres"), estado.canales)

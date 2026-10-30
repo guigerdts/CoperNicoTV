@@ -51,14 +51,25 @@ interface CanalDao {
      * `GROUP BY c.id` garantiza una sola fila por Canal aunque tenga varias
      * Apariencias en la misma Lista. El orden usa la primera Apariencia visible
      * para que dos consultas consecutivas devuelvan la misma página.
+     *
+     * Las columnas de grupo, historial y Apariencia alimentan los modos A/B/C.
+     * La clave primaria del Canal sigue siendo la identidad de la fila; el
+     * historial es opcional y puede no existir.
      */
     @Query(
         """
         SELECT c.id AS id, c.nombre AS nombre,
             EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito,
-            EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto
+            EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto,
+            a.grupoId AS grupoId,
+            g.nombre AS grupoNombre,
+            h.fecha AS ultimaReproduccionEpochMs,
+            a.id AS aparienciaId,
+            a.orden AS ordenManual
         FROM Canal c
         INNER JOIN Apariencia a ON a.canalId = c.id
+        LEFT JOIN Grupo g ON g.id = a.grupoId
+        LEFT JOIN Historial h ON h.canalId = c.id
         WHERE a.listaId = (
             SELECT id FROM Lista WHERE estado = 'activa' ORDER BY id DESC LIMIT 1
         )
@@ -86,4 +97,53 @@ interface CanalDao {
         soloFavoritos: Boolean,
         incluirOcultos: Boolean,
     ): PagingSource<Int, CanalBusqueda>
+
+    /**
+     * Todos los Canales filtrados de la Lista activa, sin paginación SQL.
+     *
+     * La usa el `PagingSource` en memoria de los modos A/B/C, que necesita la
+     * lista completa para ordenarla con la collation de `:core`. El `ORDER BY`
+     * es solo un desempate estable; la ordenación real ocurre en Kotlin.
+     */
+    @Query(
+        """
+        SELECT c.id AS id, c.nombre AS nombre,
+            EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito,
+            EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto,
+            a.grupoId AS grupoId,
+            g.nombre AS grupoNombre,
+            h.fecha AS ultimaReproduccionEpochMs,
+            a.id AS aparienciaId,
+            a.orden AS ordenManual
+        FROM Canal c
+        INNER JOIN Apariencia a ON a.canalId = c.id
+        LEFT JOIN Grupo g ON g.id = a.grupoId
+        LEFT JOIN Historial h ON h.canalId = c.id
+        WHERE a.listaId = (
+            SELECT id FROM Lista WHERE estado = 'activa' ORDER BY id DESC LIMIT 1
+        )
+          AND (:texto = '' OR c.nombre LIKE :patron ESCAPE '!')
+          AND (:grupoId IS NULL OR a.grupoId = :grupoId)
+          AND (:soloFavoritos = 0 OR EXISTS(
+              SELECT 1 FROM Favorito f2 WHERE f2.canalId = c.id
+          ))
+          AND (:incluirOcultos = 1 OR NOT EXISTS(
+              SELECT 1 FROM OcultacionCanal oc2 WHERE oc2.canalId = c.id
+          ))
+          AND (
+              :incluirOcultos = 1 OR a.grupoId IS NULL OR NOT EXISTS(
+                  SELECT 1 FROM OcultacionGrupo og WHERE og.grupoId = a.grupoId
+              )
+          )
+        GROUP BY c.id, c.nombre
+        ORDER BY c.id
+        """,
+    )
+    suspend fun buscarEnListaActivaTodos(
+        texto: String,
+        patron: String,
+        grupoId: Long?,
+        soloFavoritos: Boolean,
+        incluirOcultos: Boolean,
+    ): List<CanalBusqueda>
 }

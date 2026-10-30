@@ -1,6 +1,7 @@
 package com.copernicotv.app.data
 
 import android.database.sqlite.SQLiteConstraintException
+import android.util.Log
 import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
@@ -48,7 +49,8 @@ data class ListaResumen(
  * Lista y Canal, Favoritos, Ocultaciones y reordenamiento manual de Apariencias.
  *
  * La UI no accede a DAOs (K5). El reordenamiento reutiliza `Apariencia.orden` y
- * nunca toca `ColeccionCanal.posicion` ni la preferencia A/B/C.
+ * nunca toca `ColeccionCanal.posicion` ni la preferencia A/B/C. La preferencia
+ * de ordenación se limpia al eliminar la Lista y se barre al iniciar (DC-08).
  */
 @Singleton
 class CatalogoCrudRepositorio
@@ -56,6 +58,7 @@ class CatalogoCrudRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val preferencias: PreferenciasOrden,
     ) {
         fun listas(): Flow<List<ListaResumen>> =
             db.listaDao().observarTodas().map { listas ->
@@ -158,11 +161,28 @@ class CatalogoCrudRepositorio
                             db.fuenteDao().eliminar(lista.fuenteId)
                         }
                     }
-                    ResultadoAccion.Ok
                 } catch (error: Exception) {
-                    ResultadoAccion.Error(ERROR_ELIMINAR_LISTA)
+                    return@withContext ResultadoAccion.Error(ERROR_ELIMINAR_LISTA)
                 }
+                runCatching { preferencias.limpiar(listaId) }
+                    .onFailure { Log.w(TAG, "No se pudo limpiar la preferencia de orden") }
+                ResultadoAccion.Ok
             }
+
+        /**
+         * Elimina las preferencias de ordenación de Listas que ya no existen.
+         *
+         * Se ejecuta al construir el ViewModel. Si DataStore falla, la Lista
+         * sigue operativa y el barrido se reintenta en el próximo inicio.
+         */
+        suspend fun sincronizarPreferenciasDeOrden() {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val idsValidos = db.listaDao().listar().map { it.id }.toSet()
+                    preferencias.barrerHuerfanas(idsValidos)
+                }.onFailure { Log.w(TAG, "No se pudieron barrer las preferencias de orden") }
+            }
+        }
 
         suspend fun seleccionarLista(listaId: Long): ResultadoAccion =
             withContext(Dispatchers.IO) {
@@ -405,6 +425,7 @@ class CatalogoCrudRepositorio
 
         private companion object {
             const val ESTADO_ACTIVA = "activa"
+            const val TAG = "CatalogoCrud"
 
             const val ERROR_NOMBRE_VACIO = "nombre_vacio"
             const val ERROR_UBICACION_INVALIDA = "ubicacion_invalida"

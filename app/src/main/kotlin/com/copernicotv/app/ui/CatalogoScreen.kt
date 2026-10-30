@@ -61,6 +61,8 @@ import com.copernicotv.app.data.CanalBusqueda
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
 import com.copernicotv.app.data.ListaResumen
+import com.copernicotv.core.orden.DireccionOrden
+import com.copernicotv.core.orden.ModoOrden
 
 /** Etiqueta del disparador de importación del canario. */
 const val TAG_IMPORTAR = "importar-fixture"
@@ -164,6 +166,18 @@ const val TAG_DIALOGO_CANCELAR = "dialogo-cancelar"
 /** Etiqueta del botón de confirmación de borrado. */
 const val TAG_CONFIRMAR_ELIMINAR = "confirmar-eliminar"
 
+/** Etiqueta del selector de modo de ordenación A/B/C. */
+const val TAG_MODO = "orden-modo"
+
+/** Etiqueta del botón que invierte la dirección de ordenación. */
+const val TAG_DIRECCION = "orden-direccion"
+
+/** Prefijo de las etiquetas de cada opción de modo de ordenación. */
+const val PREFIJO_TAG_MODO_OPCION = "orden-modo-"
+
+/** Prefijo de las etiquetas de las cabeceras de Grupo. */
+const val PREFIJO_TAG_SECCION_GRUPO = "seccion-grupo-"
+
 /** Acciones que la pantalla de catálogo delega en el ViewModel. */
 data class CatalogoAcciones(
     val onImportar: () -> Unit,
@@ -184,6 +198,8 @@ data class CatalogoAcciones(
     val onAlternarFavorito: (Long) -> Unit,
     val onAlternarOculto: (Long) -> Unit,
     val onMoverCanal: (Long, Int) -> Unit,
+    val onModo: (ModoOrden) -> Unit,
+    val onDireccion: () -> Unit,
 )
 
 /**
@@ -240,6 +256,7 @@ fun CatalogoScreen(
                     )
                 }
                 Resultados(
+                    modo = criterios.modo,
                     resultados = resultados,
                     hayFiltros = hayFiltros,
                     onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
@@ -263,6 +280,7 @@ fun CatalogoScreen(
                     onDialogo = { dialogo = it },
                 )
                 Resultados(
+                    modo = criterios.modo,
                     resultados = resultados,
                     hayFiltros = hayFiltros,
                     onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
@@ -323,6 +341,12 @@ private fun Controles(
         onEliminar = {
             listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
         },
+    )
+    SelectorOrden(
+        modo = criterios.modo,
+        direccion = criterios.direccion,
+        onModo = acciones.onModo,
+        onDireccion = acciones.onDireccion,
     )
     estado.mensaje?.let { codigo ->
         Text(
@@ -535,6 +559,56 @@ private fun SelectorLista(
 }
 
 @Composable
+private fun SelectorOrden(
+    modo: ModoOrden,
+    direccion: DireccionOrden,
+    onModo: (ModoOrden) -> Unit,
+    onDireccion: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .testTag(TAG_MODO),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ModoOrden.entries.forEach { opcion ->
+            FilterChip(
+                selected = modo == opcion,
+                onClick = { onModo(opcion) },
+                label = { Text(stringResource(textoModo(opcion))) },
+                modifier = Modifier.testTag(PREFIJO_TAG_MODO_OPCION + opcion.codigo),
+            )
+        }
+        TextButton(
+            onClick = onDireccion,
+            modifier = Modifier.testTag(TAG_DIRECCION),
+        ) {
+            Text(
+                text =
+                    stringResource(
+                        if (direccion == DireccionOrden.ASCENDENTE) {
+                            R.string.catalogo_ascendente
+                        } else {
+                            R.string.catalogo_descendente
+                        },
+                    ),
+            )
+        }
+    }
+}
+
+private fun textoModo(modo: ModoOrden): Int =
+    when (modo) {
+        ModoOrden.MANUAL -> R.string.catalogo_modo_manual
+        ModoOrden.NOMBRE -> R.string.catalogo_modo_nombre
+        ModoOrden.GRUPO -> R.string.catalogo_modo_grupo
+        ModoOrden.RECIENTES -> R.string.catalogo_modo_recientes
+    }
+
+@Composable
 private fun Filtros(
     criterios: CriteriosBusqueda,
     grupos: List<GrupoOpcion>,
@@ -578,6 +652,7 @@ private fun Filtros(
 
 @Composable
 private fun Resultados(
+    modo: ModoOrden,
     resultados: LazyPagingItems<CanalBusqueda>,
     hayFiltros: Boolean,
     onCanal: (CanalBusqueda) -> Unit,
@@ -630,6 +705,12 @@ private fun Resultados(
                 ) { indice ->
                     val canal = resultados[indice]
                     if (canal != null) {
+                        CabeceraGrupoSiCorresponde(
+                            modo = modo,
+                            indice = indice,
+                            canal = canal,
+                            anterior = resultados.peek((indice - 1).coerceAtLeast(0)),
+                        )
                         CanalFila(
                             canal = canal,
                             indice = indice,
@@ -645,6 +726,34 @@ private fun Resultados(
             }
         }
     }
+}
+
+@Composable
+private fun CabeceraGrupoSiCorresponde(
+    modo: ModoOrden,
+    indice: Int,
+    canal: CanalBusqueda,
+    anterior: CanalBusqueda?,
+) {
+    if (modo == ModoOrden.GRUPO &&
+        (indice == 0 || anterior?.grupoNombre != canal.grupoNombre)
+    ) {
+        CabeceraGrupo(canal.grupoNombre)
+    }
+}
+
+@Composable
+private fun CabeceraGrupo(grupoNombre: String?) {
+    val texto = grupoNombre ?: stringResource(R.string.catalogo_sin_grupo)
+    Text(
+        text = texto,
+        style = MaterialTheme.typography.titleSmall,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .testTag(PREFIJO_TAG_SECCION_GRUPO + (grupoNombre ?: "sin-grupo")),
+    )
 }
 
 @Composable

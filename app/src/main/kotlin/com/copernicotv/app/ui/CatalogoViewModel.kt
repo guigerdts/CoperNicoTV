@@ -12,9 +12,13 @@ import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
 import com.copernicotv.app.data.ListaResumen
+import com.copernicotv.app.data.PreferenciasOrden
 import com.copernicotv.app.data.ResultadoAccion
 import com.copernicotv.app.data.ResumenImportacion
 import com.copernicotv.app.diagnostico.detalleTecnico
+import com.copernicotv.core.orden.DireccionOrden
+import com.copernicotv.core.orden.ModoOrden
+import com.copernicotv.core.orden.PreferenciaOrden
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -27,6 +31,8 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,6 +68,7 @@ class CatalogoViewModel
         private val repositorio: CatalogoRepositorio,
         private val busqueda: BusquedaCatalogoRepositorio,
         private val crud: CatalogoCrudRepositorio,
+        private val preferencias: PreferenciasOrden,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
@@ -102,6 +109,8 @@ class CatalogoViewModel
 
         init {
             observarCatalogo()
+            observarPreferencias()
+            sincronizarPreferencias()
         }
 
         fun actualizarTexto(texto: String) {
@@ -121,7 +130,39 @@ class CatalogoViewModel
         }
 
         fun limpiarCriterios() {
-            _criterios.value = CriteriosBusqueda()
+            _criterios.value =
+                _criterios.value.copy(
+                    texto = "",
+                    grupoId = null,
+                    soloFavoritos = false,
+                    mostrarOcultos = false,
+                )
+        }
+
+        /** Cambia el modo A/B/C y lo persiste para la Lista activa. */
+        fun seleccionarModo(modo: ModoOrden) {
+            val listaId = listas.value.firstOrNull { it.activa }?.id ?: return
+            val direccion = _criterios.value.direccion
+            _criterios.value = _criterios.value.copy(modo = modo)
+            viewModelScope.launch {
+                preferencias.guardar(listaId, PreferenciaOrden(modo, direccion))
+            }
+        }
+
+        /** Invierte la dirección y la persiste para la Lista activa. */
+        fun alternarDireccion() {
+            val listaId = listas.value.firstOrNull { it.activa }?.id ?: return
+            val modo = _criterios.value.modo
+            val nueva =
+                if (_criterios.value.direccion == DireccionOrden.ASCENDENTE) {
+                    DireccionOrden.DESCENDENTE
+                } else {
+                    DireccionOrden.ASCENDENTE
+                }
+            _criterios.value = _criterios.value.copy(direccion = nueva)
+            viewModelScope.launch {
+                preferencias.guardar(listaId, PreferenciaOrden(modo, nueva))
+            }
         }
 
         fun alternarMostrarOcultos() {
@@ -241,6 +282,38 @@ class CatalogoViewModel
                 _estado.value = _estado.value.copy(importando = false, listaId = listaId, mensaje = null)
                 observarCatalogo()
             }
+        }
+
+        /**
+         * Observa la preferencia de la Lista activa y la refleja en los criterios.
+         *
+         * Al cambiar de Lista, el flujo se cambia sin perder el modo y la
+         * dirección que la nueva Lista tenga persistidos.
+         */
+        private fun observarPreferencias() {
+            viewModelScope.launch {
+                listas
+                    .map { actuales -> actuales.firstOrNull { it.activa }?.id }
+                    .distinctUntilChanged()
+                    .flatMapLatest { listaId ->
+                        if (listaId == null) {
+                            flowOf(PreferenciaOrden())
+                        } else {
+                            preferencias.preferencia(listaId)
+                        }
+                    }
+                    .collectLatest { preferencia ->
+                        _criterios.value =
+                            _criterios.value.copy(
+                                modo = preferencia.modo,
+                                direccion = preferencia.direccion,
+                            )
+                    }
+            }
+        }
+
+        private fun sincronizarPreferencias() {
+            viewModelScope.launch { crud.sincronizarPreferenciasDeOrden() }
         }
 
         /**

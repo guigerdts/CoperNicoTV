@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.androidx.paging.compose)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.datastore.preferences)
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)

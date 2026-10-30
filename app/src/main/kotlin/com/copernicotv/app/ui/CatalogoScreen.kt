@@ -1,7 +1,8 @@
 package com.copernicotv.app.ui
 
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,11 +39,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -625,7 +633,7 @@ private fun Resultados(
                         CanalFila(
                             canal = canal,
                             indice = indice,
-                            onClick = { onCanal(canal) },
+                            alSeleccionar = { onCanal(canal) },
                         )
                     }
                 }
@@ -643,7 +651,7 @@ private fun Resultados(
 private fun CanalFila(
     canal: CanalBusqueda,
     indice: Int,
-    onClick: () -> Unit,
+    alSeleccionar: () -> Unit,
 ) {
     var enfocado by remember { mutableStateOf(false) }
     val nombre = canal.nombre ?: stringResource(R.string.catalogo_sin_nombre)
@@ -652,7 +660,20 @@ private fun CanalFila(
             Modifier
                 .fillMaxWidth()
                 .onFocusChanged { enfocado = it.isFocused }
-                .clickable(onClick = onClick)
+                .onKeyEvent { evento ->
+                    if (evento.type == KeyEventType.KeyUp &&
+                        (evento.key == Key.DirectionCenter || evento.key == Key.Enter)
+                    ) {
+                        alSeleccionar()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                .focusable()
+                .pointerInput(alSeleccionar) {
+                    detectTapGestures { alSeleccionar() }
+                }
                 .border(
                     width = if (enfocado) 2.dp else 1.dp,
                     color =
@@ -665,13 +686,17 @@ private fun CanalFila(
                 )
                 .padding(horizontal = 12.dp, vertical = 4.dp)
                 .testTag(PREFIJO_TAG_CANAL + indice)
-                .semantics {
+                .semantics(mergeDescendants = true) {
                     contentDescription =
                         if (canal.esFavorito) {
                             "$nombre, favorito"
                         } else {
                             nombre
                         }
+                    onClick(label = null) {
+                        alSeleccionar()
+                        true
+                    }
                 },
         verticalAlignment = Alignment.CenterVertically,
     ) {

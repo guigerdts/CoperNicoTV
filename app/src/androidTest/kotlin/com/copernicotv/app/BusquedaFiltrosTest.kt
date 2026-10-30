@@ -72,7 +72,7 @@ class BusquedaFiltrosTest {
             composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isEmpty()
         }
 
-        composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performClick()
+        composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performScrollTo().performClick()
         composeRule.waitUntil(TIEMPO_ESPERA) {
             composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isNotEmpty()
         }

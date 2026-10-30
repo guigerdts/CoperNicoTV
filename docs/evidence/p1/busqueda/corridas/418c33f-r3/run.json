@@ -1,0 +1,107 @@
+{
+  "orden": 3,
+  "run": "40988640006",
+  "jvm": {
+    "entorno": {
+      "plataforma": "jvm",
+      "runner": "ubuntu24",
+      "arquitectura": "X64",
+      "sistema": "Linux",
+      "jdk": "17.0.21",
+      "robolectricSdk": 34,
+      "heapMaximoBytes": 536870912
+    },
+    "parseo": {
+      "calentamientos": 10,
+      "mediciones": 30,
+      "medianaMs": 24.74,
+      "p95Ms": 46.13,
+      "maximoMs": 51.755,
+      "picoHeapMiB": 45.419,
+      "cumple": true
+    },
+    "busqueda": {
+      "primeraPagina": {
+        "calentamientos": 10,
+        "mediciones": 30,
+        "medianaMs": 25.854,
+        "p95Ms": 34.428,
+        "maximoMs": 35.725,
+        "picoHeapMiB": 71.397,
+        "cumple": true
+      },
+      "pagina2": {
+        "calentamientos": 10,
+        "mediciones": 30,
+        "medianaMs": 12.433,
+        "p95Ms": 22.528,
+        "maximoMs": 25.457,
+        "picoHeapMiB": 70.606,
+        "cumple": true
+      },
+      "cumple": true
+    }
+  },
+  "android": {
+    "entorno": {
+      "plataforma": "android",
+      "api": 34,
+      "release": "14",
+      "modelo": "sdk_gphone64_x86_64",
+      "dispositivo": "emu64xa",
+      "producto": "sdk_gphone64_x86_64",
+      "hardware": "ranchu",
+      "fingerprint": "google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.050/12077443:userdebug/dev-keys",
+      "anchoPx": 1080,
+      "altoPx": 1920,
+      "densidadDpi": 320,
+      "heapMaximoBytes": 201326592,
+      "memoriaNativaBytes": 9426256
+    },
+    "parseo": {
+      "calentamientos": 5,
+      "mediciones": 20,
+      "medianaMs": 128.249,
+      "p95Ms": 204.859,
+      "maximoMs": 229.251,
+      "picoHeapMiB": 29.578,
+      "cumple": true
+    },
+    "busqueda": {
+      "primeraPagina": {
+        "calentamientos": 5,
+        "mediciones": 20,
+        "medianaMs": 29.078,
+        "p95Ms": 30.651,
+        "maximoMs": 35.95,
+        "picoHeapMiB": 11.847,
+        "cumple": true
+      },
+      "pagina2": {
+        "calentamientos": 5,
+        "mediciones": 20,
+        "medianaMs": 14.26,
+        "p95Ms": 16.281,
+        "maximoMs": 16.799,
+        "picoHeapMiB": 11.941,
+        "cumple": true
+      },
+      "cumple": true
+    }
+  },
+  "jobs": {
+    "jvm-tests": "success",
+    "static-analysis": "success",
+    "apk": "success",
+    "instrumented-mobile": "success",
+    "instrumented-tv": "success",
+    "p1-performance": "success",
+    "p1-android": "success"
+  },
+  "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
+  "evento": "workflow_dispatch",
+  "conclusion": "success",
+  "fechaInicio": "2026-10-30T01:55:08Z",
+  "fechaFin": "2026-10-30T02:01:51Z",
+  "evidencia": "docs/evidence/p1/busqueda/corridas/418c33f-r3/"
+}

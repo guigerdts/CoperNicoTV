@@ -1182,6 +1182,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E3-U1 (datos de Favoritos, Historial y Ocultaciones) | 2026-10-29 | `app/.../data/db/dao/{EstadoUsuarioDaos,IntegridadDaos}.kt`, `app/.../data/db/AppDatabase.kt`, `app/.../di/AppModule.kt`, `app/.../data/{Favoritos,Historial,Ocultaciones}Repositorio.kt`, `app/src/test/.../data/EstadoUsuarioPersistenciaTest.kt` | Commit `9781bf2`; 8 archivos, +758 | Local: `:core:test`, `ktlintCheck`, `detekt`, `:app:ktlintCheck` y `:app:detekt` verdes; `:app:testDebugUnitTest` no ejecutable local por SDK ausente. CI: `jvm-tests` | `:app` 137 pruebas, 0 fallos; `EstadoUsuarioPersistenciaTest` 12/12 (incluye atomicidad); `TV emulator trial` verde | `40950814485` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `40950814041` | Parcial: E3-T2/T3 con capa de datos; E3-T4 cubierta en datos (UI en E3-T6); E3 abierta |
 | E3-U2 (búsqueda y filtros) | 2026-10-29 | `app/build.gradle.kts`, `app/.../data/BusquedaCatalogoRepositorio.kt`, `app/.../data/db/dao/{CanalDao,AparienciaDao,GrupoDao}.kt`, `app/.../ui/{CatalogoViewModel,CatalogoScreen}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{BusquedaCatalogoPersistenciaTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../{BusquedaFiltrosTest,CanarioMovilTest,CanarioTvTest}.kt`, `.github/workflows/ci.yml` | Commits `e45101f` (15 archivos, +893/−28) y `025477e` (1 archivo, +2/−2) | Local: `:core:test`, `ktlintCheck` y `detekt` verdes; `:app:testDebugUnitTest` no ejecutable local por SDK ausente. CI: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` | `:core` 244 pruebas (1 ignorada); `:app` 144 pruebas, 0 fallos; `BusquedaCatalogoPersistenciaTest` 7/7; `instrumented-mobile` 16 (incluye `BusquedaFiltrosTest` 1/1); `instrumented-tv` 1/1; P1 de búsqueda/página 2 no ejecutada | `40969314617` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `40969314701` | Implementada y verificada en CI; E3-T1 pendiente de medición P1 y baseline; E3 abierta |
 | E3-T1 (medición P1 de búsqueda) | 2026-10-30 | `app/src/test/kotlin/com/copernicotv/app/p1/MedicionP1BusquedaTest.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/p1/MedicionP1BusquedaAndroidTest.kt`, `app/build.gradle.kts`, `.github/scripts/p1-android.sh`, `.github/workflows/ci.yml`, `docs/evidence/p1/busqueda/**`, `odd/tasks/mvp-copernicotv.md` | Commits `f07e5e1`, `418c33f` y `7c3483d` (corrección documental y aprobación); U0 en el commit de cierre; sin cambios de producción | `workflow_dispatch` sobre `418c33f`: runs `40987152414`, `40987957054` y `40988640006`; auditoría Python de p95 nearest-rank, CSV contra JSON, límites, referencias y fixture; CI de `7c3483d` | JVM búsqueda: p95 24.460/18.696, 34.429/19.296 y 34.428/22.528 ms; heap 70.535/72.225/71.397 MiB. Android: p95 17.177/8.209, 38.892/15.347 y 30.651/16.281 ms; heap 13.920/19.102/11.941 MiB. Las tres corridas 7/7 verdes; `cumple: true`; baseline aprobado con referencias JVM 34.429/22.528 ms y 72.225 MiB, Android 38.892/16.281 ms y 19.102 MiB | `40987152414`, `40987957054`, `40988640006` (7/7 verdes cada uno); CI `40993183550` (5/5 verdes; `p1-performance` y `p1-android` omitidos); `TV emulator trial` `40993183552` verde | Baseline aprobado el 2026-10-30; E3-T1 cerrada. Auditoría: página completa de 50 = primer resultado completo observable en Paging 3; KDoc/`assumeTrue` corregidos; sin re-medición |
+| E3-U3 (catálogo móvil y reordenamiento manual) | 2026-10-30 | `app/src/main/kotlin/com/copernicotv/app/data/CatalogoCrudRepositorio.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/{CanalDao,ListaDao,AparienciaDao}.kt`, `app/src/main/kotlin/com/copernicotv/app/data/{BusquedaCatalogoRepositorio,CanalEscritor}.kt`, `app/src/main/kotlin/com/copernicotv/app/ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/src/main/kotlin/com/copernicotv/app/MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/kotlin/com/copernicotv/app/data/{CatalogoCrudPersistenciaTest,ReordenamientoAparienciasTest}.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/CatalogoUiTest.kt`, `.github/workflows/ci.yml` | Commit `e91c45b`; 18 archivos, 1960 inserciones y 51 eliminaciones | Local: `./gradlew :core:test :app:ktlintCheck :app:detekt` verde. `git diff --check` limpio con CRLF. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `CatalogoCrudPersistenciaTest` 4 casos y `ReordenamientoAparienciasTest` 2 casos (JVM/Robolectric); `CatalogoUiTest` 4 casos instrumentados; `CatalogoPersistenciaTest`, `BusquedaCatalogoPersistenciaTest` y medidores P1 actualizados; `CatalogoUiTest` añadido al filtro móvil de CI | Pendiente de CI | E3-T6 parcial («Sin grupo» pendiente de E3-T7); E3-T8 cubierta en BD y UI, con recreación de proceso pendiente; E3-T5/T7/T9 y E4 pendientes; E3 abierta |
 
 ### 10.2 Evidencia de CI
 
@@ -2473,6 +2474,50 @@ pendiente el `EXPLAIN QUERY PLAN`.
   `7c3483d` se registra en §10.2; la CI del commit de cierre se verifica al
   publicar.
 
+### L53 — E3-U3: catálogo móvil y reordenamiento manual (2026-10-30)
+
+- **Autorización y alcance.** El propietario autorizó ejecutar E3-U3 sobre
+  `feat/e1-bootstrap` con el alcance E3-T6 (UI de catálogo móvil) y E3-T8
+  (reordenamiento manual de Apariencias). No se implementan E3-T5, E3-T7,
+  E3-T9 ni E4; no se toca `main`, el esquema Room v1,
+  `docs/evidence/u0-manifest.md` ni la evidencia histórica de P1/E2. El CRUD de
+  Lista y Canal se incluye porque U0 lo asigna a E3-T6; no se añade
+  funcionalidad de E4.
+- **Contrato.** Se cubren S39 (CRUD de Lista y Canal), S14a/S14c y S45a–S45c
+  (reordenamiento estable, aislado por Lista y sin tocar
+  `ColeccionCanal.posicion` ni la preferencia A/B/C), y K5 (la UI no accede a
+  DAOs). «Sin grupo» queda pendiente de E3-T7 porque pertenece al Modo B; no se
+  simula un Grupo ficticio.
+- **Implementación.** `CatalogoCrudRepositorio` concentra CRUD de Lista y Canal,
+  Favoritos, Ocultaciones y el movimiento de Apariencias; `CatalogoViewModel`
+  expone `listas` y las acciones; `CatalogoScreen` incorpora selector de Lista,
+  diálogos de alta/edición/borrado, filtro «Mostrar ocultos», estados de carga,
+  vacío y error, foco visible y filas de Canal de un solo nodo enfocable;
+  `MainActivity` agrupa las acciones en `CatalogoAcciones`. El reordenamiento
+  renumera `Apariencia.orden` por bloques de Canal dentro de una transacción y
+  no modifica `ColeccionCanal.posicion`.
+- **Pruebas.** JVM/Robolectric: `CatalogoCrudPersistenciaTest` (4 casos) y
+  `ReordenamientoAparienciasTest` (2 casos: aislamiento L1/L2, persistencia tras
+  reabrir la base, `ColeccionCanal` intacta y extremos sin movimiento).
+  Instrumentadas: `CatalogoUiTest` (4 casos: D-pad y Centro, Favorito/Ocultación
+  con filtros, CRUD de Lista/Canal y «Bajar» con orden persistido). Se actualizan
+  `CatalogoPersistenciaTest`, `BusquedaCatalogoPersistenciaTest` y los medidores
+  P1 para la nueva firma de búsqueda; `CatalogoUiTest` se añade al filtro móvil
+  de CI.
+- **Validación local.** `./gradlew :core:test :app:ktlintCheck :app:detekt`
+  verde. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, las pruebas
+  instrumentadas y el APK no se ejecutan localmente porque falta Android SDK;
+  se validan en CI. No se declara ninguna prueba no ejecutada como verde.
+- **Estado.** E3-T6 queda **parcial**: CRUD, UI, D-pad, estados y «Sin nombre»
+  cubiertos; «Sin grupo» pendiente de E3-T7. E3-T8 queda cubierta en BD y UI,
+  con la recreación de proceso pendiente de una prueba instrumentada específica.
+  E3-T5, E3-T7, E3-T9 y E4 siguen pendientes; E3 permanece **abierta**.
+- **Frontera y CRLF.** No se modifica `main`, `origin/main`, el esquema Room v1,
+  `docs/evidence/u0-manifest.md`, `docs/evidence/p1/` ni evidencia histórica.
+  Este archivo conserva CRLF y `git diff --check` limpio. La CI del commit
+  `e91c45b` se registra en §10.2 al publicarse; no se declara verde antes de
+  observar el run.
+
 ### Próximo paso
 
 E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
@@ -2517,10 +2562,17 @@ valores son JVM 34.429/22.528 ms y 72.225 MiB; Android 38.892/16.281 ms y
 contrato y corrección documental del medidor. E3 sigue **abierta** por
 E3-T2/T3, E3-T5, E3-T6/T7/T8/T9 y las tareas de UI.
 
-La secuencia propuesta para el resto de E3 es: U3 catálogo móvil y
-reordenamiento (E3-T6, E3-T8); U4 ordenación A/B/C y DataStore (E3-T7); U5
-colecciones (E3-T5); U6 perfiles (E3-T9); U7 cierre y evidencia. No se
-implementa ninguna otra unidad.
+**E3-U3 (catálogo móvil y reordenamiento manual) ejecutada el 2026-10-30.**
+Implementa E3-T6 (CRUD de Lista/Canal, estados, D-pad, «Sin nombre») y E3-T8
+(reordenamiento manual de Apariencias) sobre `feat/e1-bootstrap`, con commit
+`e91c45b`. La validación local es `:core:test`, `:app:ktlintCheck` y
+`:app:detekt`; `:app:testDebugUnitTest`, las instrumentadas y el APK se validan
+en CI. E3-T6 queda parcial por «Sin grupo» (E3-T7); E3-T8 queda cubierta en BD
+y UI, con la recreación de proceso pendiente. E3 sigue **abierta**.
+
+La secuencia propuesta para el resto de E3 es: U4 ordenación A/B/C y DataStore
+(E3-T7); U5 colecciones (E3-T5); U6 perfiles (E3-T9); U7 cierre y evidencia. No
+se implementa ninguna otra unidad.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y

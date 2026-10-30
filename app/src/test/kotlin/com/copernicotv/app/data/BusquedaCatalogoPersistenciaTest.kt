@@ -177,6 +177,7 @@ class BusquedaCatalogoPersistenciaTest {
         texto: String = "",
         grupoId: Long? = null,
         soloFavoritos: Boolean = false,
+        incluirOcultos: Boolean = false,
         offset: Int = 0,
     ): List<CanalBusqueda> {
         val source =
@@ -185,6 +186,7 @@ class BusquedaCatalogoPersistenciaTest {
                 patron = patron(texto),
                 grupoId = grupoId,
                 soloFavoritos = soloFavoritos,
+                incluirOcultos = incluirOcultos,
             )
         val parametros =
             PagingSource.LoadParams.Refresh<Int>(

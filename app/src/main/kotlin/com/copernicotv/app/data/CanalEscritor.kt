@@ -54,4 +54,32 @@ class CanalEscritor(
         if (violaciones.isNotEmpty()) throw CanalRechazado(violaciones)
         return db.canalDao().insertar(entidad)
     }
+
+    /**
+     * Valida y actualiza un Canal existente.
+     *
+     * Mantiene la misma fila y, por lo tanto, sus FKs. Solo cambian los campos
+     * derivados de la declaración editada.
+     */
+    suspend fun actualizar(
+        entidad: CanalEntity,
+        tvgIdUnicoEnFuente: Boolean,
+    ): Int {
+        val violaciones =
+            InvariantesCanal.validar(
+                FilaCanal(
+                    nombre = entidad.nombre,
+                    estado = entidad.estado,
+                    claveDerivable = entidad.claveDerivable,
+                    claveCanonica = entidad.claveCanonica,
+                    claveUnicidad = entidad.claveUnicidad,
+                    tvgId = entidad.tvgId,
+                    urlStreamCifradaPresente = entidad.urlStreamCifrada.isNotEmpty(),
+                    urlStreamHmacPresente = entidad.urlStreamHmac.isNotEmpty(),
+                ),
+                tvgIdUnicoEnFuente,
+            )
+        if (violaciones.isNotEmpty()) throw CanalRechazado(violaciones)
+        return db.canalDao().actualizar(entidad)
+    }
 }

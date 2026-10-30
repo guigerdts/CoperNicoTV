@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.copernicotv.app.ui.CatalogoAcciones
 import com.copernicotv.app.ui.CatalogoScreen
 import com.copernicotv.app.ui.CatalogoViewModel
 import com.copernicotv.app.ui.CoperNicoTheme
@@ -25,6 +26,7 @@ class MainActivity : ComponentActivity() {
                 val estado by viewModel.estado.collectAsStateWithLifecycle()
                 val criterios by viewModel.criterios.collectAsStateWithLifecycle()
                 val grupos by viewModel.grupos.collectAsStateWithLifecycle()
+                val listas by viewModel.listas.collectAsStateWithLifecycle()
                 val resultados = viewModel.resultados.collectAsLazyPagingItems()
                 // `ACTION_OPEN_DOCUMENT` es el único mecanismo que produce un
                 // grant persistible; `GET_CONTENT` no lo hace y rompería la
@@ -37,14 +39,29 @@ class MainActivity : ComponentActivity() {
                     estado = estado,
                     criterios = criterios,
                     grupos = grupos,
+                    listas = listas,
                     resultados = resultados,
-                    onImportar = viewModel::importarFixture,
-                    onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
-                    onTexto = viewModel::actualizarTexto,
-                    onGrupo = viewModel::seleccionarGrupo,
-                    onFavoritos = viewModel::alternarFavoritos,
-                    onTodos = viewModel::limpiarFiltros,
-                    onLimpiar = viewModel::limpiarCriterios,
+                    acciones =
+                        CatalogoAcciones(
+                            onImportar = viewModel::importarFixture,
+                            onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
+                            onTexto = viewModel::actualizarTexto,
+                            onGrupo = viewModel::seleccionarGrupo,
+                            onFavoritos = viewModel::alternarFavoritos,
+                            onTodos = viewModel::limpiarFiltros,
+                            onLimpiar = viewModel::limpiarCriterios,
+                            onMostrarOcultos = viewModel::alternarMostrarOcultos,
+                            onSeleccionarLista = viewModel::seleccionarLista,
+                            onCrearLista = viewModel::crearLista,
+                            onRenombrarLista = viewModel::renombrarLista,
+                            onEliminarLista = viewModel::eliminarLista,
+                            onCrearCanal = viewModel::crearCanal,
+                            onEditarNombreCanal = viewModel::editarNombreCanal,
+                            onEliminarCanal = viewModel::eliminarCanal,
+                            onAlternarFavorito = viewModel::alternarFavorito,
+                            onAlternarOculto = viewModel::alternarOculto,
+                            onMoverCanal = viewModel::moverCanal,
+                        ),
                 )
             }
         }

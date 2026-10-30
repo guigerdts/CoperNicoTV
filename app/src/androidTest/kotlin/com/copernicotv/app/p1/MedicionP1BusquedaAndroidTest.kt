@@ -269,6 +269,7 @@ class MedicionP1BusquedaAndroidTest {
             patron = "%$TEXTO%",
             grupoId = null,
             soloFavoritos = false,
+            incluirOcultos = false,
         )
 
     private fun cargar(

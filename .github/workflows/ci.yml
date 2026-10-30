@@ -112,7 +112,7 @@ jobs:
           # excluye a propósito porque corre en el job de TV.
           script: >-
             ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.BusquedaFiltrosTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.BusquedaFiltrosTest,com.copernicotv.app.CatalogoUiTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest
       - name: Publicar reportes instrumentados
         if: always()
         uses: actions/upload-artifact@v4

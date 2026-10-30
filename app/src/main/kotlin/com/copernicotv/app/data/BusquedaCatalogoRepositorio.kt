@@ -14,6 +14,7 @@ data class CriteriosBusqueda(
     val texto: String = "",
     val grupoId: Long? = null,
     val soloFavoritos: Boolean = false,
+    val mostrarOcultos: Boolean = false,
 )
 
 /** Opción de filtro por Grupo, limitada a la Lista activa. */
@@ -27,6 +28,7 @@ data class CanalBusqueda(
     val id: Long,
     val nombre: String?,
     val esFavorito: Boolean,
+    val estaOculto: Boolean,
 )
 
 /**
@@ -63,6 +65,7 @@ class BusquedaCatalogoRepositorio
                         patron = patronBusqueda(texto),
                         grupoId = criterios.grupoId,
                         soloFavoritos = criterios.soloFavoritos,
+                        incluirOcultos = criterios.mostrarOcultos,
                     )
                 },
             ).flow

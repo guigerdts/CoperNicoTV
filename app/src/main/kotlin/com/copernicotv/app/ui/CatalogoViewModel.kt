@@ -7,9 +7,12 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.copernicotv.app.data.BusquedaCatalogoRepositorio
 import com.copernicotv.app.data.CanalBusqueda
+import com.copernicotv.app.data.CatalogoCrudRepositorio
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
+import com.copernicotv.app.data.ListaResumen
+import com.copernicotv.app.data.ResultadoAccion
 import com.copernicotv.app.data.ResumenImportacion
 import com.copernicotv.app.diagnostico.detalleTecnico
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,6 +42,7 @@ data class CatalogoUiState(
     val importando: Boolean = false,
     val listaId: Long? = null,
     val mensaje: String? = null,
+    val mensajeAccion: String? = null,
 )
 
 /**
@@ -57,6 +61,7 @@ class CatalogoViewModel
     constructor(
         private val repositorio: CatalogoRepositorio,
         private val busqueda: BusquedaCatalogoRepositorio,
+        private val crud: CatalogoCrudRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
@@ -64,6 +69,15 @@ class CatalogoViewModel
 
         private val _criterios = MutableStateFlow(CriteriosBusqueda())
         val criterios: StateFlow<CriteriosBusqueda> = _criterios.asStateFlow()
+
+        val listas: StateFlow<List<ListaResumen>> =
+            crud
+                .listas()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
+                    initialValue = emptyList(),
+                )
 
         val grupos: StateFlow<List<GrupoOpcion>> =
             busqueda
@@ -108,6 +122,74 @@ class CatalogoViewModel
 
         fun limpiarCriterios() {
             _criterios.value = CriteriosBusqueda()
+        }
+
+        fun alternarMostrarOcultos() {
+            _criterios.value =
+                _criterios.value.copy(mostrarOcultos = !_criterios.value.mostrarOcultos)
+        }
+
+        fun seleccionarLista(listaId: Long) {
+            ejecutarAccion { crud.seleccionarLista(listaId) }
+        }
+
+        fun crearLista(nombre: String) {
+            ejecutarAccion { crud.crearLista(nombre) }
+        }
+
+        fun renombrarLista(
+            listaId: Long,
+            nombre: String,
+        ) {
+            ejecutarAccion { crud.renombrarLista(listaId, nombre) }
+        }
+
+        fun eliminarLista(listaId: Long) {
+            ejecutarAccion { crud.eliminarLista(listaId) }
+        }
+
+        fun crearCanal(
+            nombre: String?,
+            url: String,
+        ) {
+            ejecutarAccion { crud.crearCanal(nombre, url) }
+        }
+
+        fun editarNombreCanal(
+            canalId: Long,
+            nombre: String?,
+        ) {
+            ejecutarAccion { crud.editarNombreCanal(canalId, nombre) }
+        }
+
+        fun eliminarCanal(canalId: Long) {
+            ejecutarAccion { crud.eliminarCanal(canalId) }
+        }
+
+        fun alternarFavorito(canalId: Long) {
+            ejecutarAccion { crud.alternarFavorito(canalId) }
+        }
+
+        fun alternarOculto(canalId: Long) {
+            ejecutarAccion { crud.alternarOculto(canalId) }
+        }
+
+        fun moverCanal(
+            canalId: Long,
+            delta: Int,
+        ) {
+            ejecutarAccion { crud.moverCanal(canalId, delta) }
+        }
+
+        private fun ejecutarAccion(bloque: suspend () -> ResultadoAccion) {
+            viewModelScope.launch {
+                when (val resultado = bloque()) {
+                    ResultadoAccion.Ok ->
+                        _estado.value = _estado.value.copy(mensajeAccion = null)
+                    is ResultadoAccion.Error ->
+                        _estado.value = _estado.value.copy(mensajeAccion = resultado.codigo)
+                }
+            }
         }
 
         fun importarFixture() {

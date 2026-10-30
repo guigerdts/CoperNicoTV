@@ -4,6 +4,7 @@ import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.copernicotv.app.data.CanalBusqueda
 import com.copernicotv.app.data.db.entities.CanalEntity
 import kotlinx.coroutines.flow.Flow
@@ -15,6 +16,12 @@ interface CanalDao {
 
     @Insert
     suspend fun insertarTodos(canales: List<CanalEntity>): List<Long>
+
+    @Update
+    suspend fun actualizar(canal: CanalEntity): Int
+
+    @Query("DELETE FROM Canal WHERE id = :id")
+    suspend fun eliminar(id: Long): Int
 
     @Query("SELECT * FROM Canal WHERE id = :id")
     suspend fun porId(id: Long): CanalEntity?
@@ -48,7 +55,8 @@ interface CanalDao {
     @Query(
         """
         SELECT c.id AS id, c.nombre AS nombre,
-            EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito
+            EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito,
+            EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto
         FROM Canal c
         INNER JOIN Apariencia a ON a.canalId = c.id
         WHERE a.listaId = (
@@ -59,11 +67,11 @@ interface CanalDao {
           AND (:soloFavoritos = 0 OR EXISTS(
               SELECT 1 FROM Favorito f2 WHERE f2.canalId = c.id
           ))
-          AND NOT EXISTS(
-              SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id
-          )
+          AND (:incluirOcultos = 1 OR NOT EXISTS(
+              SELECT 1 FROM OcultacionCanal oc2 WHERE oc2.canalId = c.id
+          ))
           AND (
-              a.grupoId IS NULL OR NOT EXISTS(
+              :incluirOcultos = 1 OR a.grupoId IS NULL OR NOT EXISTS(
                   SELECT 1 FROM OcultacionGrupo og WHERE og.grupoId = a.grupoId
               )
           )
@@ -76,5 +84,6 @@ interface CanalDao {
         patron: String,
         grupoId: Long?,
         soloFavoritos: Boolean,
+        incluirOcultos: Boolean,
     ): PagingSource<Int, CanalBusqueda>
 }

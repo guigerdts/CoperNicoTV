@@ -52,7 +52,7 @@ No se descartó ninguna corrida. Las tres se lanzaron secuencialmente con
 
 ## Resultado
 
-El peor valor de las tres corridas es la referencia candidata:
+El peor valor de las tres corridas es la referencia aprobada:
 
 | Entorno | Primera página p95 | Página 2 p95 | Pico heap |
 |---|---|---|---|
@@ -62,13 +62,38 @@ El peor valor de las tres corridas es la referencia candidata:
 Todos los valores están muy por debajo de los límites absolutos de DC-10
 (JVM: 150/80 ms y 256 MiB; Android: 300/150 ms y 384 MiB).
 
+## Auditoría y corrección documental
+
+- DC-10 §3 define la métrica como primera página de búsqueda con primera página
+  de 50. En Paging 3 la página es la unidad atómica de entrega y el primer
+  elemento individual no es observable antes de que la página se materialice.
+  La página completa de 50 es, por tanto, el primer resultado completo
+  observable; no se requiere una medición separada del primer elemento.
+- El KDoc y el mensaje de `assumeTrue` del medidor JVM citaban
+  `:app:p1BusquedaPerformance`, tarea inexistente. La activación real es
+  `:app:testDebugUnitTest -Pp1.busqueda=true`.
+- El defecto era exclusivamente documental: no afectaba la ruta, el fixture, los
+  parámetros ni el medidor. No se repitieron las mediciones; las tres corridas
+  sobre `418c33f` siguen siendo la evidencia válida.
+
 ## Estado
 
-El baseline queda **candidato, pendiente de revisión humana**. No se declara
-aprobado y E3-T1 no se cierra. La aprobación humana explícita es la que
-satisface DC-10 §5. El detalle de la referencia, los umbrales de regresión y la
-evidencia está en `p1-baseline-busqueda.md` y
-`p1-baseline-busqueda.json`.
+El baseline queda **aprobado el 2026-10-30** por la instrucción del propietario
+del producto condicionada a la auditoría contractual; no se registra una
+aprobación humana separada. E3-T1 se cierra. La regresión se evalúa desde la
+primera medición posterior a la aprobación. El detalle de la referencia, los
+umbrales de regresión, las limitaciones y la evidencia está en
+`p1-baseline-busqueda.md` y `p1-baseline-busqueda.json`.
+
+## Limitaciones y pendientes
+
+- Room in-memory: ejercita DAO, SQL y PagingSource reales, pero no I/O en disco;
+  no representa el rendimiento completo de la UI/Compose.
+- No se miden UI/Compose ni filtros combinados; los filtros tienen cobertura
+  funcional en E3-U2.
+- La regresión no se evalúa en esta calibración.
+- S52 conserva pendiente el `EXPLAIN QUERY PLAN`; E3-T2/T3, E3-T5,
+  E3-T6/T7/T8/T9 y E4 siguen fuera de esta aprobación.
 
 ## Artefactos
 

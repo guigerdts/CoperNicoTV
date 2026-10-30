@@ -1,19 +1,45 @@
 # Baseline P1 de búsqueda — E3-T1
 
-**Estado: candidato pendiente de revisión humana.** Este documento no declara
-aprobado el baseline ni cierra E3-T1. La aprobación humana explícita es la que
-satisface DC-10 §5.
+**Estado: aprobado el 2026-10-30.** La aprobación es la instrucción del
+propietario del producto condicionada a la auditoría contractual; no se inventa
+una aprobación humana separada. La auditoría confirmó que las tres corridas
+sobre `418c33f` cumplen DC-10 y que el defecto del KDoc/`assumeTrue` era
+exclusivamente documental. E3-T1 queda cerrada.
 
 ## Alcance
 
-Cubre la primera página de búsqueda y la página 2 sobre 10 000 Canales en JVM y
-Android, con el pico de heap Java de cada escenario. El protocolo completo de
-cada corrida también ejecutó la medición de parseo JVM y Android; sus resultados
-se registran abajo para demostrar que las tres corridas fueron completas.
+Cubre la primera página de búsqueda de 50 resultados y la página 2 sobre 10 000
+Canales en JVM y Android, con el pico de heap Java de cada escenario. En Paging 3
+la página es la unidad atómica de entrega: el primer elemento individual no es
+observable antes de que la página se materialice, por lo que la página completa
+de 50 es el primer resultado completo observable. El protocolo completo de cada
+corrida también ejecutó la medición de parseo JVM y Android; sus resultados se
+registran abajo para demostrar que las tres corridas fueron completas.
 
-No cubre UI/Compose, filtros combinados medidos, ordenación, E3-U3/E4 ni la
-regresión posterior: la regresión se evalúa desde la primera medición que se
-haga después de aprobar este baseline.
+La base es Room in-memory: ejercita DAO, SQL y PagingSource reales, pero no I/O
+en disco; los resultados no representan el rendimiento completo de la UI/Compose
+ni de una base file-backed. No cubre UI/Compose, filtros combinados medidos,
+ordenación, E3-U3/E4 ni la regresión posterior. La regresión se evalúa desde la
+primera medición que se haga después de aprobar este baseline.
+
+## Auditoría del contrato
+
+DC-10 §3 define la métrica como «Primera página de búsqueda ... primera página
+de 50; se mide desde la emisión de la consulta hasta el primer resultado
+completo». La auditoría determinó que la lectura aplicable es la página completa
+de 50: en la ruta real, Paging 3 entrega la página de forma atómica y el primer
+elemento individual no está disponible antes de que la página se materialice.
+Medir una fila aislada exigiría cambiar la ruta medida y no representaría la
+entrega real. Por tanto, la página completa de 50 es el primer resultado
+completo observable y las mediciones existentes satisfacen el contrato sin una
+medición adicional del primer elemento.
+
+El KDoc y el mensaje de `assumeTrue` del medidor JVM citaban la tarea
+inexistente `:app:p1BusquedaPerformance`. La activación real es
+`:app:testDebugUnitTest -Pp1.busqueda=true`. La corrección es exclusivamente
+documental: no cambia la ruta, el fixture, los parámetros ni el medidor, por lo
+que no se repitieron las mediciones. Las tres corridas sobre `418c33f` siguen
+siendo la evidencia válida.
 
 ## Commit y corridas
 
@@ -21,6 +47,8 @@ Las tres corridas verdes consecutivas se ejecutaron con `workflow_dispatch`
 sobre el mismo commit:
 
 - Commit: `418c33f6745ad4667c7e77a77dfc609ecf4f0d5b` (`418c33f`)
+- La corrección documental posterior no cambia la ruta, el fixture, los
+  parámetros ni el medidor; por eso el commit medido sigue siendo `418c33f`.
 - Workflow: `.github/workflows/ci.yml`
 - Jobs de medición: `p1-performance` (JVM) y `p1-android` (Android)
 - Fecha: 2026-10-30
@@ -141,22 +169,62 @@ Se toma el peor valor de las tres corridas, no el promedio ni la mediana.
 - Pico de heap de referencia: **19.102 MiB**; regresión admisible ×1.15 →
   **21.967 MiB**.
 
-La regresión no se evalúa en esta primera calibración. Se evaluará desde la
-primera medición posterior a la aprobación humana, comparando contra estas
-referencias y exigiendo además el límite absoluto.
+La referencia está aprobada. La regresión no se evalúa en esta primera
+calibración; se evaluará desde la primera medición posterior a la aprobación,
+comparando contra estas referencias y exigiendo además el límite absoluto.
 
-## Revisión humana
+## Revisión humana y aprobación
 
-**Pendiente.** No hay aprobación humana registrada. El baseline queda como
-candidato y E3-T1 sigue abierta. La aprobación debe decidir, como mínimo:
+**Aprobado el 2026-10-30.** La aprobación es la instrucción del propietario del
+producto condicionada a la auditoría contractual; no se registra una aprobación
+humana separada. La auditoría confirmó:
 
-1. aprobar el baseline de búsqueda JVM y Android y sus referencias;
-2. confirmar el criterio de referencia: peor p95 por escenario y peor pico de
-   heap de las tres corridas, no promedio ni mediana;
-3. confirmar que las tres corridas verdes sobre `418c33f` son consecutivas y
-   comparables;
-4. confirmar que no se descarta ninguna corrida y que la regresión se evalúa
-   desde la próxima medición posterior a la aprobación.
+1. las tres corridas verdes sobre `418c33f` son consecutivas y comparables;
+2. no se descarta ninguna corrida;
+3. los p95, las referencias y los umbrales son correctos;
+4. el defecto del KDoc/`assumeTrue` es exclusivamente documental;
+5. la página completa de 50 es el primer resultado completo observable en
+   Paging 3, por lo que no se requiere una medición separada del primer elemento.
+
+Decisiones aprobadas:
+
+- baseline de búsqueda JVM y Android y sus referencias;
+- criterio de referencia: peor p95 por escenario y peor pico de heap de las tres
+  corridas, no promedio ni mediana;
+- regresión evaluada desde la primera medición posterior a la aprobación.
+
+Decisiones pendientes: ninguna para este baseline.
+
+## Limitaciones aceptadas
+
+- Room in-memory: ejercita DAO, SQL y PagingSource reales, pero no I/O en disco;
+  no representa el rendimiento completo de la UI/Compose ni de una base
+  file-backed.
+- No se mide UI/Compose ni una lista precargada; la métrica es de consulta o
+  página.
+- No se miden filtros combinados; su cobertura es funcional en E3-U2, no de
+  rendimiento.
+- La regresión no se evalúa en esta primera calibración; se evalúa desde la
+  primera medición posterior a la aprobación.
+
+## Métricas cubiertas
+
+- Primera página de búsqueda de 50 resultados en JVM y Android.
+- Página 2 de la misma búsqueda en JVM y Android.
+- Pico de heap Java durante cada escenario.
+- Parseo JVM y Android del protocolo completo, registrado como evidencia de
+  corrida completa; no es la referencia de búsqueda.
+
+## Requisitos pendientes
+
+- Evaluar la regresión contra este baseline desde la primera medición posterior
+  a la aprobación.
+- Medir filtros combinados si se define una métrica de rendimiento para ellos;
+  DC-10 no la define.
+- Medir UI/Compose o una base file-backed si se requiere representar el
+  rendimiento completo de la interfaz.
+- S52 conserva pendiente el `EXPLAIN QUERY PLAN`; E3-T2/T3, E3-T5, E3-T6/T7/T8/T9
+  y E4 siguen fuera de esta aprobación.
 
 ## Evidencia
 

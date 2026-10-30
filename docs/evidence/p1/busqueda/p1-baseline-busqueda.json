@@ -2,7 +2,7 @@
   "esquema": "p1-baseline-busqueda/v1",
   "fecha": "2026-10-30T02:01:51Z",
   "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
-  "estado": "candidato_pendiente_de_revision_humana",
+  "estado": "aprobado",
   "entornos": {
     "jvm": {
       "runner": "ubuntu24",
@@ -48,7 +48,7 @@
       "calentamientos": 10,
       "mediciones": 30,
       "medicionesHeap": 3,
-      "primeraPagina": "load(Refresh) con loadSize=50 sobre Room real; se mide hasta completar la página",
+      "primeraPagina": "load(Refresh) con loadSize=50 sobre Room real; se mide hasta completar la página de 50, que es el primer resultado completo observable en Paging 3",
       "pagina2": "load(Refresh) de página 1 fuera del cronómetro y load(Append) con la nextKey; se mide solo la página 2",
       "heap": "Runtime.totalMemory() - freeMemory() muestreado tras System.gc(), máximo registrado"
     },
@@ -57,7 +57,7 @@
       "calentamientos": 5,
       "mediciones": 20,
       "medicionesHeap": 3,
-      "primeraPagina": "load(Refresh) con loadSize=50 sobre Room real; se mide hasta completar la página",
+      "primeraPagina": "load(Refresh) con loadSize=50 sobre Room real; se mide hasta completar la página de 50, que es el primer resultado completo observable en Paging 3",
       "pagina2": "load(Refresh) de página 1 fuera del cronómetro y load(Append) con la nextKey; se mide solo la página 2",
       "heap": "Runtime.totalMemory() - freeMemory() muestreado tras System.gc() y pausa de 50 ms; máximo registrado"
     }
@@ -422,16 +422,19 @@
     }
   },
   "revisionHumana": {
-    "estado": "pendiente",
-    "fecha": null,
-    "aprobadoPor": null,
-    "decisionesPendientes": [
+    "estado": "aprobado",
+    "fecha": "2026-10-30",
+    "aprobadoPor": "Propietario del producto, mediante la instrucción de aprobación condicionada a la auditoría contractual",
+    "fundamento": "La auditoría confirmó que las tres corridas verdes sobre 418c33f cumplen DC-10, que los p95 y las referencias son correctos y que el defecto del KDoc/assumeTrue es exclusivamente documental.",
+    "decisionesAprobadas": [
       "Aprobar el baseline de búsqueda JVM y Android y sus referencias.",
-      "Confirmar el criterio de referencia: peor p95 por escenario y peor pico de heap de las tres corridas.",
+      "Confirmar el criterio de referencia: peor p95 por escenario y peor pico de heap de las tres corridas, no promedio ni mediana.",
       "Confirmar que las tres corridas verdes sobre 418c33f son consecutivas y comparables.",
-      "Confirmar que no se descarta ninguna corrida y que la regresión se evalúa desde la próxima medición posterior a la aprobación."
+      "Confirmar que no se descarta ninguna corrida y que la regresión se evalúa desde la próxima medición posterior a la aprobación.",
+      "Aceptar que la primera página de 50 es el primer resultado completo observable en Paging 3 y que no se requiere una medición separada del primer elemento."
     ],
-    "detalle": "El baseline queda como candidato. No se declara aprobado ni se cierra E3-T1 hasta la aprobación humana explícita.",
+    "decisionesPendientes": [],
+    "detalle": "Baseline aprobado. E3-T1 se cierra; la regresión se evalúa desde la primera medición posterior.",
     "regresionEvaluada": false
   },
   "artefactos": {
@@ -457,8 +460,35 @@
     ]
   },
   "alcance": {
-    "cubre": "primera página de búsqueda y página 2 sobre 10 000 Canales en JVM y Android, con pico de heap Java; el protocolo completo incluye además parseo JVM y Android",
-    "noCubre": "UI/Compose, filtros combinados medidos, ordenación, E3-U3/E4, ni la regresión posterior (no evaluada hasta la aprobación)"
+    "cubre": "primera página de búsqueda de 50 resultados (primer resultado completo observable en Paging 3) y página 2 sobre 10 000 Canales en JVM y Android, con pico de heap Java; el protocolo completo incluye además parseo JVM y Android",
+    "noCubre": "UI/Compose, I/O en disco (Room in-memory), filtros combinados medidos, ordenación, E3-U3/E4, ni la regresión posterior (no evaluada hasta la aprobación)"
   },
-  "descartadas": []
+  "descartadas": [],
+  "auditoriaContrato": {
+    "fecha": "2026-10-30",
+    "resultado": "cumple",
+    "lecturaAplicable": "DC-10 §3 define la métrica como 'primera página de búsqueda' con 'primera página de 50'. En la ruta real, Paging 3 entrega la página de forma atómica: el primer elemento individual no es observable antes de que la página se materialice. Medir una fila aislada exigiría cambiar la ruta medida y no representaría la entrega real. Por tanto, la página completa de 50 es el primer resultado completo observable y la medición existente satisface el contrato.",
+    "primerElementoIndividualRequerido": false,
+    "defectoDocumental": "El KDoc y el mensaje de assumeTrue citaban :app:p1BusquedaPerformance, tarea inexistente. La activación real es :app:testDebugUnitTest -Pp1.busqueda=true. La corrección es exclusivamente documental: no cambia la ruta, el fixture, los parámetros ni el medidor.",
+    "medicionesReejecutadas": false,
+    "motivoNoReejecucion": "La corrección no altera el comportamiento medido; las tres corridas verdes sobre 418c33f siguen siendo la evidencia válida del baseline."
+  },
+  "limitacionesAceptadas": [
+    "Room in-memory: ejercita DAO, SQL y PagingSource reales, pero no I/O en disco; no representa el rendimiento completo de la UI/Compose ni de una base file-backed.",
+    "No se mide UI/Compose ni una lista precargada; la métrica es de consulta/página.",
+    "No se miden filtros combinados; su cobertura es funcional en E3-U2, no de rendimiento.",
+    "La regresión no se evalúa en esta primera calibración; se evalúa desde la primera medición posterior a la aprobación."
+  ],
+  "metricasCubiertas": [
+    "Primera página de búsqueda de 50 resultados en JVM y Android.",
+    "Página 2 de la misma búsqueda en JVM y Android.",
+    "Pico de heap Java durante cada escenario.",
+    "Parseo JVM y Android del protocolo completo, registrado como evidencia de corrida completa; no es la referencia de búsqueda."
+  ],
+  "requisitosPendientes": [
+    "Evaluar la regresión contra este baseline desde la primera medición posterior a la aprobación.",
+    "Medir filtros combinados si se define una métrica de rendimiento para ellos; DC-10 no la define.",
+    "Medir UI/Compose o una base file-backed si se requiere representar el rendimiento completo de la interfaz.",
+    "S52 conserva pendiente el EXPLAIN QUERY PLAN; E3-T2/T3, E3-T5, E3-T6/T7/T8/T9 y E4 siguen fuera de esta aprobación."
+  ]
 }

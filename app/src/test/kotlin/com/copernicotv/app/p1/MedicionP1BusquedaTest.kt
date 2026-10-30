@@ -41,7 +41,8 @@ import kotlin.math.max
 /**
  * Medición P1 de E3-T1 conforme a DC-10: primera página de búsqueda y página 2.
  *
- * Se ejecuta solo con `-Dp1.medir=true`, que activa `:app:p1BusquedaPerformance`.
+ * Se ejecuta solo con `-Dp1.medir=true`, que activa la tarea
+ * `:app:testDebugUnitTest` con `-Pp1.busqueda=true`.
  * La base se puebla con las 10 000 entradas de `F-P1-10k.m3u`; la medición usa
  * la misma consulta `PagingSource` que entrega `BusquedaCatalogoRepositorio` a
  * Paging 3, con tamaño de página 50. No mide Compose ni una lista precargada.
@@ -58,7 +59,7 @@ class MedicionP1BusquedaTest {
     @Before
     fun exigirModoMedicion() {
         assumeTrue(
-            "medición P1 de búsqueda desactivada; usar la tarea :app:p1BusquedaPerformance",
+            "medición P1 de búsqueda desactivada; usar :app:testDebugUnitTest -Pp1.busqueda=true",
             System.getProperty("p1.medir") == "true",
         )
     }

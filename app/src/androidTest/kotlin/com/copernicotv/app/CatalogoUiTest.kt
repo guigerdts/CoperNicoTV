@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollTo
@@ -414,7 +415,10 @@ class CatalogoUiTest {
                 composeRule.waitUntil(TIEMPO_ESPERA, condicion)
             }.exceptionOrNull()
         if (fallo != null) {
-            throw AssertionError("La condición de UI no se cumplió a tiempo", fallo)
+            val arbol =
+                runCatching { composeRule.onRoot().printToString() }
+                    .getOrElse { "Sin árbol de semántica: $it" }
+            throw AssertionError("La condición de UI no se cumplió a tiempo\n$arbol", fallo)
         }
     }
 

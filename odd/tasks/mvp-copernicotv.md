@@ -1027,7 +1027,7 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 |---|---|---|
 | E3-T1 | Búsqueda y filtros | Búsqueda paginada y filtros combinables con 10 000 Canales; medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10; la búsqueda paginada y los filtros están implementados en E3-U2 (2026-10-29); la medición P1 de búsqueda/página 2 se ejecutó el 2026-10-30 sobre `418c33f` (runs `40987152414`, `40987957054` y `40988640006`; L51) y cumple los límites absolutos; el baseline JVM+Android quedó aprobado el 2026-10-30 (L52), con auditoría del contrato y corrección documental del medidor; E3-T1 se declara cerrada. |
 | E3-T2 | Favoritos | Único por Canal; sobrevive a Actualización. Estado tras E3-U7 (2026-10-31): parcial; la unicidad está implementada y probada, pero «sobrevive a Actualización» depende de E4-T6 y no se ejecutó (L56). |
-| E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación futura con `EXPLAIN QUERY PLAN`; acceso rápido; base de S14g; S11. Estado tras E3-U7 (2026-10-31): parcial; unicidad, fecha, N=10, orden e índice están implementados y probados; faltan la fusión `max(fecha)` de E4-T4/T5, el `EXPLAIN QUERY PLAN` futuro y el acceso rápido S11c, que no tiene UI cableada (solo `HistorialRepositorio.ultimos`) (L56). |
+| E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación futura con `EXPLAIN QUERY PLAN`; acceso rápido; base de S14g; S11. Estado tras E3-U8 (2026-10-31): parcial; unicidad, fecha, N=10, orden e índice están implementados y probados; el acceso rápido S11c está implementado con UI y pruebas (L57); faltan la fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN` futuro (L56, L57). |
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas. Estado tras E3-U7 (2026-10-31): cubierta en datos; FKs e índices únicos y pruebas de ocultación por Canal/Grupo y grupos homónimos de Listas distintas (L56). |
 | E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. Estado tras E3-U7 (2026-10-31): parcial; además de la unicidad, S45a exige recreación de proceso y la prueba disponible solo cierra y reabre la base (L56). |
 | E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado. Estado tras E3-U7 (2026-10-31): parcial; navegación, CRUD y «Sin grupo» están instrumentados, pero no hay prueba instrumentada que afirme «Sin nombre» (L56). |
@@ -1187,6 +1187,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E3-U5 (colecciones) | 2026-10-31 | `app/.../data/{ColeccionRepositorio,ColeccionResumen}.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{ColeccionRepositorioTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../{CanarioMovilTest,CatalogoUiTest,BusquedaFiltrosTest}.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `ColeccionRepositorioTest` 6/6; `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1; `CatalogoUiTest` 9/9, `BusquedaFiltrosTest` 1/1 y `CanarioMovilTest` 2/2 | `41202494843` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde. El run `41200336925` falló solo en `instrumented-mobile` por el viewport reducido y la conservación de clave de Paging; corregido en `ace8744` | Implementada y validada en su parte independiente de E4; unicidad de pertenencia tras E4/m5 pendiente; E3 abierta |
 | E3-U6 (perfiles) | 2026-10-31 | `app/.../data/PerfilRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/PerfilRepositorioTest.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `PerfilRepositorioTest` 18/18 (n—n, Perfil vacío, Lista sin Perfil, cascadas y concurrencia); `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1 | `41202494843` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde | CRUD y asociación implementados y validados; preferencias de pista pendientes de E6/E7; S2c parcial; E3 abierta |
 | E3-U7 (auditoría de cierre) | 2026-10-31 | `odd/tasks/mvp-copernicotv.md` (§8.3, §10.1, §10.10.3, §11 L56, «Próximo paso»), `docs/evidence/u0-integrity.sha256` | Ver L56; sin cambios de producción ni de esquema | `./gradlew :app:ktlintCheck :app:detekt :core:test`; `git -c core.whitespace=cr-at-eol diff --check`; `sha256sum -c`; recálculo SHA-256; `git status --porcelain`; `gh run view` | Auditoría T1–T9: T1 cerrada, T4 cubierta, T2/T3/T5/T6/T7/T8/T9 parciales; E3 no cerrada | `41206648731` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41206648729` verde | Auditoría ejecutada; E3 abierta |
+| E3-U8 (acceso rápido de Historial) | 2026-10-31 | `app/src/main/kotlin/com/copernicotv/app/data/HistorialRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{EstadoUsuarioPersistenciaTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../CatalogoUiTest.kt` | Commit de implementación pendiente de publicar; ver L57 | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `EstadoUsuarioPersistenciaTest` 2 casos nuevos (últimos diez con nombre y marcas; desempate por canal descendente); `CatalogoUiTest.elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal`; `CatalogoPersistenciaTest` actualizado con la nueva dependencia | Pendiente de CI al documentar (L57) | S11c implementado; E3-T3 sigue parcial por la fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`; E3 abierta |
 
 ### 10.2 Evidencia de CI
 
@@ -1629,7 +1630,7 @@ proceso.
 |---|---|---|---|
 | E3-T1 | Cumplida | §10.10.1; búsqueda paginada y filtros en E3-U2; `BusquedaFiltrosTest` 1/1; tres corridas P1 de búsqueda sobre `418c33f` (`40987152414`, `40987957054`, `40988640006`) y baseline aprobado en L52. | Ninguno; E3-T1 está cerrada. |
 | E3-T2 | Parcial | `FavoritoEntity` con índice único `canalId`; `FavoritoDao` usa `OnConflictStrategy.IGNORE`; `EstadoUsuarioPersistenciaTest` prueba alta idempotente y restricción real; `CatalogoUiTest.favoritoYocultacionFiltranYseRevierten` prueba la UI. | «Sobrevive a Actualización» no se ejecutó; depende de E4-T6. |
-| E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción. | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` futuro; acceso rápido S11c: `HistorialRepositorio.ultimos()` existe, pero no hay UI cableada. |
+| E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente. | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` futuro. |
 | E3-T4 | Cubierta | `OcultacionCanalEntity` y `OcultacionGrupoEntity` con FK y `UNIQUE`; `EstadoUsuarioPersistenciaTest` prueba que ocultar Canal/Grupo no altera Apariencias ni Canales y que grupos homónimos de Listas distintas se ocultan por separado; `CatalogoUiTest` prueba alternar Oculto por Canal. | Ninguno para el criterio de datos. |
 | E3-T5 | Parcial | `ColeccionRepositorioTest` 6/6: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada y errores; `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones. | Unicidad de pertenencia y las dos posiciones de ADR-0004:60(m5) tras E4; S45a exige recreación de proceso y la prueba solo cierra y reabre la base. |
 | E3-T6 | Parcial | `CatalogoUiTest` 9/9: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo» y recreación de Activity; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | No hay prueba instrumentada que afirme «Sin nombre». |
@@ -1646,6 +1647,46 @@ la recreación de proceso de S14k/S45d y no existe prueba instrumentada de
 verde y `TV emulator trial` `41206648729` verde. No se inicia E4 ni se declara
 E3 cerrada. La siguiente unidad ejecutable sin E4 es el acceso rápido de
 Historial (E3-T3/S11c), que no depende de E4.
+
+#### 10.10.4 E3-U8: acceso rápido de Historial (S11c)
+
+**Estado: S11c implementado. E3-T3 sigue parcial por criterios de E4.** La
+unidad agrega el acceso rápido de Historial sobre `feat/e1-bootstrap`, sin
+cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
+`docs/evidence/p1/` ni evidencia histórica.
+
+- **Alcance.** `HistorialDao.observarUltimos(limite)` devuelve un `Flow` con
+  los últimos diez Canales en el orden persistido `fecha DESC, canalId DESC`,
+  resolviendo `nombre`, `esFavorito` y `estaOculto` en la misma consulta
+  (`INNER JOIN Canal` y `EXISTS` sobre `Favorito`/`OcultacionCanal`).
+  `HistorialRepositorio.observarUltimos()` fija el límite en `LIMITE = 10`.
+  `CatalogoViewModel.recientes` lo expone como `StateFlow`, y `CatalogoScreen`
+  lo presenta en la sección «Acceso rápido». Cada entrada abre el mismo
+  diálogo de acciones que una fila del Catálogo; no se adelanta el reproductor
+  de E6. Un Canal sin nombre se presenta como «Sin nombre» (S14).
+- **Archivos.** `app/src/main/kotlin/com/copernicotv/app/data/HistorialRepositorio.kt`,
+  `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/CatalogoViewModel.kt`,
+  `app/.../ui/CatalogoScreen.kt`, `app/.../MainActivity.kt`,
+  `app/src/main/res/values/strings.xml`,
+  `app/src/test/.../data/EstadoUsuarioPersistenciaTest.kt`,
+  `app/src/test/.../data/CatalogoPersistenciaTest.kt` y
+  `app/src/androidTest/.../CatalogoUiTest.kt`.
+- **Pruebas.** `EstadoUsuarioPersistenciaTest` agrega dos casos: los últimos
+  diez con nombre y marcas actuales, y el desempate por `canalId` descendente.
+  `CatalogoUiTest.elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal`
+  siembra doce Canales, comprueba que la UI muestra los diez más recientes en
+  orden, que no aparece el undécimo y que la entrada abre el diálogo de
+  acciones del Canal correcto. `CatalogoPersistenciaTest` se actualiza con la
+  nueva dependencia del ViewModel.
+- **Validación local.** `./gradlew :app:ktlintCheck :app:detekt :core:test`
+  verde y `git -c core.whitespace=cr-at-eol diff --check` limpio.
+- **Límite de entorno.** `:app:compileDebugKotlin` falla con «SDK location not
+  found»; `:app:testDebugUnitTest`, las instrumentadas y el APK solo se
+  ejecutan en CI (ADR-0005). La validación local cubre formato, análisis
+  estático y `:core:test`; la compilación y las pruebas de `:app` quedan
+  sujetas al run de CI que registra L57.
+- **Pendiente.** La fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`
+  futuro siguen pendientes; E3 permanece abierta.
 
 ## 11. Log
 
@@ -2761,6 +2802,39 @@ Historial (E3-T3/S11c), que no depende de E4.
 - **Frontera y CRLF.** Este archivo conserva CRLF; no se modifican las rutas
   protegidas ni la aprobación documental de U0 registrada en L32.
 
+### L57 — E3-U8: acceso rápido de Historial (S11c) (2026-10-31)
+
+- **Autorización y alcance.** El propietario autorizó continuar con la
+  siguiente unidad E3 ejecutable sin E4: el acceso rápido de Historial
+  (E3-T3/S11c). La unidad se ejecuta sobre `feat/e1-bootstrap` y no modifica
+  `main`, el esquema Room v1, `docs/evidence/u0-manifest.md`,
+  `docs/evidence/p1/` ni evidencia histórica. No se inicia E4 ni se declara
+  cerrada E3.
+- **Implementación.** `HistorialDao.observarUltimos(limite)` devuelve un
+  `Flow` con los últimos diez Canales en orden `fecha DESC, canalId DESC`,
+  con `nombre`, `esFavorito` y `estaOculto` resueltos por `JOIN` y `EXISTS`;
+  `HistorialRepositorio.observarUltimos()` fija `LIMITE = 10`;
+  `CatalogoViewModel.recientes` lo expone como `StateFlow`; `CatalogoScreen`
+  muestra la sección «Acceso rápido» y cada entrada abre el diálogo de
+  acciones existente. La UI no adelanta el reproductor de E6.
+- **Pruebas.** `EstadoUsuarioPersistenciaTest` agrega dos casos: últimos diez
+  con nombre y marcas, y desempate por `canalId` descendente.
+  `CatalogoUiTest.elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal`
+  siembra doce Canales y verifica límite, orden y apertura del Canal.
+  `CatalogoPersistenciaTest` actualiza la construcción del ViewModel.
+- **Validación local.** `./gradlew :app:ktlintCheck :app:detekt :core:test`
+  verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. No hay RED
+  local posible para `:app`: `:app:compileDebugKotlin` y
+  `:app:testDebugUnitTest` fallan por SDK ausente, y las instrumentadas y el
+  APK solo se ejecutan en CI (ADR-0005). El run de CI se registra al publicar
+  el commit.
+- **Estado.** S11c queda implementado. E3-T3 sigue **parcial** por la fusión
+  `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN` futuro. E3 permanece
+  **abierta**. La siguiente unidad ejecutable sin E4 se decide al cerrar esta
+  entrega; no se inicia E4.
+- **Frontera y CRLF.** Este archivo conserva CRLF; no se modifican las rutas
+  protegidas ni la aprobación documental de U0 registrada en L32.
+
 ### Próximo paso
 
 E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
@@ -2839,16 +2913,27 @@ E3 sigue **abierta** por E3-T2/T3 (criterios dependientes de E4), E3-T5
 §10.10.3 clasifica E3-T1 como cerrada, E3-T4 como cubierta y
 E3-T2/T3/T5/T6/T7/T8/T9 como parciales. E3 permanece **abierta**. La
 recreación de proceso no se sustituye por reabrir la base, una instancia nueva
-de DataStore ni recrear Activity. La siguiente unidad ejecutable sin E4 es el
-acceso rápido de Historial (E3-T3/S11c), que se implementará a continuación;
-no se inicia E4.
+de DataStore ni recrear Activity. La siguiente unidad ejecutable sin E4 era el
+acceso rápido de Historial (E3-T3/S11c), que se implementó en U8 (L57); no se
+inicia E4.
+
+**E3-U8 (acceso rápido de Historial) ejecutada el 2026-10-31.** Implementa
+S11c sobre `feat/e1-bootstrap` con `HistorialDao.observarUltimos` (límite 10,
+orden `fecha DESC, canalId DESC`, nombre y marcas en la misma consulta),
+`HistorialRepositorio.observarUltimos()`, `CatalogoViewModel.recientes` y la
+sección «Acceso rápido» de `CatalogoScreen`, que abre el diálogo de acciones
+existente. La validación local es `:app:ktlintCheck`, `:app:detekt` y
+`:core:test`; `:app:testDebugUnitTest`, las instrumentadas y el APK se validan
+en CI. S11c queda implementado y E3-T3 sigue parcial por la fusión
+`max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN` futuro (L57). E3 permanece
+**abierta**; no se inicia E4.
 
 La secuencia ejecutada de E3 es: U4 (E3-T7) el 2026-10-31; U5 colecciones
 (E3-T5) y U6 perfiles (E3-T9) el 2026-10-31 (L55); U7 auditoría de cierre el
-2026-10-31 (L56). La siguiente unidad es el acceso rápido de Historial
-(E3-T3/S11c), sin E4. No se declara cerrada E3 mientras existan criterios
-dependientes de E4, la recreación de proceso de E3-T5/T7/T8 y las preferencias
-de pista de E3-T9.
+2026-10-31 (L56); U8 acceso rápido de Historial (S11c) el 2026-10-31 (L57). La
+siguiente unidad se decide al cerrar esta entrega, sin E4. No se declara
+cerrada E3 mientras existan criterios dependientes de E4, la recreación de
+proceso de E3-T5/T7/T8 y las preferencias de pista de E3-T9.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y

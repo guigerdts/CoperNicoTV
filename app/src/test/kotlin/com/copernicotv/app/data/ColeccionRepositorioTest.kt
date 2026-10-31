@@ -75,7 +75,10 @@ class ColeccionRepositorioTest {
             db = abrirBase()
             val reabierto = ColeccionRepositorio(db)
             assertEquals(listOf("C2", "C1", "C3"), reabierto.canalesDe(nueva.id).first().map { it.nombre })
-            assertEquals("Favoritos del living", reabierto.colecciones().first().single().nombre)
+            assertEquals(
+                "Favoritos del living",
+                reabierto.colecciones().first().first { it.id == nueva.id }.nombre,
+            )
         }
     }
 

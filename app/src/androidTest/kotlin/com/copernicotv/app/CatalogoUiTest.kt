@@ -17,6 +17,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.requestFocus
 import com.copernicotv.app.data.PreferenciasOrden
 import com.copernicotv.app.data.db.AppDatabase

@@ -70,6 +70,63 @@ class AparienciaEscritor(
             }
         }
 
+    /**
+     * Reconciliación de una Apariencia declarada por una Actualización (E4-T1/T2).
+     *
+     * A diferencia de [upsert], que suma repeticiones, aquí la declaración es la
+     * fuente de verdad: se actualizan `grupo`, `group_title`, `tvg_name` y
+     * `repeticiones` conservando el `orden` manual de la fila existente. Una
+     * tupla con migración pendiente se rechaza igual que en [upsert].
+     */
+    suspend fun reconciliar(
+        apariencia: AparienciaEntity,
+        ahora: Instant = Instant.now(),
+    ): ResultadoUpsertApariencia =
+        db.withTransaction {
+            val dao = db.aparienciaDao()
+            val pendientes =
+                dao.pendientesSinResolverDeTupla(
+                    listaId = apariencia.listaId,
+                    canalId = apariencia.canalId,
+                    clavePresentacion = apariencia.clavePresentacion,
+                )
+            if (pendientes > 0) {
+                return@withTransaction ResultadoUpsertApariencia.Rechazada(
+                    codigo = CODIGO_PENDIENTE,
+                    listaId = apariencia.listaId,
+                    canalId = apariencia.canalId,
+                    clavePresentacion = apariencia.clavePresentacion,
+                )
+            }
+            val existente =
+                dao.porTupla(
+                    listaId = apariencia.listaId,
+                    canalId = apariencia.canalId,
+                    clavePresentacion = apariencia.clavePresentacion,
+                )
+            if (existente == null) {
+                ResultadoUpsertApariencia.Escrita(apariencia.copy(id = dao.insertar(apariencia)))
+            } else {
+                dao.actualizarDatos(
+                    id = existente.id,
+                    grupoId = apariencia.grupoId,
+                    groupTitle = apariencia.groupTitle,
+                    tvgName = apariencia.tvgName,
+                    repeticiones = apariencia.repeticiones,
+                    actualizadoEn = ahora,
+                )
+                ResultadoUpsertApariencia.Escrita(
+                    existente.copy(
+                        grupoId = apariencia.grupoId,
+                        groupTitle = apariencia.groupTitle,
+                        tvgName = apariencia.tvgName,
+                        repeticiones = apariencia.repeticiones,
+                        actualizadoEn = ahora,
+                    ),
+                )
+            }
+        }
+
     companion object {
         /** Código contractual de rechazo del upsert de una tupla con migración pendiente. */
         const val CODIGO_PENDIENTE: String = "apariencia_migracion_pendiente"

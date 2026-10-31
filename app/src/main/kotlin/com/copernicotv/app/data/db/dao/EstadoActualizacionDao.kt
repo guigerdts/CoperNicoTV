@@ -24,6 +24,12 @@ interface EstadoActualizacionDao {
     @Query("SELECT * FROM EstadoActualizacion WHERE listaId = :listaId ORDER BY inicio DESC, id DESC LIMIT 1")
     suspend fun ultimoDeLista(listaId: Long): EstadoActualizacionEntity?
 
+    @Query("SELECT * FROM EstadoActualizacion WHERE id = :id")
+    suspend fun porId(id: Long): EstadoActualizacionEntity?
+
+    @Query("SELECT * FROM EstadoActualizacion WHERE listaId = :listaId ORDER BY inicio DESC, id DESC")
+    suspend fun porLista(listaId: Long): List<EstadoActualizacionEntity>
+
     @Query("SELECT COUNT(*) FROM EstadoActualizacion")
     suspend fun contar(): Int
 }

@@ -1187,7 +1187,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E3-U5 (colecciones) | 2026-10-31 | `app/.../data/{ColeccionRepositorio,ColeccionResumen}.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{ColeccionRepositorioTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../{CanarioMovilTest,CatalogoUiTest,BusquedaFiltrosTest}.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `ColeccionRepositorioTest` 6/6; `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1; `CatalogoUiTest` 9/9, `BusquedaFiltrosTest` 1/1 y `CanarioMovilTest` 2/2 | `41202494843` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde. El run `41200336925` falló solo en `instrumented-mobile` por el viewport reducido y la conservación de clave de Paging; corregido en `ace8744` | Implementada y validada en su parte independiente de E4; unicidad de pertenencia tras E4/m5 pendiente; E3 abierta |
 | E3-U6 (perfiles) | 2026-10-31 | `app/.../data/PerfilRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/PerfilRepositorioTest.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `PerfilRepositorioTest` 18/18 (n—n, Perfil vacío, Lista sin Perfil, cascadas y concurrencia); `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1 | `41202494843` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde | CRUD y asociación implementados y validados; preferencias de pista pendientes de E6/E7; S2c parcial; E3 abierta |
 | E3-U7 (auditoría de cierre) | 2026-10-31 | `odd/tasks/mvp-copernicotv.md` (§8.3, §10.1, §10.10.3, §11 L56, «Próximo paso»), `docs/evidence/u0-integrity.sha256` | Ver L56; sin cambios de producción ni de esquema | `./gradlew :app:ktlintCheck :app:detekt :core:test`; `git -c core.whitespace=cr-at-eol diff --check`; `sha256sum -c`; recálculo SHA-256; `git status --porcelain`; `gh run view` | Auditoría T1–T9: T1 cerrada, T4 cubierta, T2/T3/T5/T6/T7/T8/T9 parciales; E3 no cerrada | `41206648731` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41206648729` verde | Auditoría ejecutada; E3 abierta |
-| E3-U8 (acceso rápido de Historial) | 2026-10-31 | `app/src/main/kotlin/com/copernicotv/app/data/HistorialRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{EstadoUsuarioPersistenciaTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../CatalogoUiTest.kt` | Commit de implementación pendiente de publicar; ver L57 | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `EstadoUsuarioPersistenciaTest` 2 casos nuevos (últimos diez con nombre y marcas; desempate por canal descendente); `CatalogoUiTest.elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal`; `CatalogoPersistenciaTest` actualizado con la nueva dependencia | Pendiente de CI al documentar (L57) | S11c implementado; E3-T3 sigue parcial por la fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`; E3 abierta |
+| E3-U8 (acceso rápido de Historial) | 2026-10-31 | `app/src/main/kotlin/com/copernicotv/app/data/HistorialRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{EstadoUsuarioPersistenciaTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../CatalogoUiTest.kt` | Commits `e67db44` (implementación; 9 archivos, +200) y `a097acc` (documentación) | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `EstadoUsuarioPersistenciaTest` 2 casos nuevos (últimos diez con nombre y marcas; desempate por canal descendente); `CatalogoUiTest.elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal`; `CatalogoPersistenciaTest` actualizado con la nueva dependencia | `41211756626` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); TV trial `41211756665` verde. `:core` 253 (1 omitida) y `:app` 169 (1 omitida); `instrumented-mobile` 26/26; `instrumented-tv` 1/1 | S11c implementado; E3-T3 sigue parcial por la fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`; E3 abierta |
 
 ### 10.2 Evidencia de CI
 
@@ -1685,6 +1685,12 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
   ejecutan en CI (ADR-0005). La validación local cubre formato, análisis
   estático y `:core:test`; la compilación y las pruebas de `:app` quedan
   sujetas al run de CI que registra L57.
+- **CI.** El run `41211756626` sobre `a097acc` quedó 5/5 verde (`jvm-tests`,
+  `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+  `p1-performance` y `p1-android` omitidos por diseño) y `TV emulator trial`
+  `41211756665` verde. `jvm-tests`: `:core` 253 pruebas (1 omitida) y `:app`
+  169 (1 omitida), 0 fallos; `instrumented-mobile` 26/26; `instrumented-tv`
+  1/1.
 - **Pendiente.** La fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`
   futuro siguen pendientes; E3 permanece abierta.
 
@@ -2826,8 +2832,14 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
   verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. No hay RED
   local posible para `:app`: `:app:compileDebugKotlin` y
   `:app:testDebugUnitTest` fallan por SDK ausente, y las instrumentadas y el
-  APK solo se ejecutan en CI (ADR-0005). El run de CI se registra al publicar
-  el commit.
+  APK solo se ejecutan en CI (ADR-0005).
+- **CI.** El run `41211756626` sobre `a097acc` quedó 5/5 verde (`jvm-tests`,
+  `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+  `p1-performance` y `p1-android` omitidos por diseño) y `TV emulator trial`
+  `41211756665` verde. `jvm-tests`: `:core` 253 pruebas (1 omitida) y `:app`
+  169 (1 omitida), 0 fallos; `instrumented-mobile` 26/26; `instrumented-tv`
+  1/1. La compilación de `:app` y las pruebas instrumentadas quedan validadas
+  por CI.
 - **Estado.** S11c queda implementado. E3-T3 sigue **parcial** por la fusión
   `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN` futuro. E3 permanece
   **abierta**. La siguiente unidad ejecutable sin E4 se decide al cerrar esta

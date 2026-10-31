@@ -1,7 +1,6 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsSelected
@@ -413,15 +412,9 @@ class CatalogoUiTest {
     private fun esperarListaCon(indice: Int) {
         esperarHasta {
             runCatching {
-                val info =
-                    composeRule
-                        .onNodeWithTag(TAG_RESULTADOS)
-                        .fetchSemanticsNode()
-                        .config[SemanticsProperties.CollectionInfo]
-                info.rowCount > indice
-            }.getOrDefault(false)
+                composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
+            }.isSuccess
         }
-        composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
     }
 
     private fun esperarTexto(

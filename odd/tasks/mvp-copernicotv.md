@@ -1029,11 +1029,11 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 | E3-T2 | Favoritos | Único por Canal; sobrevive a Actualización |
 | E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación futura con `EXPLAIN QUERY PLAN`; acceso rápido; base de S14g; S11 |
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas |
-| E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. |
+| E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. |
 | E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado |
-| E3-T7 | Ordenación del catálogo y preferencias por Lista | Modos A/B/C y dirección; canales nunca reproducidos al final; desempates deterministas con acentos; comparación reproducible JVM/Android con tabla de orden español fija en `:core` (parte de esta tarea; no crea tarea ni dependencia nueva), sin `Locale.getDefault()` ni `Collator` dependiente del dispositivo; canales sin nombre al final y «Sin nombre» solo de presentación; en Modo B, sección visual «Sin grupo» al final sin Grupo ficticio; preferencia independiente por Lista en DataStore (dueña de la persistencia; E7-T5 la consume); no modifica Apariencia/Colección ni identidad; S14e–S14m. La combinación de A/B/C y direcciones, orden manual de Apariencias (E3-T8), orden independiente de Colecciones (E3-T5) y preferencia por Lista persistida (esta tarea) es la cobertura aprobada de `README.md:38`/`:84`; no se agregan funciones implícitas. Las reglas de comparación, Canales sin nombre y Canales sin grupo están aprobadas; la limpieza de la preferencia al borrar Listas se rige por DC-08; implementada y validada el 2026-10-31 (L54). Depende de E3-T3 y E3-T6; no bloquea E3-T5; E3 sigue abierta por E3-T2/T3 (criterios dependientes de E4), E3-T5, E3-T8 (recreación de proceso) y E3-T9 |
-| E3-T8 | Reordenamiento manual de Apariencias | Reordenar Apariencias dentro de una Lista desde la UI; reutilizar la persistencia de `Apariencia.orden` definida en E2-T3, sin crear una segunda ruta; aislar por Lista con L1/L2 y tres Canales compartidos (C1, C2, C3); no modifica `ColeccionCanal.posicion` ni la preferencia de ordenación A/B/C; S14a, S14c, S45a–S45c. Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden manual de Apariencias); su cierre requiere implementación y validación, no solo la decisión de alcance. Depende de E3-T6; referencia contractual con E2-T3; no duplica E3-T5 (Colecciones) ni E3-T7 (ordenación del catálogo) |
-| E3-T9 | Perfiles de reproducción | Perfil con nombre que agrupa Listas M3U; no se reduce a renombrar la Lista activa. Las preferencias de reproducción son globales (D3, L24); el Perfil no las posee ni las duplica. No inventa pistas ni capacidades; distingue preferencias guardadas de opciones disponibles para el contenido actual. Depende de E1-U3 para `Perfil`; la integración de preferencias de pista depende de E6-T3 y E7-T5. Las preferencias de reproducción son globales y, si la pista preferida no está disponible, se usa `auto/default`, se conserva la preferencia y se avisa en la UI (D3, L24). La representación/cardinalidad se resuelve en DC-02 (`PerfilLista` n—n, nombre único, Perfil vacío, sin preferencias por Perfil); S2c sigue pendiente de implementación/validación. No se declara implementado ni probado. |
+| E3-T7 | Ordenación del catálogo y preferencias por Lista | Modos A/B/C y dirección; canales nunca reproducidos al final; desempates deterministas con acentos; comparación reproducible JVM/Android con tabla de orden español fija en `:core` (parte de esta tarea; no crea tarea ni dependencia nueva), sin `Locale.getDefault()` ni `Collator` dependiente del dispositivo; canales sin nombre al final y «Sin nombre» solo de presentación; en Modo B, sección visual «Sin grupo» al final sin Grupo ficticio; preferencia independiente por Lista en DataStore (dueña de la persistencia; E7-T5 la consume); no modifica Apariencia/Colección ni identidad; S14e–S14m. La combinación de A/B/C y direcciones, orden manual de Apariencias (E3-T8), orden independiente de Colecciones (E3-T5) y preferencia por Lista persistida (esta tarea) es la cobertura aprobada de `README.md:38`/`:84`; no se agregan funciones implícitas. Las reglas de comparación, Canales sin nombre y Canales sin grupo están aprobadas; la limpieza de la preferencia al borrar Listas se rige por DC-08; implementada y validada el 2026-10-31 (L54). Depende de E3-T3 y E3-T6; no bloquea E3-T5; E3 sigue abierta por E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad de pertenencia tras E4/m5), E3-T8 (recreación de proceso) y E3-T9 (preferencias de pista dependientes de E6/E7) |
+| E3-T8 | Reordenamiento manual de Apariencias | Reordenar Apariencias dentro de una Lista desde la UI; reutilizar la persistencia de `Apariencia.orden` definida en E2-T3, sin crear una segunda ruta; aislar por Lista con L1/L2 y tres Canales compartidos (C1, C2, C3); no modifica `ColeccionCanal.posicion` ni la preferencia de ordenación A/B/C; S14a, S14c, S45a–S45c. Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden manual de Apariencias); su cierre requiere implementación y validación, no solo la decisión de alcance. Depende de E3-T6; referencia contractual con E2-T3; no duplica E3-T5 (Colecciones) ni E3-T7 (ordenación del catálogo). Cubierta en BD y UI (E3-U3/L53, revalidada en L55); la recreación de proceso física sigue pendiente y no se simula. |
+| E3-T9 | Perfiles de reproducción | Perfil con nombre que agrupa Listas M3U; no se reduce a renombrar la Lista activa. Las preferencias de reproducción son globales (D3, L24); el Perfil no las posee ni las duplica. No inventa pistas ni capacidades; distingue preferencias guardadas de opciones disponibles para el contenido actual. Depende de E1-U3 para `Perfil`; la integración de preferencias de pista depende de E6-T3 y E7-T5. Las preferencias de reproducción son globales y, si la pista preferida no está disponible, se usa `auto/default`, se conserva la preferencia y se avisa en la UI (D3, L24). La representación/cardinalidad se resuelve en DC-02 (`PerfilLista` n—n, nombre único, Perfil vacío, sin preferencias por Perfil); el CRUD de Perfil y la asociación n—n de Listas están implementados y validados el 2026-10-31 (L55). S2c queda parcialmente cubierta: falta la integración de preferencias de pista, dependiente de E6-T3/E7-T5, y su validación completa. |
 
 ### 8.4 E4 — Actualización, reconciliación y fusión
 
@@ -1096,7 +1096,7 @@ E5 **no se declara validada** hasta implementar y verificar la huella `huella:v2
 7. Cada unidad registra archivos modificados, diff, comandos ejecutados y referencia de CI cuando aplique.
 8. E5 no se declara validada hasta implementar y verificar la huella, las señales y los criterios de reconfirmación de DC-06; sus pruebas con fixtures no sustituyen el cierre end-to-end.
 9. Cada fila de la matriz identifica nivel, aserción y procedimiento reproducible; `S55` y `K14` describen evidencia de CI, no sustituyen el nivel que ejecuta el comportamiento. Las rutas con `...`, `*` o `**` son previstas hasta que los archivos existan.
-10. Las filas dependientes de P1/P2, de D1(a), de D2(a), de D3, D4 o D5, o de una definición funcional pendiente, no se declaran completas por aprobar solo su parte independiente. En particular: las filas de P1 no se declaran completas hasta medir, registrar baseline y cumplir DC-10; las de P2, hasta la revisión humana y firma de DC-11 (CI no es validación visual); S57 no valida la protección en reposo hasta implementar y probar DC-04; S3b/S46b no se declaran completas hasta implementar y probar DC-07; S2c no se declara completa hasta implementar y validar DC-02; S14 no se declara completa hasta implementar y validar las reglas aprobadas de mayúsculas/acentos, Canales sin nombre y Canales sin grupo; y S51/E2-T7 no se declaran completas hasta implementar y probar DC-09 y DC-04. Las decisiones B1–B11 están resueltas en §6.2; lo pendiente es implementación, medición o prueba física, no una decisión abierta. S11, S17, S20, S44, S47 y S51 ya no son definiciones funcionales pendientes; sus decisiones están en L24. L28/L29 resuelven documentalmente H-01–H-11; H-02 fija la versión Unicode 15.1.0 y la política, mientras que la estrategia de implementación y los vectores de conformidad siguen pendientes de E1. Si esa estrategia exige una tabla o dependencia nueva, se autoriza antes de incorporarla.
+10. Las filas dependientes de P1/P2, de D1(a), de D2(a), de D3, D4 o D5, o de una definición funcional pendiente, no se declaran completas por aprobar solo su parte independiente. En particular: las filas de P1 no se declaran completas hasta medir, registrar baseline y cumplir DC-10; las de P2, hasta la revisión humana y firma de DC-11 (CI no es validación visual); S57 no valida la protección en reposo hasta implementar y probar DC-04; S3b/S46b no se declaran completas hasta implementar y probar DC-07; S2c no se declara completa hasta implementar y validar DC-02 y la integración de preferencias de pista (E6-T3/E7-T5); S14 no se declara completa hasta implementar y validar las reglas aprobadas de mayúsculas/acentos, Canales sin nombre y Canales sin grupo; y S51/E2-T7 no se declaran completas hasta implementar y probar DC-09 y DC-04. Las decisiones B1–B11 están resueltas en §6.2; lo pendiente es implementación, medición o prueba física, no una decisión abierta. S11, S17, S20, S44, S47 y S51 ya no son definiciones funcionales pendientes; sus decisiones están en L24. L28/L29 resuelven documentalmente H-01–H-11; H-02 fija la versión Unicode 15.1.0 y la política, mientras que la estrategia de implementación y los vectores de conformidad siguen pendientes de E1. Si esa estrategia exige una tabla o dependencia nueva, se autoriza antes de incorporarla.
 
 ### 9.2 Criterio de finalización de E1
 
@@ -1184,6 +1184,8 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E3-T1 (medición P1 de búsqueda) | 2026-10-30 | `app/src/test/kotlin/com/copernicotv/app/p1/MedicionP1BusquedaTest.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/p1/MedicionP1BusquedaAndroidTest.kt`, `app/build.gradle.kts`, `.github/scripts/p1-android.sh`, `.github/workflows/ci.yml`, `docs/evidence/p1/busqueda/**`, `odd/tasks/mvp-copernicotv.md` | Commits `f07e5e1`, `418c33f` y `7c3483d` (corrección documental y aprobación); U0 en el commit de cierre; sin cambios de producción | `workflow_dispatch` sobre `418c33f`: runs `40987152414`, `40987957054` y `40988640006`; auditoría Python de p95 nearest-rank, CSV contra JSON, límites, referencias y fixture; CI de `7c3483d` | JVM búsqueda: p95 24.460/18.696, 34.429/19.296 y 34.428/22.528 ms; heap 70.535/72.225/71.397 MiB. Android: p95 17.177/8.209, 38.892/15.347 y 30.651/16.281 ms; heap 13.920/19.102/11.941 MiB. Las tres corridas 7/7 verdes; `cumple: true`; baseline aprobado con referencias JVM 34.429/22.528 ms y 72.225 MiB, Android 38.892/16.281 ms y 19.102 MiB | `40987152414`, `40987957054`, `40988640006` (7/7 verdes cada uno); CI `40993183550` (5/5 verdes; `p1-performance` y `p1-android` omitidos); `TV emulator trial` `40993183552` verde | Baseline aprobado el 2026-10-30; E3-T1 cerrada. Auditoría: página completa de 50 = primer resultado completo observable en Paging 3; KDoc/`assumeTrue` corregidos; sin re-medición |
 | E3-U3 (catálogo móvil y reordenamiento manual) | 2026-10-30 | `app/src/main/kotlin/com/copernicotv/app/data/CatalogoCrudRepositorio.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/{CanalDao,ListaDao,AparienciaDao}.kt`, `app/src/main/kotlin/com/copernicotv/app/data/{BusquedaCatalogoRepositorio,CanalEscritor}.kt`, `app/src/main/kotlin/com/copernicotv/app/ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/src/main/kotlin/com/copernicotv/app/MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/kotlin/com/copernicotv/app/data/{CatalogoCrudPersistenciaTest,ReordenamientoAparienciasTest}.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/{CatalogoUiTest,BusquedaFiltrosTest}.kt`, `.github/workflows/ci.yml` | Commits `e91c45b` (implementación; 18 archivos, +1960/−51), `9fda95d` (seguimiento), `041d5a2` y `1ead792` (correcciones de layout, foco y filtros) | Local: `./gradlew :core:test :app:ktlintCheck :app:detekt` verde. `git diff --check` limpio con CRLF. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `CatalogoCrudPersistenciaTest` 4 casos y `ReordenamientoAparienciasTest` 2 casos (JVM/Robolectric); `CatalogoUiTest` 4 casos y `BusquedaFiltrosTest` 1 caso instrumentados; `instrumented-mobile` 20/20; `instrumented-tv` 1/1; `CatalogoPersistenciaTest`, `BusquedaCatalogoPersistenciaTest` y medidores P1 actualizados; `CatalogoUiTest` añadido al filtro móvil de CI | `41055686806` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); `TV emulator trial` `41055686832` verde. El run previo `41054021747` falló en móvil por foco/filtros y quedó corregido en `1ead792` | E3-T6 parcial («Sin grupo» pendiente de E3-T7); E3-T8 cubierta en BD y UI, con recreación de proceso pendiente; E3-T5/T7/T9 y E4 pendientes; E3 abierta |
 | E3-U4 (ordenación A/B/C y preferencia por Lista) | 2026-10-31 | `core/src/main/kotlin/com/copernicotv/core/orden/OrdenCatalogo.kt`, `core/src/test/kotlin/com/copernicotv/core/orden/OrdenCatalogoTest.kt`, `app/src/main/kotlin/com/copernicotv/app/data/{PreferenciasOrden,CatalogoOrdenadoPagingSource,BusquedaCatalogoRepositorio,CatalogoCrudRepositorio}.kt`, `app/src/main/kotlin/com/copernicotv/app/data/db/dao/CanalDao.kt`, `app/src/main/kotlin/com/copernicotv/app/ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/src/main/kotlin/com/copernicotv/app/MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/kotlin/com/copernicotv/app/data/{PreferenciasOrdenDataStoreTest,PreferenciasOrdenEnMemoria,OrdenGrupoPersistenciaTest}.kt`, `app/src/androidTest/kotlin/com/copernicotv/app/CatalogoUiTest.kt`, `app/build.gradle.kts` | Commits `0f6c51f` (implementación; 18 archivos, +1307/−24), `e26bf52` (selector en la fila de filtros), `57189c9` (diagnóstico y persistencia de Grupo), `f345aae` y `9cbbb99` (diagnóstico y desplazamiento), `d8c3674` (desplazamiento con `ScrollToIndex`) | Local: `./gradlew :app:ktlintCheck :app:detekt` verde. `git diff --check` limpio con CRLF. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `OrdenCatalogoTest` 9/9; `PreferenciasOrdenDataStoreTest` 2/2; `OrdenGrupoPersistenciaTest` 2/2; `CatalogoUiTest` 9/9 (4 de E3-U3 + 5 de modos, dirección, «Sin grupo» y persistencia al recrear); `jvm-tests` `:core` 253 (1 omitida) y `:app` 157 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1 | `41193880304` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); `TV emulator trial` `41193880355` verde. Los runs `41192724764` y `41191669398` fallaron solo en `instrumented-mobile` por el desplazamiento del `LazyColumn`; corregido en `9cbbb99` y `d8c3674` | E3-T7 implementada y validada; E3-T6 cubierta (incluye «Sin grupo»); E3-T8 sigue con recreación de proceso pendiente; E3-T2/T3 conservan criterios dependientes de E4; E3-T5/T9 pendientes; E3 abierta |
+| E3-U5 (colecciones) | 2026-10-31 | `app/.../data/{ColeccionRepositorio,ColeccionResumen}.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{ColeccionRepositorioTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../{CanarioMovilTest,CatalogoUiTest,BusquedaFiltrosTest}.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `ColeccionRepositorioTest` 6/6; `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1; `CatalogoUiTest` 9/9, `BusquedaFiltrosTest` 1/1 y `CanarioMovilTest` 2/2 | `41202494843` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde. El run `41200336925` falló solo en `instrumented-mobile` por el viewport reducido y la conservación de clave de Paging; corregido en `ace8744` | Implementada y validada en su parte independiente de E4; unicidad de pertenencia tras E4/m5 pendiente; E3 abierta |
+| E3-U6 (perfiles) | 2026-10-31 | `app/.../data/PerfilRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/PerfilRepositorioTest.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `PerfilRepositorioTest` 18/18 (n—n, Perfil vacío, Lista sin Perfil, cascadas y concurrencia); `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1 | `41202494843` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde | CRUD y asociación implementados y validados; preferencias de pista pendientes de E6/E7; S2c parcial; E3 abierta |
 
 ### 10.2 Evidencia de CI
 
@@ -1545,8 +1547,10 @@ de los tres runs. No se modificaron `docs/evidence/p1/p1-baseline.json`,
 **Estado exacto de E3-T1:** implementación y pruebas funcionales de E3-U2
 verificadas en CI; medición P1 de búsqueda y página 2 ejecutada y conforme a los
 límites absolutos; baseline JVM+Android **aprobado el 2026-10-30** (L52). E3-T1
-queda **cerrada**. E3 sigue **abierta** por E3-T2/T3, E3-T5, E3-T6/T7/T8/T9 y
-las tareas de UI pendientes.
+queda **cerrada**. E3 sigue **abierta** por E3-T2/T3 (criterios dependientes de
+E4), E3-T5 (unicidad de pertenencia tras E4/m5), E3-T8 (recreación de proceso)
+y E3-T9 (preferencias de pista dependientes de E6/E7); E3-T6/T7 quedan
+cubiertas.
 
 **Limitaciones aceptadas.** La base es Room in-memory: ejercita DAO, SQL y
 PagingSource reales, pero no I/O en disco; los resultados no representan el
@@ -1555,6 +1559,54 @@ UI/Compose ni una lista precargada. No se miden filtros combinados; su cobertura
 es funcional en E3-U2. La regresión no se evalúa en esta primera calibración; se
 evalúa desde la primera medición posterior a la aprobación. S52 conserva
 pendiente el `EXPLAIN QUERY PLAN`.
+
+#### 10.10.2 E3-U5/U6: colecciones y perfiles
+
+**Estado: E3-T5 implementada y validada en su parte independiente de E4; E3-T9
+parcial; E3 abierta.** La unidad U5 cubre E3-T5 y la U6 cubre la parte de
+E3-T9 que no depende de E6/E7.
+
+- **Alcance.** U5 implementa Colecciones con orden propio en
+  `ColeccionCanal.posicion`, CRUD, alta idempotente de Canal, baja con
+  reindexado y borrado en cascada, sin tocar `Apariencia.orden` ni la
+  preferencia A/B/C. U6 implementa el CRUD de Perfil y la asociación n—n de
+  Listas mediante `PerfilLista` (DC-02): nombre normalizado único global,
+  Perfil vacío y Lista sin Perfil permitidos. No se implementan preferencias de
+  pista por Perfil; siguen siendo globales y dependen de E6-T3/E7-T5.
+- **Implementación.** `ColeccionRepositorio` y `ColeccionResumen` para el
+  catálogo de Colecciones; `PerfilRepositorio` para Perfiles y asociaciones;
+  `IntegridadDaos` amplía los DAO de Colección, pertenencia y Perfil;
+  `CatalogoViewModel` expone `colecciones`, `coleccionCanales`, `perfiles` y
+  `listasDePerfil` con sus acciones; `CatalogoScreen` integra los diálogos y
+  accesos de Colecciones/Perfiles; `MainActivity` cablea los estados y
+  acciones; `strings.xml` añade los textos. `CatalogoPersistenciaTest` se
+  actualiza para la nueva firma del ViewModel.
+- **Pruebas.** `ColeccionRepositorioTest` 6/6 (orden propio tras reabrir la
+  base, independencia de Apariencias, alta idempotente, baja con reindexado,
+  cascada y errores); `PerfilRepositorioTest` 18/18 (n—n, Perfil vacío, Lista
+  sin Perfil, cascadas, Lista inexistente, nombre vacío, conflicto y
+  concurrencia); `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida),
+  0 fallos; `instrumented-mobile` 25/25, con `CatalogoUiTest` 9/9,
+  `BusquedaFiltrosTest` 1/1 y `CanarioMovilTest` 2/2; `instrumented-tv` 1/1.
+- **CI.** Run `41202494843` sobre `ace8744`: 5/5 verdes (`jvm-tests`,
+  `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`);
+  `p1-performance` y `p1-android` omitidos por diseño en push. `TV emulator
+  trial` `41202494799` verde. El run `41200336925` sobre `980c6cb` falló solo
+  en `instrumented-mobile` (6 pruebas) porque la nueva fila de Colecciones y
+  Perfiles redujo el viewport de resultados a 84 px y Paging conserva por clave
+  el primer elemento visible al reordenar; las pruebas ahora desplazan la lista
+  y verifican en el mismo reintento. Corregido en `ace8744`.
+- **Limitaciones.** La unicidad de pertenencia de `ColeccionCanal` tras la
+  consolidación de E4/m5 no se impone antes; el esquema sigue admitiendo dos
+  posiciones del mismo Canal y duplicados idénticos, y la UI evita el duplicado
+  con alta idempotente. La recreación de proceso física de E3-T8 sigue
+  pendiente; la evidencia disponible es cierre/reapertura de la base y
+  reconstrucción del repositorio, no una prueba de proceso real. S2c no se
+  declara completa: falta la integración de preferencias de pista de E6/E7.
+- **Frontera y CRLF.** No se modifican `main`, `origin/main`, el esquema Room
+  v1, `docs/evidence/u0-manifest.md`, `docs/evidence/p1/` ni evidencia
+  histórica. Este archivo conserva CRLF y `git -c core.whitespace=cr-at-eol
+  diff --check` limpio.
 
 ## 11. Log
 
@@ -2578,6 +2630,57 @@ pendiente el `EXPLAIN QUERY PLAN`.
   del `LazyColumn`; corregido en `9cbbb99` y `d8c3674`. §10.2 registra el run
   final.
 
+### L55 — E3-U5/U6: colecciones y perfiles (2026-10-31)
+
+- **Autorización y alcance.** El propietario autorizó continuar E3 sin E4:
+  ejecutar U5 (E3-T5, Colecciones) y U6 (E3-T9, Perfiles) sobre
+  `feat/e1-bootstrap`, sin modificar `main`, el esquema Room v1,
+  `docs/evidence/u0-manifest.md` ni la evidencia histórica de P1/E2. No se
+  reabre E3-T1 ni se implementa E4. No se simulan criterios que dependan de E4.
+- **Contrato.** U5 cubre el orden propio de Colecciones y la pertenencia de
+  Canal sin tocar `Apariencia.orden` ni la preferencia A/B/C. U6 cubre DC-02:
+  `Perfil`/`PerfilLista` n—n, nombre normalizado único global, Perfil vacío y
+  Lista sin Perfil permitidos, sin preferencias por Perfil. S2c queda
+  parcialmente cubierta porque la integración de preferencias de pista depende
+  de E6-T3/E7-T5.
+- **Implementación.** `ColeccionRepositorio` y `ColeccionResumen`;
+  `PerfilRepositorio` con CRUD y asociación/desasociación; `IntegridadDaos`
+  amplía los DAO de Colección, pertenencia y Perfil; `CatalogoViewModel`
+  expone los flujos y acciones; `CatalogoScreen` integra los diálogos y
+  accesos; `MainActivity` cablea los estados; `strings.xml` añade los textos;
+  `CatalogoPersistenciaTest` se adapta a la nueva firma del ViewModel. El alta
+  de Canal en Colección es idempotente desde la UI, pero el esquema sigue
+  admitiendo dos posiciones del mismo Canal y duplicados idénticos antes de
+  E4/m5; no se añade unicidad prematura.
+- **Pruebas.** `ColeccionRepositorioTest` 6/6; `PerfilRepositorioTest` 18/18;
+  `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida), 0 fallos;
+  `instrumented-mobile` 25/25, con `CatalogoUiTest` 9/9,
+  `BusquedaFiltrosTest` 1/1 y `CanarioMovilTest` 2/2; `instrumented-tv` 1/1.
+- **Validación local.** `./gradlew :app:ktlintCheck :app:detekt :core:test`
+  verde; `git -c core.whitespace=cr-at-eol diff --check` limpio.
+  `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, las instrumentadas y el
+  APK no se ejecutan localmente por SDK ausente; se validan en CI. No se
+  declara ninguna prueba no ejecutada como verde.
+- **Estado.** E3-T5 queda implementada y validada en su parte independiente de
+  E4; la unicidad de pertenencia tras E4/m5 sigue pendiente. E3-T9 queda
+  parcial: CRUD y asociación n—n implementados y validados; preferencias de
+  pista pendientes de E6/E7. E3-T8 sigue cubierta en BD y UI con la recreación
+  de proceso pendiente. E3-T2/T3 conservan criterios dependientes de E4. S2c
+  queda parcial. E3 permanece **abierta**; la siguiente unidad es U7 (cierre y
+  evidencia), sin E4.
+- **Frontera y CRLF.** No se modifica `main` (sigue en `d419fdf`), el esquema
+  Room v1, `docs/evidence/u0-manifest.md`, `docs/evidence/p1/` ni evidencia
+  histórica. Este archivo conserva CRLF y `git diff --check` limpio con
+  `core.whitespace=cr-at-eol`.
+- **CI y publicación.** La implementación se publicó en `feat/e1-bootstrap`
+  con `4114177`, `af1e037`, `980c6cb` y `ace8744`. El run `41202494843`
+  (sobre `ace8744`) quedó 5/5 verde: `jvm-tests`, `static-analysis`, `apk`,
+  `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android`
+  se omiten por diseño en push. `TV emulator trial` `41202494799` quedó verde.
+  El run `41200336925` (sobre `980c6cb`) falló solo en `instrumented-mobile`
+  con 6 pruebas por el viewport reducido y la conservación de clave de Paging;
+  corregido en `ace8744` y verificado en el run final.
+
 ### Próximo paso
 
 E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
@@ -2646,12 +2749,16 @@ run `41193880304` quedó 5/5 verde (`jvm-tests`, `static-analysis`, `apk`,
 `41193880355` verde. E3-T7 queda implementada y validada; E3-T6 queda
 cubierta, incluida la sección «Sin grupo»; E3-T8 sigue cubierta en BD y UI
 con la recreación de proceso pendiente. E3 sigue **abierta** por E3-T2/T3
-(criterios dependientes de E4), E3-T5, E3-T8 (recreación de proceso) y E3-T9.
-La siguiente unidad ejecutable sin E4 es U5 (E3-T5), que no depende de E4.
+(criterios dependientes de E4), E3-T5 (unicidad de pertenencia tras E4/m5),
+E3-T8 (recreación de proceso) y E3-T9 (preferencias de pista de E6/E7). U5 y
+U6 quedaron ejecutadas el 2026-10-31 (L55); la siguiente unidad es U7 (cierre
+y evidencia), sin E4.
 
-La secuencia propuesta para el resto de E3 es: U5 colecciones (E3-T5); U6
-perfiles (E3-T9); U7 cierre y evidencia. U4 (E3-T7) quedó ejecutada el
-2026-10-31. No se implementa ninguna otra unidad.
+La secuencia ejecutada de E3 es: U4 (E3-T7) el 2026-10-31; U5 colecciones
+(E3-T5) y U6 perfiles (E3-T9) el 2026-10-31 (L55). La siguiente unidad es U7
+(cierre y evidencia), sin E4. No se implementa ninguna otra unidad ni se
+declara cerrada E3 mientras existan criterios dependientes de E4, la
+recreación de proceso de E3-T8 y las preferencias de pista de E3-T9.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y

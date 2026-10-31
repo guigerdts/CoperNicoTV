@@ -308,6 +308,15 @@ class CatalogoUiTest {
     }
 
     @Test
+    fun elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre() {
+        sembrarCanales(nombres = listOf(null, "Canal B", "Canal C"))
+
+        esperarTexto(0, "Sin nombre")
+        esperarTexto(1, "Canal B")
+        esperarTexto(2, "Canal C")
+    }
+
+    @Test
     fun laPreferenciaDeOrdenSobreviveARecrearLaActividad() {
         sembrarCanales()
 
@@ -332,7 +341,7 @@ class CatalogoUiTest {
     }
 
     private fun sembrarCanales(
-        nombres: List<String> = listOf("Canal A", "Canal B", "Canal C"),
+        nombres: List<String?> = listOf("Canal A", "Canal B", "Canal C"),
         grupos: List<String?> = listOf(null, null, null),
         fechas: List<Instant?> = listOf(null, null, null),
     ) {

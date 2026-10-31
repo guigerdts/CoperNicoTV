@@ -2,12 +2,15 @@ package com.copernicotv.app.data.db.dao
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.copernicotv.app.data.ColeccionCanalResumen
 import com.copernicotv.app.data.db.entities.ColeccionCanalEntity
 import com.copernicotv.app.data.db.entities.ColeccionEntity
 import com.copernicotv.app.data.db.entities.HistorialEntity
 import com.copernicotv.app.data.db.entities.PerfilEntity
 import com.copernicotv.app.data.db.entities.PerfilListaEntity
+import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
 @Dao
@@ -72,17 +75,32 @@ interface PerfilDao {
     @Query("SELECT COUNT(*) FROM Perfil")
     suspend fun contar(): Int
 
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun asociarLista(fila: PerfilListaEntity)
 
     @Query("SELECT listaId FROM PerfilLista WHERE perfilId = :perfilId")
     suspend fun listasDePerfil(perfilId: Long): List<Long>
 
+    @Query("SELECT listaId FROM PerfilLista WHERE perfilId = :perfilId ORDER BY listaId")
+    fun observarListasDePerfil(perfilId: Long): Flow<List<Long>>
+
+    @Query("DELETE FROM PerfilLista WHERE perfilId = :perfilId AND listaId = :listaId")
+    suspend fun desasociarLista(
+        perfilId: Long,
+        listaId: Long,
+    ): Int
+
     @Query("SELECT COUNT(*) FROM PerfilLista")
     suspend fun contarAsociaciones(): Int
 
+    @Query("SELECT * FROM Perfil ORDER BY nombreNormalizado, id")
+    fun observarTodos(): Flow<List<PerfilEntity>>
+
+    @Query("SELECT * FROM Perfil ORDER BY nombreNormalizado, id")
+    suspend fun listar(): List<PerfilEntity>
+
     @Query("DELETE FROM Perfil WHERE id = :id")
-    suspend fun eliminar(id: Long)
+    suspend fun eliminar(id: Long): Int
 }
 
 @Dao
@@ -90,8 +108,46 @@ interface ColeccionCanalDao {
     @Insert
     suspend fun insertar(fila: ColeccionCanalEntity): Long
 
-    @Query("SELECT * FROM ColeccionCanal WHERE coleccionId = :coleccionId ORDER BY id")
+    @Query("SELECT * FROM ColeccionCanal WHERE id = :id")
+    suspend fun porId(id: Long): ColeccionCanalEntity?
+
+    @Query("SELECT * FROM ColeccionCanal WHERE coleccionId = :coleccionId ORDER BY posicion, id")
     suspend fun porColeccion(coleccionId: Long): List<ColeccionCanalEntity>
+
+    @Query(
+        """
+        SELECT cc.id AS id, cc.canalId AS canalId, c.nombre AS nombre, cc.posicion AS posicion
+        FROM ColeccionCanal cc
+        INNER JOIN Canal c ON c.id = cc.canalId
+        WHERE cc.coleccionId = :coleccionId
+        ORDER BY cc.posicion, cc.id
+        """,
+    )
+    fun observarPorColeccion(coleccionId: Long): Flow<List<ColeccionCanalResumen>>
+
+    @Query("SELECT * FROM ColeccionCanal WHERE coleccionId = :coleccionId AND canalId = :canalId ORDER BY posicion, id")
+    suspend fun porCanal(
+        coleccionId: Long,
+        canalId: Long,
+    ): List<ColeccionCanalEntity>
+
+    @Query("SELECT COALESCE(MAX(posicion), -1) FROM ColeccionCanal WHERE coleccionId = :coleccionId")
+    suspend fun maxPosicion(coleccionId: Long): Int
+
+    @Query("UPDATE ColeccionCanal SET posicion = :posicion WHERE id = :id")
+    suspend fun actualizarPosicion(
+        id: Long,
+        posicion: Int,
+    ): Int
+
+    @Query("DELETE FROM ColeccionCanal WHERE id = :id")
+    suspend fun eliminarFila(id: Long): Int
+
+    @Query("DELETE FROM ColeccionCanal WHERE coleccionId = :coleccionId AND canalId = :canalId")
+    suspend fun eliminarPorCanal(
+        coleccionId: Long,
+        canalId: Long,
+    ): Int
 
     @Query("SELECT COUNT(*) FROM ColeccionCanal")
     suspend fun contar(): Int
@@ -101,6 +157,31 @@ interface ColeccionCanalDao {
 interface ColeccionDao {
     @Insert
     suspend fun insertar(coleccion: ColeccionEntity): Long
+
+    @Query("SELECT * FROM Coleccion WHERE id = :id")
+    suspend fun porId(id: Long): ColeccionEntity?
+
+    @Query("SELECT * FROM Coleccion ORDER BY id")
+    suspend fun listar(): List<ColeccionEntity>
+
+    @Query("SELECT * FROM Coleccion ORDER BY id")
+    fun observarTodas(): Flow<List<ColeccionEntity>>
+
+    @Query("UPDATE Coleccion SET nombre = :nombre, actualizadoEn = :actualizadoEn WHERE id = :id")
+    suspend fun renombrar(
+        id: Long,
+        nombre: String,
+        actualizadoEn: Instant,
+    ): Int
+
+    @Query("UPDATE Coleccion SET actualizadoEn = :actualizadoEn WHERE id = :id")
+    suspend fun tocar(
+        id: Long,
+        actualizadoEn: Instant,
+    ): Int
+
+    @Query("DELETE FROM Coleccion WHERE id = :id")
+    suspend fun eliminar(id: Long): Int
 
     @Query("SELECT COUNT(*) FROM Coleccion")
     suspend fun contar(): Int

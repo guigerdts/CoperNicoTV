@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -58,9 +59,12 @@ import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.copernicotv.app.R
 import com.copernicotv.app.data.CanalBusqueda
+import com.copernicotv.app.data.ColeccionCanalResumen
+import com.copernicotv.app.data.ColeccionResumen
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
 import com.copernicotv.app.data.ListaResumen
+import com.copernicotv.app.data.PerfilResumen
 import com.copernicotv.core.orden.DireccionOrden
 import com.copernicotv.core.orden.ModoOrden
 
@@ -181,6 +185,77 @@ const val PREFIJO_TAG_MODO_OPCION = "orden-modo-"
 /** Prefijo de las etiquetas de las cabeceras de Grupo. */
 const val PREFIJO_TAG_SECCION_GRUPO = "seccion-grupo-"
 
+/** Etiqueta del botón que abre la gestión de Colecciones. */
+const val TAG_COLECCIONES = "abrir-colecciones"
+
+/** Etiqueta del botón que abre la gestión de Perfiles. */
+const val TAG_PERFILES = "abrir-perfiles"
+
+/** Etiqueta del botón para crear una Colección. */
+const val TAG_NUEVA_COLECCION = "nueva-coleccion"
+
+/** Etiqueta del botón para renombrar la Colección seleccionada. */
+const val TAG_RENOMBRAR_COLECCION = "renombrar-coleccion"
+
+/** Etiqueta del botón para eliminar la Colección seleccionada. */
+const val TAG_ELIMINAR_COLECCION = "eliminar-coleccion"
+
+/** Etiqueta del selector de Colección activa. */
+const val TAG_COLECCION_ACTIVA = "coleccion-activa"
+
+/** Prefijo de las etiquetas de Colección en el selector. */
+const val PREFIJO_TAG_COLECCION = "coleccion-"
+
+/** Prefijo de las etiquetas de pertenencia Canal↔Colección. */
+const val PREFIJO_TAG_COLECCION_CANAL = "coleccion-canal-"
+
+/** Prefijo de la acción Subir dentro de una Colección. */
+const val TAG_COLECCION_CANAL_SUBIR = "coleccion-canal-subir-"
+
+/** Prefijo de la acción Bajar dentro de una Colección. */
+const val TAG_COLECCION_CANAL_BAJAR = "coleccion-canal-bajar-"
+
+/** Prefijo de la acción Quitar de una Colección. */
+const val TAG_COLECCION_CANAL_QUITAR = "coleccion-canal-quitar-"
+
+/** Etiqueta de la acción Agregar a Colección en el diálogo de Canal. */
+const val TAG_ACCION_AGREGAR_COLECCION = "accion-agregar-coleccion"
+
+/** Prefijo de las etiquetas de Colección en el diálogo Agregar. */
+const val TAG_AGREGAR_A_COLECCION = "agregar-a-coleccion-"
+
+/** Etiqueta del botón para crear un Perfil. */
+const val TAG_NUEVO_PERFIL = "nuevo-perfil"
+
+/** Etiqueta del botón para renombrar el Perfil seleccionado. */
+const val TAG_RENOMBRAR_PERFIL = "renombrar-perfil"
+
+/** Etiqueta del botón para eliminar el Perfil seleccionado. */
+const val TAG_ELIMINAR_PERFIL = "eliminar-perfil"
+
+/** Etiqueta del selector de Perfil activo. */
+const val TAG_PERFIL_ACTIVO = "perfil-activo"
+
+/** Prefijo de las etiquetas de Perfil en el selector. */
+const val PREFIJO_TAG_PERFIL = "perfil-"
+
+/** Prefijo de las etiquetas de Lista asociada a un Perfil. */
+const val PREFIJO_TAG_PERFIL_LISTA = "perfil-lista-"
+
+/** Estado de la gestión de Colecciones que la UI recibe ya resuelto. */
+data class ColeccionesUiState(
+    val colecciones: List<ColeccionResumen> = emptyList(),
+    val seleccionadaId: Long? = null,
+    val canales: List<ColeccionCanalResumen> = emptyList(),
+)
+
+/** Estado de la gestión de Perfiles que la UI recibe ya resuelto. */
+data class PerfilesUiState(
+    val perfiles: List<PerfilResumen> = emptyList(),
+    val seleccionadoId: Long? = null,
+    val listas: List<Long> = emptyList(),
+)
+
 /** Acciones que la pantalla de catálogo delega en el ViewModel. */
 data class CatalogoAcciones(
     val onImportar: () -> Unit,
@@ -203,6 +278,19 @@ data class CatalogoAcciones(
     val onMoverCanal: (Long, Int) -> Unit,
     val onModo: (ModoOrden) -> Unit,
     val onDireccion: () -> Unit,
+    val onSeleccionarColeccion: (Long?) -> Unit,
+    val onCrearColeccion: (String) -> Unit,
+    val onRenombrarColeccion: (Long, String) -> Unit,
+    val onEliminarColeccion: (Long) -> Unit,
+    val onAgregarCanalAColeccion: (Long, Long) -> Unit,
+    val onQuitarCanalDeColeccion: (Long) -> Unit,
+    val onMoverCanalEnColeccion: (Long, Int) -> Unit,
+    val onSeleccionarPerfil: (Long?) -> Unit,
+    val onCrearPerfil: (String) -> Unit,
+    val onRenombrarPerfil: (Long, String) -> Unit,
+    val onEliminarPerfil: (Long) -> Unit,
+    val onAsociarListaAPerfil: (Long, Long) -> Unit,
+    val onDesasociarListaDePerfil: (Long, Long) -> Unit,
 )
 
 /**
@@ -218,6 +306,8 @@ fun CatalogoScreen(
     criterios: CriteriosBusqueda,
     grupos: List<GrupoOpcion>,
     listas: List<ListaResumen>,
+    coleccionesUi: ColeccionesUiState,
+    perfilesUi: PerfilesUiState,
     resultados: LazyPagingItems<CanalBusqueda>,
     acciones: CatalogoAcciones,
 ) {
@@ -297,6 +387,9 @@ fun CatalogoScreen(
     DialogoCatalogoActivo(
         dialogo = dialogo,
         acciones = acciones,
+        listas = listas,
+        coleccionesUi = coleccionesUi,
+        perfilesUi = perfilesUi,
         onDialogo = { dialogo = it },
     )
 }
@@ -345,6 +438,24 @@ private fun Controles(
             listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
         },
     )
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(
+            onClick = { onDialogo(DialogoCatalogo.Colecciones) },
+            modifier = Modifier.testTag(TAG_COLECCIONES),
+        ) {
+            Text(stringResource(R.string.catalogo_colecciones))
+        }
+        TextButton(
+            onClick = { onDialogo(DialogoCatalogo.Perfiles) },
+            modifier = Modifier.testTag(TAG_PERFILES),
+        ) {
+            Text(stringResource(R.string.catalogo_perfiles))
+        }
+    }
     estado.mensaje?.let { codigo ->
         Text(
             text = stringResource(R.string.catalogo_error, codigo),
@@ -392,10 +503,14 @@ private fun Controles(
     }
 }
 
+@Suppress("LongMethod", "LongParameterList")
 @Composable
 private fun DialogoCatalogoActivo(
     dialogo: DialogoCatalogo?,
     acciones: CatalogoAcciones,
+    listas: List<ListaResumen>,
+    coleccionesUi: ColeccionesUiState,
+    perfilesUi: PerfilesUiState,
     onDialogo: (DialogoCatalogo?) -> Unit,
 ) {
     when (val actual = dialogo) {
@@ -432,6 +547,50 @@ private fun DialogoCatalogoActivo(
                 },
                 onCancelar = { onDialogo(null) },
             )
+        DialogoCatalogo.Colecciones ->
+            DialogoColecciones(
+                colecciones = coleccionesUi.colecciones,
+                seleccionadaId = coleccionesUi.seleccionadaId,
+                canales = coleccionesUi.canales,
+                onSeleccionar = acciones.onSeleccionarColeccion,
+                onNueva = { nombre ->
+                    acciones.onCrearColeccion(nombre)
+                },
+                onRenombrar = { id, nombre ->
+                    acciones.onRenombrarColeccion(id, nombre)
+                },
+                onEliminar = { id ->
+                    acciones.onEliminarColeccion(id)
+                },
+                onSubir = { filaId -> acciones.onMoverCanalEnColeccion(filaId, -1) },
+                onBajar = { filaId -> acciones.onMoverCanalEnColeccion(filaId, 1) },
+                onQuitar = acciones.onQuitarCanalDeColeccion,
+                onCerrar = { onDialogo(null) },
+            )
+        is DialogoCatalogo.AgregarAColeccion ->
+            DialogoAgregarAColeccion(
+                canal = actual.canal,
+                colecciones = coleccionesUi.colecciones,
+                onElegir = { coleccionId ->
+                    acciones.onAgregarCanalAColeccion(coleccionId, actual.canal.id)
+                    onDialogo(null)
+                },
+                onCancelar = { onDialogo(null) },
+            )
+        DialogoCatalogo.Perfiles ->
+            DialogoPerfiles(
+                perfiles = perfilesUi.perfiles,
+                seleccionadoId = perfilesUi.seleccionadoId,
+                listas = listas,
+                listasDePerfil = perfilesUi.listas,
+                onSeleccionar = acciones.onSeleccionarPerfil,
+                onNueva = acciones.onCrearPerfil,
+                onRenombrar = acciones.onRenombrarPerfil,
+                onEliminar = acciones.onEliminarPerfil,
+                onAsociar = acciones.onAsociarListaAPerfil,
+                onDesasociar = acciones.onDesasociarListaDePerfil,
+                onCerrar = { onDialogo(null) },
+            )
         DialogoCatalogo.NuevoCanal ->
             DialogoCanal(
                 titulo = stringResource(R.string.catalogo_nuevo_canal),
@@ -455,6 +614,7 @@ private fun DialogoCatalogoActivo(
                     onDialogo(null)
                 },
                 onEditar = { onDialogo(DialogoCatalogo.EditarCanal(actual.canal)) },
+                onAgregarColeccion = { onDialogo(DialogoCatalogo.AgregarAColeccion(actual.canal)) },
                 onSubir = {
                     acciones.onMoverCanal(actual.canal.id, -1)
                     onDialogo(null)
@@ -837,6 +997,359 @@ private fun CanalFila(
     }
 }
 
+@Suppress("LongMethod", "LongParameterList")
+@Composable
+private fun DialogoColecciones(
+    colecciones: List<ColeccionResumen>,
+    seleccionadaId: Long?,
+    canales: List<ColeccionCanalResumen>,
+    onSeleccionar: (Long?) -> Unit,
+    onNueva: (String) -> Unit,
+    onRenombrar: (Long, String) -> Unit,
+    onEliminar: (Long) -> Unit,
+    onSubir: (Long) -> Unit,
+    onBajar: (Long) -> Unit,
+    onQuitar: (Long) -> Unit,
+    onCerrar: () -> Unit,
+) {
+    val seleccionada = colecciones.firstOrNull { it.id == seleccionadaId }
+    var mostrarNueva by remember { mutableStateOf(false) }
+    var mostrarRenombrar by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text(stringResource(R.string.catalogo_colecciones)) },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .width(380.dp)
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        onClick = { mostrarNueva = true },
+                        modifier = Modifier.testTag(TAG_NUEVA_COLECCION),
+                    ) {
+                        Text(stringResource(R.string.catalogo_nueva_coleccion))
+                    }
+                    TextButton(
+                        onClick = { mostrarRenombrar = true },
+                        enabled = seleccionada != null,
+                        modifier = Modifier.testTag(TAG_RENOMBRAR_COLECCION),
+                    ) {
+                        Text(stringResource(R.string.catalogo_renombrar_coleccion))
+                    }
+                    TextButton(
+                        onClick = { seleccionada?.let { onEliminar(it.id) } },
+                        enabled = seleccionada != null,
+                        modifier = Modifier.testTag(TAG_ELIMINAR_COLECCION),
+                    ) {
+                        Text(stringResource(R.string.catalogo_eliminar_coleccion))
+                    }
+                }
+                Box {
+                    var expandido by remember { mutableStateOf(false) }
+                    TextButton(
+                        onClick = { expandido = true },
+                        modifier = Modifier.testTag(TAG_COLECCION_ACTIVA),
+                    ) {
+                        Text(
+                            seleccionada?.nombre
+                                ?: stringResource(R.string.catalogo_sin_coleccion),
+                        )
+                    }
+                    DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
+                        colecciones.forEach { coleccion ->
+                            DropdownMenuItem(
+                                text = { Text(coleccion.nombre) },
+                                onClick = {
+                                    onSeleccionar(coleccion.id)
+                                    expandido = false
+                                },
+                                modifier = Modifier.testTag(PREFIJO_TAG_COLECCION + coleccion.id),
+                            )
+                        }
+                    }
+                }
+                if (colecciones.isEmpty()) {
+                    Text(stringResource(R.string.catalogo_sin_colecciones))
+                } else if (seleccionada == null) {
+                    Text(stringResource(R.string.catalogo_seleccionar_coleccion))
+                } else {
+                    Text(
+                        text = stringResource(R.string.catalogo_canales_coleccion),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    if (canales.isEmpty()) {
+                        Text(stringResource(R.string.catalogo_coleccion_vacia))
+                    }
+                    canales.forEach { fila ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = fila.nombre ?: stringResource(R.string.catalogo_sin_nombre),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .testTag(PREFIJO_TAG_COLECCION_CANAL + fila.id),
+                            )
+                            TextButton(
+                                onClick = { onSubir(fila.id) },
+                                modifier = Modifier.testTag(TAG_COLECCION_CANAL_SUBIR + fila.id),
+                            ) {
+                                Text(stringResource(R.string.catalogo_subir))
+                            }
+                            TextButton(
+                                onClick = { onBajar(fila.id) },
+                                modifier = Modifier.testTag(TAG_COLECCION_CANAL_BAJAR + fila.id),
+                            ) {
+                                Text(stringResource(R.string.catalogo_bajar))
+                            }
+                            TextButton(
+                                onClick = { onQuitar(fila.id) },
+                                modifier = Modifier.testTag(TAG_COLECCION_CANAL_QUITAR + fila.id),
+                            ) {
+                                Text(stringResource(R.string.catalogo_quitar))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onCerrar,
+                modifier = Modifier.testTag(TAG_ACCION_CERRAR),
+            ) {
+                Text(stringResource(R.string.catalogo_cerrar))
+            }
+        },
+    )
+    if (mostrarNueva) {
+        DialogoTexto(
+            titulo = stringResource(R.string.catalogo_nueva_coleccion),
+            etiqueta = stringResource(R.string.catalogo_nombre_coleccion),
+            valorInicial = "",
+            onGuardar = { nombre ->
+                onNueva(nombre)
+                mostrarNueva = false
+            },
+            onCancelar = { mostrarNueva = false },
+        )
+    }
+    if (mostrarRenombrar && seleccionada != null) {
+        DialogoTexto(
+            titulo = stringResource(R.string.catalogo_renombrar_coleccion),
+            etiqueta = stringResource(R.string.catalogo_nombre_coleccion),
+            valorInicial = seleccionada.nombre,
+            onGuardar = { nombre ->
+                onRenombrar(seleccionada.id, nombre)
+                mostrarRenombrar = false
+            },
+            onCancelar = { mostrarRenombrar = false },
+        )
+    }
+}
+
+@Suppress("LongMethod", "LongParameterList")
+@Composable
+private fun DialogoAgregarAColeccion(
+    canal: CanalBusqueda,
+    colecciones: List<ColeccionResumen>,
+    onElegir: (Long) -> Unit,
+    onCancelar: () -> Unit,
+) {
+    val nombre = canal.nombre ?: stringResource(R.string.catalogo_sin_nombre)
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text(stringResource(R.string.catalogo_agregar_coleccion_titulo, nombre)) },
+        text = {
+            Column(
+                modifier = Modifier.width(320.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                if (colecciones.isEmpty()) {
+                    Text(stringResource(R.string.catalogo_sin_colecciones))
+                }
+                colecciones.forEach { coleccion ->
+                    TextButton(
+                        onClick = { onElegir(coleccion.id) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .testTag(TAG_AGREGAR_A_COLECCION + coleccion.id),
+                    ) {
+                        Text(coleccion.nombre)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(
+                onClick = onCancelar,
+                modifier = Modifier.testTag(TAG_DIALOGO_CANCELAR),
+            ) {
+                Text(stringResource(R.string.catalogo_cancelar))
+            }
+        },
+    )
+}
+
+@Suppress("LongMethod", "LongParameterList")
+@Composable
+private fun DialogoPerfiles(
+    perfiles: List<PerfilResumen>,
+    seleccionadoId: Long?,
+    listas: List<ListaResumen>,
+    listasDePerfil: List<Long>,
+    onSeleccionar: (Long?) -> Unit,
+    onNueva: (String) -> Unit,
+    onRenombrar: (Long, String) -> Unit,
+    onEliminar: (Long) -> Unit,
+    onAsociar: (Long, Long) -> Unit,
+    onDesasociar: (Long, Long) -> Unit,
+    onCerrar: () -> Unit,
+) {
+    val seleccionado = perfiles.firstOrNull { it.id == seleccionadoId }
+    var mostrarNuevo by remember { mutableStateOf(false) }
+    var mostrarRenombrar by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onCerrar,
+        title = { Text(stringResource(R.string.catalogo_perfiles)) },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .width(380.dp)
+                        .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    TextButton(
+                        onClick = { mostrarNuevo = true },
+                        modifier = Modifier.testTag(TAG_NUEVO_PERFIL),
+                    ) {
+                        Text(stringResource(R.string.catalogo_nuevo_perfil))
+                    }
+                    TextButton(
+                        onClick = { mostrarRenombrar = true },
+                        enabled = seleccionado != null,
+                        modifier = Modifier.testTag(TAG_RENOMBRAR_PERFIL),
+                    ) {
+                        Text(stringResource(R.string.catalogo_renombrar_perfil))
+                    }
+                    TextButton(
+                        onClick = { seleccionado?.let { onEliminar(it.id) } },
+                        enabled = seleccionado != null,
+                        modifier = Modifier.testTag(TAG_ELIMINAR_PERFIL),
+                    ) {
+                        Text(stringResource(R.string.catalogo_eliminar_perfil))
+                    }
+                }
+                Box {
+                    var expandido by remember { mutableStateOf(false) }
+                    TextButton(
+                        onClick = { expandido = true },
+                        modifier = Modifier.testTag(TAG_PERFIL_ACTIVO),
+                    ) {
+                        Text(
+                            seleccionado?.nombre
+                                ?: stringResource(R.string.catalogo_sin_perfil),
+                        )
+                    }
+                    DropdownMenu(expanded = expandido, onDismissRequest = { expandido = false }) {
+                        perfiles.forEach { perfil ->
+                            DropdownMenuItem(
+                                text = { Text(perfil.nombre) },
+                                onClick = {
+                                    onSeleccionar(perfil.id)
+                                    expandido = false
+                                },
+                                modifier = Modifier.testTag(PREFIJO_TAG_PERFIL + perfil.id),
+                            )
+                        }
+                    }
+                }
+                if (perfiles.isEmpty()) {
+                    Text(stringResource(R.string.catalogo_sin_perfiles))
+                } else if (seleccionado == null) {
+                    Text(stringResource(R.string.catalogo_seleccionar_perfil))
+                } else {
+                    Text(
+                        text = stringResource(R.string.catalogo_listas_perfil),
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    if (listas.isEmpty()) {
+                        Text(stringResource(R.string.catalogo_sin_listas))
+                    }
+                    listas.forEach { lista ->
+                        val asociada = listasDePerfil.contains(lista.id)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = asociada,
+                                onCheckedChange = { marcada ->
+                                    if (marcada) {
+                                        onAsociar(seleccionado.id, lista.id)
+                                    } else {
+                                        onDesasociar(seleccionado.id, lista.id)
+                                    }
+                                },
+                                modifier = Modifier.testTag(PREFIJO_TAG_PERFIL_LISTA + lista.id),
+                            )
+                            Text(lista.nombre)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onCerrar,
+                modifier = Modifier.testTag(TAG_ACCION_CERRAR),
+            ) {
+                Text(stringResource(R.string.catalogo_cerrar))
+            }
+        },
+    )
+    if (mostrarNuevo) {
+        DialogoTexto(
+            titulo = stringResource(R.string.catalogo_nuevo_perfil),
+            etiqueta = stringResource(R.string.catalogo_nombre_perfil),
+            valorInicial = "",
+            onGuardar = { nombre ->
+                onNueva(nombre)
+                mostrarNuevo = false
+            },
+            onCancelar = { mostrarNuevo = false },
+        )
+    }
+    if (mostrarRenombrar && seleccionado != null) {
+        DialogoTexto(
+            titulo = stringResource(R.string.catalogo_renombrar_perfil),
+            etiqueta = stringResource(R.string.catalogo_nombre_perfil),
+            valorInicial = seleccionado.nombre,
+            onGuardar = { nombre ->
+                onRenombrar(seleccionado.id, nombre)
+                mostrarRenombrar = false
+            },
+            onCancelar = { mostrarRenombrar = false },
+        )
+    }
+}
+
 @Composable
 private fun DialogoTexto(
     titulo: String,
@@ -965,6 +1478,7 @@ private fun DialogoAccionesCanal(
     onFavorito: () -> Unit,
     onOculto: () -> Unit,
     onEditar: () -> Unit,
+    onAgregarColeccion: () -> Unit,
     onSubir: () -> Unit,
     onBajar: () -> Unit,
     onEliminar: () -> Unit,
@@ -1006,6 +1520,12 @@ private fun DialogoAccionesCanal(
                     Text(stringResource(R.string.catalogo_editar))
                 }
                 TextButton(
+                    onClick = onAgregarColeccion,
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_ACCION_AGREGAR_COLECCION),
+                ) {
+                    Text(stringResource(R.string.catalogo_agregar_coleccion))
+                }
+                TextButton(
                     onClick = onSubir,
                     modifier = Modifier.fillMaxWidth().testTag(TAG_ACCION_SUBIR),
                 ) {
@@ -1043,6 +1563,12 @@ private sealed interface DialogoCatalogo {
     data class RenombrarLista(val lista: ListaResumen) : DialogoCatalogo
 
     data class EliminarLista(val lista: ListaResumen) : DialogoCatalogo
+
+    data object Colecciones : DialogoCatalogo
+
+    data class AgregarAColeccion(val canal: CanalBusqueda) : DialogoCatalogo
+
+    data object Perfiles : DialogoCatalogo
 
     data object NuevoCanal : DialogoCatalogo
 

@@ -48,4 +48,27 @@
     <string name="catalogo_modo_recientes">Recientes</string>
     <string name="catalogo_ascendente">Ascendente</string>
     <string name="catalogo_descendente">Descendente</string>
+    <string name="catalogo_colecciones">Colecciones</string>
+    <string name="catalogo_perfiles">Perfiles</string>
+    <string name="catalogo_nueva_coleccion">Nueva colección</string>
+    <string name="catalogo_renombrar_coleccion">Renombrar colección</string>
+    <string name="catalogo_eliminar_coleccion">Eliminar colección</string>
+    <string name="catalogo_nombre_coleccion">Nombre de la colección</string>
+    <string name="catalogo_sin_coleccion">Sin colección</string>
+    <string name="catalogo_sin_colecciones">Todavía no hay colecciones.</string>
+    <string name="catalogo_seleccionar_coleccion">Seleccione una colección.</string>
+    <string name="catalogo_canales_coleccion">Canales de la colección</string>
+    <string name="catalogo_coleccion_vacia">La colección no tiene canales.</string>
+    <string name="catalogo_quitar">Quitar</string>
+    <string name="catalogo_agregar_coleccion">Agregar a colección</string>
+    <string name="catalogo_agregar_coleccion_titulo">Agregar «%1$s» a una colección</string>
+    <string name="catalogo_nuevo_perfil">Nuevo perfil</string>
+    <string name="catalogo_renombrar_perfil">Renombrar perfil</string>
+    <string name="catalogo_eliminar_perfil">Eliminar perfil</string>
+    <string name="catalogo_nombre_perfil">Nombre del perfil</string>
+    <string name="catalogo_sin_perfil">Sin perfil</string>
+    <string name="catalogo_sin_perfiles">Todavía no hay perfiles.</string>
+    <string name="catalogo_seleccionar_perfil">Seleccione un perfil.</string>
+    <string name="catalogo_listas_perfil">Listas del perfil</string>
+    <string name="catalogo_sin_listas">Todavía no hay listas.</string>
 </resources>

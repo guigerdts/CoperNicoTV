@@ -9,9 +9,14 @@ import com.copernicotv.app.data.BusquedaCatalogoRepositorio
 import com.copernicotv.app.data.CanalBusqueda
 import com.copernicotv.app.data.CatalogoCrudRepositorio
 import com.copernicotv.app.data.CatalogoRepositorio
+import com.copernicotv.app.data.ColeccionCanalResumen
+import com.copernicotv.app.data.ColeccionRepositorio
+import com.copernicotv.app.data.ColeccionResumen
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
 import com.copernicotv.app.data.ListaResumen
+import com.copernicotv.app.data.PerfilRepositorio
+import com.copernicotv.app.data.PerfilResumen
 import com.copernicotv.app.data.PreferenciasOrden
 import com.copernicotv.app.data.ResultadoAccion
 import com.copernicotv.app.data.ResumenImportacion
@@ -60,6 +65,7 @@ data class CatalogoUiState(
  * reemplazan el disparador por el flujo de alta de Fuente, pero el camino de
  * persistencia es el mismo.
  */
+@Suppress("TooManyFunctions")
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CatalogoViewModel
@@ -69,6 +75,8 @@ class CatalogoViewModel
         private val busqueda: BusquedaCatalogoRepositorio,
         private val crud: CatalogoCrudRepositorio,
         private val preferencias: PreferenciasOrden,
+        private val coleccionesRepositorio: ColeccionRepositorio,
+        private val perfilesRepositorio: PerfilRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
@@ -90,6 +98,58 @@ class CatalogoViewModel
             busqueda
                 .gruposDeListaActiva()
                 .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
+                    initialValue = emptyList(),
+                )
+
+        val colecciones: StateFlow<List<ColeccionResumen>> =
+            coleccionesRepositorio
+                .colecciones()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
+                    initialValue = emptyList(),
+                )
+
+        private val seleccionColeccion = MutableStateFlow<Long?>(null)
+        val coleccionSeleccionadaId: StateFlow<Long?> = seleccionColeccion.asStateFlow()
+
+        val coleccionCanales: StateFlow<List<ColeccionCanalResumen>> =
+            seleccionColeccion
+                .flatMapLatest { coleccionId ->
+                    if (coleccionId == null) {
+                        flowOf(emptyList())
+                    } else {
+                        coleccionesRepositorio.canalesDe(coleccionId)
+                    }
+                }.stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
+                    initialValue = emptyList(),
+                )
+
+        val perfiles: StateFlow<List<PerfilResumen>> =
+            perfilesRepositorio
+                .perfiles()
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
+                    initialValue = emptyList(),
+                )
+
+        private val seleccionPerfil = MutableStateFlow<Long?>(null)
+        val perfilSeleccionadoId: StateFlow<Long?> = seleccionPerfil.asStateFlow()
+
+        val listasDePerfil: StateFlow<List<Long>> =
+            seleccionPerfil
+                .flatMapLatest { perfilId ->
+                    if (perfilId == null) {
+                        flowOf(emptyList())
+                    } else {
+                        perfilesRepositorio.listasDePerfil(perfilId)
+                    }
+                }.stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
                     initialValue = emptyList(),
@@ -220,6 +280,88 @@ class CatalogoViewModel
             delta: Int,
         ) {
             ejecutarAccion { crud.moverCanal(canalId, delta) }
+        }
+
+        fun seleccionarColeccion(coleccionId: Long?) {
+            seleccionColeccion.value = coleccionId
+        }
+
+        fun crearColeccion(nombre: String) {
+            ejecutarAccion { coleccionesRepositorio.crear(nombre) }
+        }
+
+        fun renombrarColeccion(
+            coleccionId: Long,
+            nombre: String,
+        ) {
+            ejecutarAccion { coleccionesRepositorio.renombrar(coleccionId, nombre) }
+        }
+
+        fun eliminarColeccion(coleccionId: Long) {
+            ejecutarAccion {
+                val resultado = coleccionesRepositorio.eliminar(coleccionId)
+                if (resultado is ResultadoAccion.Ok && seleccionColeccion.value == coleccionId) {
+                    seleccionColeccion.value = null
+                }
+                resultado
+            }
+        }
+
+        fun agregarCanalAColeccion(
+            coleccionId: Long,
+            canalId: Long,
+        ) {
+            ejecutarAccion { coleccionesRepositorio.agregarCanal(coleccionId, canalId) }
+        }
+
+        fun quitarCanalDeColeccion(filaId: Long) {
+            ejecutarAccion { coleccionesRepositorio.quitarFila(filaId) }
+        }
+
+        fun moverCanalEnColeccion(
+            filaId: Long,
+            delta: Int,
+        ) {
+            ejecutarAccion { coleccionesRepositorio.moverFila(filaId, delta) }
+        }
+
+        fun seleccionarPerfil(perfilId: Long?) {
+            seleccionPerfil.value = perfilId
+        }
+
+        fun crearPerfil(nombre: String) {
+            ejecutarAccion { perfilesRepositorio.crearPerfil(nombre) }
+        }
+
+        fun renombrarPerfil(
+            perfilId: Long,
+            nombre: String,
+        ) {
+            ejecutarAccion { perfilesRepositorio.renombrarPerfil(perfilId, nombre) }
+        }
+
+        fun eliminarPerfil(perfilId: Long) {
+            ejecutarAccion {
+                val resultado = perfilesRepositorio.eliminarPerfil(perfilId)
+                if (resultado is ResultadoAccion.Ok && seleccionPerfil.value == perfilId) {
+                    seleccionPerfil.value = null
+                }
+                resultado
+            }
+        }
+
+        fun asociarListaAPerfil(
+            perfilId: Long,
+            listaId: Long,
+        ) {
+            ejecutarAccion { perfilesRepositorio.asociarLista(perfilId, listaId) }
+        }
+
+        fun desasociarListaDePerfil(
+            perfilId: Long,
+            listaId: Long,
+        ) {
+            ejecutarAccion { perfilesRepositorio.desasociarLista(perfilId, listaId) }
         }
 
         private fun ejecutarAccion(bloque: suspend () -> ResultadoAccion) {

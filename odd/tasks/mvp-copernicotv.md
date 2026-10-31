@@ -1030,7 +1030,7 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 | E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación futura con `EXPLAIN QUERY PLAN`; acceso rápido; base de S14g; S11. Estado tras E3-U8 (2026-10-31): parcial; unicidad, fecha, N=10, orden e índice están implementados y probados; el acceso rápido S11c está implementado con UI y pruebas (L57); faltan la fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN` futuro (L56, L57). |
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas. Estado tras E3-U7 (2026-10-31): cubierta en datos; FKs e índices únicos y pruebas de ocultación por Canal/Grupo y grupos homónimos de Listas distintas (L56). |
 | E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. Estado tras E3-U7 (2026-10-31): parcial; además de la unicidad, S45a exige recreación de proceso y la prueba disponible solo cierra y reabre la base (L56). |
-| E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado. Estado tras E3-U7 (2026-10-31): parcial; navegación, CRUD y «Sin grupo» están instrumentados, pero no hay prueba instrumentada que afirme «Sin nombre» (L56). |
+| E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado. Estado tras E3-U9 (2026-10-31): cubierta; navegación, CRUD, «Sin grupo» y «Sin nombre» están instrumentados (L58). |
 | E3-T7 | Ordenación del catálogo y preferencias por Lista | Modos A/B/C y dirección; canales nunca reproducidos al final; desempates deterministas con acentos; comparación reproducible JVM/Android con tabla de orden español fija en `:core` (parte de esta tarea; no crea tarea ni dependencia nueva), sin `Locale.getDefault()` ni `Collator` dependiente del dispositivo; canales sin nombre al final y «Sin nombre» solo de presentación; en Modo B, sección visual «Sin grupo» al final sin Grupo ficticio; preferencia independiente por Lista en DataStore (dueña de la persistencia; E7-T5 la consume); no modifica Apariencia/Colección ni identidad; S14e–S14m. La combinación de A/B/C y direcciones, orden manual de Apariencias (E3-T8), orden independiente de Colecciones (E3-T5) y preferencia por Lista persistida (esta tarea) es la cobertura aprobada de `README.md:38`/`:84`; no se agregan funciones implícitas. Las reglas de comparación, Canales sin nombre y Canales sin grupo están aprobadas; la limpieza de la preferencia al borrar Listas se rige por DC-08; implementada el 2026-10-31 (L54) y auditada en E3-U7 (L56). Depende de E3-T3 y E3-T6; no bloquea E3-T5; E3 sigue abierta por E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad de pertenencia tras E4/m5), E3-T8 (recreación de proceso) y E3-T9 (preferencias de pista dependientes de E6/E7). Estado tras E3-U7: parcial; S14k/S45d exigen recreación de proceso y la prueba solo recrea la Activity. |
 | E3-T8 | Reordenamiento manual de Apariencias | Reordenar Apariencias dentro de una Lista desde la UI; reutilizar la persistencia de `Apariencia.orden` definida en E2-T3, sin crear una segunda ruta; aislar por Lista con L1/L2 y tres Canales compartidos (C1, C2, C3); no modifica `ColeccionCanal.posicion` ni la preferencia de ordenación A/B/C; S14a, S14c, S45a–S45c. Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden manual de Apariencias); su cierre requiere implementación y validación, no solo la decisión de alcance. Depende de E3-T6; referencia contractual con E2-T3; no duplica E3-T5 (Colecciones) ni E3-T7 (ordenación del catálogo). Cubierta en BD y UI (E3-U3/L53, revalidada en L55); la recreación de proceso física sigue pendiente y no se simula. |
 | E3-T9 | Perfiles de reproducción | Perfil con nombre que agrupa Listas M3U; no se reduce a renombrar la Lista activa. Las preferencias de reproducción son globales (D3, L24); el Perfil no las posee ni las duplica. No inventa pistas ni capacidades; distingue preferencias guardadas de opciones disponibles para el contenido actual. Depende de E1-U3 para `Perfil`; la integración de preferencias de pista depende de E6-T3 y E7-T5. Las preferencias de reproducción son globales y, si la pista preferida no está disponible, se usa `auto/default`, se conserva la preferencia y se avisa en la UI (D3, L24). La representación/cardinalidad se resuelve en DC-02 (`PerfilLista` n—n, nombre único, Perfil vacío, sin preferencias por Perfil); el CRUD de Perfil y la asociación n—n de Listas están implementados y validados el 2026-10-31 (L55). S2c queda parcialmente cubierta: falta la integración de preferencias de pista, dependiente de E6-T3/E7-T5, y su validación completa. |
@@ -1188,6 +1188,7 @@ Toda unidad que se ejecute añade una fila. La fila `E1-U0` de esta tabla es evi
 | E3-U6 (perfiles) | 2026-10-31 | `app/.../data/PerfilRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/PerfilRepositorioTest.kt` | Commits `4114177`, `af1e037`, `980c6cb` y `ace8744` | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `PerfilRepositorioTest` 18/18 (n—n, Perfil vacío, Lista sin Perfil, cascadas y concurrencia); `jvm-tests` `:core` 253 (1 omitida) y `:app` 167 (1 omitida); `instrumented-mobile` 25/25; `instrumented-tv` 1/1 | `41202494843` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41202494799` verde | CRUD y asociación implementados y validados; preferencias de pista pendientes de E6/E7; S2c parcial; E3 abierta |
 | E3-U7 (auditoría de cierre) | 2026-10-31 | `odd/tasks/mvp-copernicotv.md` (§8.3, §10.1, §10.10.3, §11 L56, «Próximo paso»), `docs/evidence/u0-integrity.sha256` | Ver L56; sin cambios de producción ni de esquema | `./gradlew :app:ktlintCheck :app:detekt :core:test`; `git -c core.whitespace=cr-at-eol diff --check`; `sha256sum -c`; recálculo SHA-256; `git status --porcelain`; `gh run view` | Auditoría T1–T9: T1 cerrada, T4 cubierta, T2/T3/T5/T6/T7/T8/T9 parciales; E3 no cerrada | `41206648731` (5/5 verdes; `p1-performance` y `p1-android` omitidos); TV trial `41206648729` verde | Auditoría ejecutada; E3 abierta |
 | E3-U8 (acceso rápido de Historial) | 2026-10-31 | `app/src/main/kotlin/com/copernicotv/app/data/HistorialRepositorio.kt`, `app/.../data/db/dao/IntegridadDaos.kt`, `app/.../ui/{CatalogoScreen,CatalogoViewModel}.kt`, `app/.../MainActivity.kt`, `app/src/main/res/values/strings.xml`, `app/src/test/.../data/{EstadoUsuarioPersistenciaTest,CatalogoPersistenciaTest}.kt`, `app/src/androidTest/.../CatalogoUiTest.kt` | Commits `e67db44` (implementación; 9 archivos, +200) y `a097acc` (documentación) | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `EstadoUsuarioPersistenciaTest` 2 casos nuevos (últimos diez con nombre y marcas; desempate por canal descendente); `CatalogoUiTest.elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal`; `CatalogoPersistenciaTest` actualizado con la nueva dependencia | `41211756626` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); TV trial `41211756665` verde. `:core` 253 (1 omitida) y `:app` 169 (1 omitida); `instrumented-mobile` 26/26; `instrumented-tv` 1/1 | S11c implementado; E3-T3 sigue parcial por la fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`; E3 abierta |
+| E3-U9 (prueba de «Sin nombre») | 2026-10-31 | `app/src/androidTest/kotlin/com/copernicotv/app/CatalogoUiTest.kt` | Commit `a363040` (prueba; 1 archivo, +10/−1) | Local: `./gradlew :app:ktlintCheck :app:detekt :core:test` verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. `:app:compileDebugKotlin`, `:app:testDebugUnitTest`, instrumentadas y APK no ejecutables local por SDK ausente | `CatalogoUiTest.elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`; `sembrarCanales` acepta `List<String?>` | `41213360494` (5/5 verdes: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`; `p1-performance` y `p1-android` omitidos); TV trial `41213360511` verde; `instrumented-mobile` 27/27 | E3-T6 cubierta; E3 abierta por E4/E6/E7 y recreación de proceso |
 
 ### 10.2 Evidencia de CI
 
@@ -1633,20 +1634,22 @@ proceso.
 | E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente. | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` futuro. |
 | E3-T4 | Cubierta | `OcultacionCanalEntity` y `OcultacionGrupoEntity` con FK y `UNIQUE`; `EstadoUsuarioPersistenciaTest` prueba que ocultar Canal/Grupo no altera Apariencias ni Canales y que grupos homónimos de Listas distintas se ocultan por separado; `CatalogoUiTest` prueba alternar Oculto por Canal. | Ninguno para el criterio de datos. |
 | E3-T5 | Parcial | `ColeccionRepositorioTest` 6/6: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada y errores; `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones. | Unicidad de pertenencia y las dos posiciones de ADR-0004:60(m5) tras E4; S45a exige recreación de proceso y la prueba solo cierra y reabre la base. |
-| E3-T6 | Parcial | `CatalogoUiTest` 9/9: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo» y recreación de Activity; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | No hay prueba instrumentada que afirme «Sin nombre». |
+| E3-T6 | Cubierta | `CatalogoUiTest`: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo», recreación de Activity y `elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | Ninguno para el criterio instrumentado. |
 | E3-T7 | Parcial | `OrdenCatalogoTest` 9/9; `OrdenGrupoPersistenciaTest` 2/2; `CatalogoUiTest` prueba modos, dirección, «Sin grupo» y preferencia tras recrear Activity; `PreferenciasOrdenDataStoreTest` 2/2 con una instancia nueva de DataStore. | S14k/S45d exigen recrear el proceso, no solo Activity o DataStore; no se ejecutó. |
 | E3-T8 | Parcial | `ReordenamientoAparienciasTest` 2/2: L1/L2 con C1, C2 y C3, reordena solo L1, conserva L2 y la Colección y reabre la base; `CatalogoUiTest.laAccionBajarReordenaYpersisteEnRoom`. | S14a/S45a–S45c exigen recreación de proceso; la prueba solo cierra y reabre la base. |
 | E3-T9 | Parcial | `PerfilRepositorioTest` 18/18: CRUD, nombre normalizado único, Perfil vacío, Lista sin Perfil, asociación n—n, cascadas y concurrencia; la UI integra Perfiles. | Preferencias de pista globales y S2c dependen de E6-T3/E7-T5; no están implementadas. |
 
-**Cierre.** La auditoría no cierra E3: E3-T1 está cerrada y E3-T4 cubierta;
-E3-T2, E3-T3, E3-T5, E3-T6, E3-T7, E3-T8 y E3-T9 siguen parciales. Las
+**Cierre.** La auditoría no cierra E3: E3-T1 está cerrada; E3-T4 y E3-T6
+están cubiertas; E3-T2, E3-T3, E3-T5, E3-T7, E3-T8 y E3-T9 siguen parciales. Las
 afirmaciones previas de L54 sobre E3-T7 «implementada y validada» y de L54
 sobre E3-T6 «cubierta» quedan precisadas: la persistencia observada no prueba
-la recreación de proceso de S14k/S45d y no existe prueba instrumentada de
-«Sin nombre». El commit de cierre `53815c3` tiene el run `41206648731` 5/5
-verde y `TV emulator trial` `41206648729` verde. No se inicia E4 ni se declara
-E3 cerrada. La siguiente unidad ejecutable sin E4 es el acceso rápido de
-Historial (E3-T3/S11c), que no depende de E4.
+la recreación de proceso de S14k/S45d y no existía prueba instrumentada de
+«Sin nombre»; esa prueba se agregó en E3-U9 (L58) y E3-T6 queda cubierta. El
+commit de cierre `53815c3` tiene el run `41206648731` 5/5 verde y `TV emulator
+trial` `41206648729` verde. No se inicia E4 ni se declara E3 cerrada. La
+siguiente unidad ejecutable sin E4 era el acceso rápido de Historial
+(E3-T3/S11c), implementado en E3-U8 (L57); tras E3-U9 no quedan unidades E3
+ejecutables sin E4.
 
 #### 10.10.4 E3-U8: acceso rápido de Historial (S11c)
 
@@ -1693,6 +1696,28 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
   1/1.
 - **Pendiente.** La fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`
   futuro siguen pendientes; E3 permanece abierta.
+
+#### 10.10.5 E3-U9: «Sin nombre» instrumentado (E3-T6)
+
+**Estado: E3-T6 cubierta.** La unidad cierra el hueco de E3-T6 señalado en
+§10.10.3: no existía una prueba instrumentada que afirmara «Sin nombre».
+
+- **Alcance.**
+  `CatalogoUiTest.elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre` siembra
+  un Canal con `nombre = null` y dos Canales con nombre, y verifica que la fila
+  sin nombre muestra «Sin nombre» y que las demás conservan su nombre. El
+  ayudante `sembrarCanales` acepta `List<String?>`; no cambia producción.
+- **Validación local.** `./gradlew :app:ktlintCheck :app:detekt :core:test`
+  verde y `git -c core.whitespace=cr-at-eol diff --check` limpio.
+- **CI.** El run `41213360494` sobre `a363040` quedó 5/5 verde (`jvm-tests`,
+  `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+  `p1-performance` y `p1-android` omitidos por diseño) y `TV emulator trial`
+  `41213360511` verde. `instrumented-mobile` 27/27; `:core` 253 (1 omitida) y
+  `:app` 169 (1 omitida).
+- **Estado.** E3-T6 queda cubierta. E3 permanece **abierta** por E3-T2/T3
+  (criterios de E4), E3-T5 (unicidad tras E4/m5 y recreación de proceso),
+  E3-T7/T8 (recreación de proceso) y E3-T9 (E6/E7). No quedan unidades E3
+  ejecutables sin E4.
 
 ## 11. Log
 
@@ -2847,6 +2872,33 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
 - **Frontera y CRLF.** Este archivo conserva CRLF; no se modifican las rutas
   protegidas ni la aprobación documental de U0 registrada en L32.
 
+### L58 — E3-U9: «Sin nombre» instrumentado (E3-T6) (2026-10-31)
+
+- **Autorización y alcance.** El propietario autorizó continuar con la
+  siguiente unidad E3 ejecutable sin E4. Cerrado el acceso rápido (U8), el
+  único hueco ejecutable sin E4 era la prueba instrumentada de «Sin nombre»
+  de E3-T6. La unidad es de pruebas: no modifica producción, el esquema Room
+  v1, `main`, `docs/evidence/u0-manifest.md`, `docs/evidence/p1/` ni
+  evidencia histórica. No se inicia E4 ni se declara cerrada E3.
+- **Implementación.**
+  `CatalogoUiTest.elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`
+  siembra un Canal sin nombre y dos con nombre, y verifica «Sin nombre» y los
+  nombres restantes. `sembrarCanales` pasa a aceptar `List<String?>`.
+- **Validación local.** `./gradlew :app:ktlintCheck :app:detekt :core:test`
+  verde; `git -c core.whitespace=cr-at-eol diff --check` limpio. Las pruebas
+  instrumentadas se ejecutan solo en CI (ADR-0005).
+- **CI.** El run `41213360494` sobre `a363040` quedó 5/5 verde (`jvm-tests`,
+  `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+  `p1-performance` y `p1-android` omitidos por diseño) y `TV emulator trial`
+  `41213360511` verde. `instrumented-mobile` 27/27; `:core` 253 (1 omitida) y
+  `:app` 169 (1 omitida).
+- **Estado.** E3-T6 queda **cubierta**. E3 permanece **abierta** por E3-T2/T3
+  (criterios de E4), E3-T5 (unicidad tras E4/m5 y recreación de proceso),
+  E3-T7/T8 (recreación de proceso) y E3-T9 (E6/E7). No quedan unidades E3
+  ejecutables sin E4; la siguiente unidad exige E4 o una verificación física.
+- **Frontera y CRLF.** Este archivo conserva CRLF; no se modifican las rutas
+  protegidas ni la aprobación documental de U0 registrada en L32.
+
 ### Próximo paso
 
 E1 queda **cerrada** sobre `3140d34`. E2 queda **cerrada** sobre `a28971a`: T2
@@ -2940,12 +2992,24 @@ en CI. S11c queda implementado y E3-T3 sigue parcial por la fusión
 `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN` futuro (L57). E3 permanece
 **abierta**; no se inicia E4.
 
+**E3-U9 («Sin nombre» instrumentado) ejecutada el 2026-10-31.** Cierra el único
+hueco ejecutable sin E4 que quedaba tras U8: la prueba instrumentada de «Sin
+nombre» de E3-T6. `CatalogoUiTest.elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`
+siembra un Canal con `nombre = null` y dos con nombre, y verifica «Sin nombre»
+y los nombres restantes; `sembrarCanales` acepta `List<String?>`. No cambia
+producción. El run `41213360494` quedó 5/5 verde (`jvm-tests`,
+`static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+`p1-performance` y `p1-android` omitidos por diseño) y `TV emulator trial`
+`41213360511` verde; `instrumented-mobile` 27/27. E3-T6 queda **cubierta**
+(L58). E3 permanece **abierta**; no se inicia E4.
+
 La secuencia ejecutada de E3 es: U4 (E3-T7) el 2026-10-31; U5 colecciones
 (E3-T5) y U6 perfiles (E3-T9) el 2026-10-31 (L55); U7 auditoría de cierre el
-2026-10-31 (L56); U8 acceso rápido de Historial (S11c) el 2026-10-31 (L57). La
-siguiente unidad se decide al cerrar esta entrega, sin E4. No se declara
-cerrada E3 mientras existan criterios dependientes de E4, la recreación de
-proceso de E3-T5/T7/T8 y las preferencias de pista de E3-T9.
+2026-10-31 (L56); U8 acceso rápido de Historial (S11c) el 2026-10-31 (L57); U9
+«Sin nombre» instrumentado el 2026-10-31 (L58). No quedan unidades E3
+ejecutables sin E4: lo pendiente exige E4 (E3-T2/T3), E4/m5 y recreación de
+proceso (E3-T5), recreación de proceso (E3-T7/T8) o E6/E7 (E3-T9). No se
+declara cerrada E3 mientras existan esos criterios.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y

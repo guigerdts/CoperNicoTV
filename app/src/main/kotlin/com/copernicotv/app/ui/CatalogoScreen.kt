@@ -106,6 +106,9 @@ const val TAG_REINTENTAR = "reintentar-catalogo"
 /** Etiqueta del indicador de carga. */
 const val TAG_CARGANDO = "cargando-catalogo"
 
+/** Etiqueta de la lista de resultados del catálogo. */
+const val TAG_RESULTADOS = "resultados-catalogo"
+
 /** Etiqueta del mensaje de error de una acción CRUD. */
 const val TAG_ERROR_ACCION = "error-accion"
 
@@ -697,7 +700,7 @@ private fun Resultados(
         }
         else -> {
             LazyColumn(
-                modifier = modifier.fillMaxWidth(),
+                modifier = modifier.fillMaxWidth().testTag(TAG_RESULTADOS),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(

@@ -1,6 +1,7 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsSelected
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.pressKey
@@ -47,6 +49,7 @@ import com.copernicotv.app.ui.TAG_FILTRO_OCULTOS
 import com.copernicotv.app.ui.TAG_FILTRO_TODOS
 import com.copernicotv.app.ui.TAG_NUEVA_LISTA
 import com.copernicotv.app.ui.TAG_NUEVO_CANAL
+import com.copernicotv.app.ui.TAG_RESULTADOS
 import com.copernicotv.core.identity.ClavePresentacion
 import com.copernicotv.core.orden.ModoOrden
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -247,9 +250,9 @@ class CatalogoUiTest {
         )
 
         composeRule.onNodeWithTag(PREFIJO_TAG_MODO_OPCION + "grupo").performScrollTo().performClick()
-        esperarTag(PREFIJO_TAG_SECCION_GRUPO + "Grupo A")
-        esperarTag(PREFIJO_TAG_SECCION_GRUPO + "Grupo Z")
-        esperarTag(PREFIJO_TAG_SECCION_GRUPO + "sin-grupo")
+        esperarCabecera(0, "Grupo A")
+        esperarCabecera(1, "Grupo Z")
+        esperarCabecera(2, "sin-grupo")
         esperarTexto(0, "Canal A")
         esperarTexto(1, "Canal C")
         esperarTexto(2, "Canal B")
@@ -399,10 +402,33 @@ class CatalogoUiTest {
         }
     }
 
+    private fun esperarCabecera(
+        indice: Int,
+        tag: String,
+    ) {
+        esperarListaCon(indice)
+        esperarTag(PREFIJO_TAG_SECCION_GRUPO + tag)
+    }
+
+    private fun esperarListaCon(indice: Int) {
+        esperarHasta {
+            runCatching {
+                val info =
+                    composeRule
+                        .onNodeWithTag(TAG_RESULTADOS)
+                        .fetchSemanticsNode()
+                        .config[SemanticsProperties.CollectionInfo]
+                info.rowCount > indice
+            }.getOrDefault(false)
+        }
+        composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
+    }
+
     private fun esperarTexto(
         indice: Int,
         texto: String,
     ) {
+        esperarListaCon(indice)
         esperarHasta {
             runCatching {
                 composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + indice).assertTextEquals(texto)

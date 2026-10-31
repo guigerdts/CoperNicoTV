@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 val perfiles by viewModel.perfiles.collectAsStateWithLifecycle()
                 val perfilSeleccionadoId by viewModel.perfilSeleccionadoId.collectAsStateWithLifecycle()
                 val listasDePerfil by viewModel.listasDePerfil.collectAsStateWithLifecycle()
+                val recientes by viewModel.recientes.collectAsStateWithLifecycle()
                 val resultados = viewModel.resultados.collectAsLazyPagingItems()
                 // `ACTION_OPEN_DOCUMENT` es el único mecanismo que produce un
                 // grant persistible; `GET_CONTENT` no lo hace y rompería la
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
                             seleccionadoId = perfilSeleccionadoId,
                             listas = listasDePerfil,
                         ),
+                    recientes = recientes,
                     resultados = resultados,
                     acciones =
                         CatalogoAcciones(

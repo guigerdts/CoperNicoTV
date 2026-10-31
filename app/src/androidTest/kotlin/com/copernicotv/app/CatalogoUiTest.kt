@@ -30,7 +30,10 @@ import com.copernicotv.app.data.db.entities.HistorialEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.PREFIJO_TAG_MODO_OPCION
+import com.copernicotv.app.ui.PREFIJO_TAG_RECIENTE
 import com.copernicotv.app.ui.PREFIJO_TAG_SECCION_GRUPO
+import com.copernicotv.app.ui.TAG_ACCESO_RAPIDO
+import com.copernicotv.app.ui.TAG_ACCIONES_CANAL
 import com.copernicotv.app.ui.TAG_ACCION_BAJAR
 import com.copernicotv.app.ui.TAG_ACCION_CERRAR
 import com.copernicotv.app.ui.TAG_ACCION_EDITAR
@@ -278,6 +281,30 @@ class CatalogoUiTest {
         esperarTexto(0, "Canal C")
         esperarTexto(1, "Canal A")
         esperarTexto(2, "Canal B")
+    }
+
+    @Test
+    fun elAccesoRapidoMuestraLosUltimosDiezYEnOrdenYAbreElCanal() {
+        val nombres = (1..12).map { "Canal $it" }
+        sembrarCanales(
+            nombres = nombres,
+            grupos = List(nombres.size) { null },
+            fechas = nombres.indices.map { indice -> Instant.ofEpochMilli(1_000L * (indice + 1)) },
+        )
+
+        esperarTag(TAG_ACCESO_RAPIDO)
+        esperarTag(PREFIJO_TAG_RECIENTE + 0)
+        esperarTag(PREFIJO_TAG_RECIENTE + 9)
+        esperarTagAusente(PREFIJO_TAG_RECIENTE + 10)
+
+        composeRule.onNodeWithTag(PREFIJO_TAG_RECIENTE + 0).assertTextEquals("Canal 12")
+        composeRule.onNodeWithTag(PREFIJO_TAG_RECIENTE + 1).assertTextEquals("Canal 11")
+        composeRule.onNodeWithTag(PREFIJO_TAG_RECIENTE + 9).assertTextEquals("Canal 3")
+
+        composeRule.onNodeWithTag(PREFIJO_TAG_RECIENTE + 1).performScrollTo().performClick()
+
+        esperarTag(TAG_ACCIONES_CANAL)
+        composeRule.onNodeWithText("Acciones de Canal 11").assertExists()
     }
 
     @Test

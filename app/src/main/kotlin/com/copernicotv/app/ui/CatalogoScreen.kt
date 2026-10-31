@@ -63,6 +63,7 @@ import com.copernicotv.app.data.ColeccionCanalResumen
 import com.copernicotv.app.data.ColeccionResumen
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
+import com.copernicotv.app.data.HistorialResumen
 import com.copernicotv.app.data.ListaResumen
 import com.copernicotv.app.data.PerfilResumen
 import com.copernicotv.core.orden.DireccionOrden
@@ -184,6 +185,12 @@ const val PREFIJO_TAG_MODO_OPCION = "orden-modo-"
 
 /** Prefijo de las etiquetas de las cabeceras de Grupo. */
 const val PREFIJO_TAG_SECCION_GRUPO = "seccion-grupo-"
+
+/** Etiqueta de la sección de acceso rápido de Historial. */
+const val TAG_ACCESO_RAPIDO = "acceso-rapido"
+
+/** Prefijo de las etiquetas de cada Canal reciente. */
+const val PREFIJO_TAG_RECIENTE = "reciente-"
 
 /** Etiqueta del botón que abre la gestión de Colecciones. */
 const val TAG_COLECCIONES = "abrir-colecciones"
@@ -308,6 +315,7 @@ fun CatalogoScreen(
     listas: List<ListaResumen>,
     coleccionesUi: ColeccionesUiState,
     perfilesUi: PerfilesUiState,
+    recientes: List<HistorialResumen>,
     resultados: LazyPagingItems<CanalBusqueda>,
     acciones: CatalogoAcciones,
 ) {
@@ -343,6 +351,7 @@ fun CatalogoScreen(
                         grupos = grupos,
                         listas = listas,
                         listaActiva = listaActiva,
+                        recientes = recientes,
                         acciones = acciones,
                         focoInicial = focoInicial,
                         onDialogo = { dialogo = it },
@@ -368,6 +377,7 @@ fun CatalogoScreen(
                     grupos = grupos,
                     listas = listas,
                     listaActiva = listaActiva,
+                    recientes = recientes,
                     acciones = acciones,
                     focoInicial = focoInicial,
                     onDialogo = { dialogo = it },
@@ -401,6 +411,7 @@ private fun Controles(
     grupos: List<GrupoOpcion>,
     listas: List<ListaResumen>,
     listaActiva: ListaResumen?,
+    recientes: List<HistorialResumen>,
     acciones: CatalogoAcciones,
     focoInicial: FocusRequester,
     onDialogo: (DialogoCatalogo) -> Unit,
@@ -437,6 +448,10 @@ private fun Controles(
         onEliminar = {
             listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
         },
+    )
+    AccesoRapido(
+        recientes = recientes,
+        onCanal = { reciente -> onDialogo(DialogoCatalogo.AccionesCanal(reciente.aCanalBusqueda())) },
     )
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -502,6 +517,53 @@ private fun Controles(
         Text(stringResource(R.string.catalogo_nuevo_canal))
     }
 }
+
+/**
+ * Acceso rápido de S11c: los últimos Canales reproducidos, en el orden
+ * persistido `fecha DESC, canalId DESC`.
+ *
+ * Cada entrada abre el mismo diálogo de acciones que una fila del Catálogo, de
+ * modo que el acceso rápido no crea una segunda ruta de interacción. Un Canal
+ * sin nombre se presenta como «Sin nombre» (S14).
+ */
+@Composable
+private fun AccesoRapido(
+    recientes: List<HistorialResumen>,
+    onCanal: (HistorialResumen) -> Unit,
+) {
+    if (recientes.isEmpty()) return
+    Text(
+        text = stringResource(R.string.catalogo_acceso_rapido),
+        style = MaterialTheme.typography.titleSmall,
+    )
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .testTag(TAG_ACCESO_RAPIDO),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        recientes.forEachIndexed { indice, reciente ->
+            TextButton(
+                onClick = { onCanal(reciente) },
+                modifier = Modifier.testTag(PREFIJO_TAG_RECIENTE + indice),
+            ) {
+                Text(reciente.nombre ?: stringResource(R.string.catalogo_sin_nombre))
+            }
+        }
+    }
+}
+
+/** Adapta una entrada del Historial al modelo que consume el diálogo de acciones. */
+private fun HistorialResumen.aCanalBusqueda(): CanalBusqueda =
+    CanalBusqueda(
+        id = canalId,
+        nombre = nombre,
+        esFavorito = esFavorito,
+        estaOculto = estaOculto,
+    )
 
 @Suppress("LongMethod", "LongParameterList")
 @Composable

@@ -48,6 +48,7 @@
     <string name="catalogo_modo_recientes">Recientes</string>
     <string name="catalogo_ascendente">Ascendente</string>
     <string name="catalogo_descendente">Descendente</string>
+    <string name="catalogo_acceso_rapido">Acceso rápido</string>
     <string name="catalogo_colecciones">Colecciones</string>
     <string name="catalogo_perfiles">Perfiles</string>
     <string name="catalogo_nueva_coleccion">Nueva colección</string>

@@ -11,6 +11,7 @@ import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.GrupoEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -157,6 +158,50 @@ class EstadoUsuarioPersistenciaTest {
             assertEquals(ids.drop(2).reversed(), historial.ultimos().map { it.canalId })
             assertNull(db.historialDao().porCanal(ids[0]))
             assertNull(db.historialDao().porCanal(ids[1]))
+        }
+    }
+
+    @Test
+    fun `el acceso rapido expone los ultimos diez con nombre y marcas`() {
+        runBlocking {
+            val fuenteId = fuente()
+            val ids =
+                (1..12).map { indice ->
+                    val canalId =
+                        db.canalDao().insertar(
+                            canal(fuenteId, clave = "canon:v2:$indice", nombre = "Canal $indice"),
+                        )
+                    historial.registrar(canalId, T1.plusSeconds(indice.toLong()))
+                    canalId
+                }
+            favoritos.agregar(ids.last(), T1)
+            ocultaciones.ocultarCanal(ids[ids.size - 2], T1)
+
+            val recientes = historial.observarUltimos().first()
+
+            assertEquals(ids.drop(2).reversed(), recientes.map { it.canalId })
+            assertEquals((12 downTo 3).map { "Canal $it" }, recientes.map { it.nombre })
+            assertTrue(recientes.first().esFavorito)
+            assertTrue(recientes.drop(1).none { it.esFavorito })
+            assertTrue(recientes[1].estaOculto)
+            assertTrue(recientes.filterIndexed { indice, _ -> indice != 1 }.none { it.estaOculto })
+        }
+    }
+
+    @Test
+    fun `el acceso rapido desempata por canal descendente`() {
+        runBlocking {
+            val fuenteId = fuente()
+            val canal1 = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:1"))
+            val canal2 = db.canalDao().insertar(canal(fuenteId, clave = "canon:v2:2"))
+
+            historial.registrar(canal1, T2)
+            historial.registrar(canal2, T2)
+
+            assertEquals(
+                listOf(canal2, canal1),
+                historial.observarUltimos().first().map { it.canalId },
+            )
         }
     }
 

@@ -107,6 +107,7 @@ class CatalogoPersistenciaTest {
                     preferencias,
                     ColeccionRepositorio(db),
                     PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),
+                    HistorialRepositorio(db),
                 )
             val estado = withTimeout(TIEMPO_ESPERA) { viewModel.estado.first { it.canales.size == 3 } }
 

@@ -4,10 +4,26 @@ import androidx.room.withTransaction
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.HistorialEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/**
+ * Entrada del acceso rápido de Historial.
+ *
+ * `canalId` es la identidad lógica del Canal; `nombre` es nulo cuando el Canal
+ * no tiene nombre, y la UI lo presenta como «Sin nombre» (S14). Las marcas se
+ * resuelven en la misma consulta para no abrir el acceso rápido a un Canal con
+ * estado desactualizado.
+ */
+data class HistorialResumen(
+    val canalId: Long,
+    val nombre: String?,
+    val esFavorito: Boolean,
+    val estaOculto: Boolean,
+)
 
 /**
  * Historial de reproducción con una sola fila por Canal.
@@ -49,6 +65,14 @@ class HistorialRepositorio
             withContext(Dispatchers.IO) {
                 db.historialDao().ultimos(LIMITE)
             }
+
+        /**
+         * Acceso rápido observable de S11c: los [LIMITE] Canales más recientes
+         * con su nombre y sus marcas actuales, en el orden `fecha DESC,
+         * canalId DESC`. Room invalida el flujo cuando cambian `Historial`,
+         * `Canal`, `Favorito` u `OcultacionCanal`.
+         */
+        fun observarUltimos(): Flow<List<HistorialResumen>> = db.historialDao().observarUltimos(LIMITE)
 
         companion object {
             const val LIMITE: Int = 10

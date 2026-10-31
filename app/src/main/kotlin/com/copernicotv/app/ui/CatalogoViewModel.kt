@@ -14,6 +14,8 @@ import com.copernicotv.app.data.ColeccionRepositorio
 import com.copernicotv.app.data.ColeccionResumen
 import com.copernicotv.app.data.CriteriosBusqueda
 import com.copernicotv.app.data.GrupoOpcion
+import com.copernicotv.app.data.HistorialRepositorio
+import com.copernicotv.app.data.HistorialResumen
 import com.copernicotv.app.data.ListaResumen
 import com.copernicotv.app.data.PerfilRepositorio
 import com.copernicotv.app.data.PerfilResumen
@@ -77,6 +79,7 @@ class CatalogoViewModel
         private val preferencias: PreferenciasOrden,
         private val coleccionesRepositorio: ColeccionRepositorio,
         private val perfilesRepositorio: PerfilRepositorio,
+        private val historialRepositorio: HistorialRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
@@ -124,6 +127,19 @@ class CatalogoViewModel
                         coleccionesRepositorio.canalesDe(coleccionId)
                     }
                 }.stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
+                    initialValue = emptyList(),
+                )
+
+        /**
+         * Acceso rápido de S11c: últimos Canales reproducidos en el orden
+         * persistido `fecha DESC, canalId DESC`, con nombre y marcas.
+         */
+        val recientes: StateFlow<List<HistorialResumen>> =
+            historialRepositorio
+                .observarUltimos()
+                .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(TIEMPO_SIN_SUSCRIPTORES),
                     initialValue = emptyList(),

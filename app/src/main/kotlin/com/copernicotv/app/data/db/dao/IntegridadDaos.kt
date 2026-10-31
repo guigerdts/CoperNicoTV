@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.copernicotv.app.data.ColeccionCanalResumen
+import com.copernicotv.app.data.HistorialResumen
 import com.copernicotv.app.data.db.entities.ColeccionCanalEntity
 import com.copernicotv.app.data.db.entities.ColeccionEntity
 import com.copernicotv.app.data.db.entities.HistorialEntity
@@ -48,6 +49,27 @@ interface HistorialDao {
 
     @Query("SELECT * FROM Historial ORDER BY fecha DESC, canalId DESC LIMIT :limite")
     suspend fun ultimos(limite: Int): List<HistorialEntity>
+
+    /**
+     * Acceso rápido de S11c: últimos [limite] Canales en el mismo orden que
+     * `ultimos`, con el nombre del Canal y sus marcas actuales.
+     *
+     * El `INNER JOIN` descarta filas de Historial cuyo Canal ya no existe; la
+     * FK con cascada hace que ese caso no ocurra, pero la consulta no depende
+     * de ello.
+     */
+    @Query(
+        """
+        SELECT c.id AS canalId, c.nombre AS nombre,
+            EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito,
+            EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto
+        FROM Historial h
+        INNER JOIN Canal c ON c.id = h.canalId
+        ORDER BY h.fecha DESC, h.canalId DESC
+        LIMIT :limite
+        """,
+    )
+    fun observarUltimos(limite: Int): Flow<List<HistorialResumen>>
 }
 
 @Dao

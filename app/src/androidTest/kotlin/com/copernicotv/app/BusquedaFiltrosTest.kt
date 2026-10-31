@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
@@ -20,6 +21,7 @@ import com.copernicotv.app.ui.PREFIJO_TAG_GRUPO
 import com.copernicotv.app.ui.TAG_BUSCAR
 import com.copernicotv.app.ui.TAG_FILTRO_FAVORITOS
 import com.copernicotv.app.ui.TAG_FILTRO_TODOS
+import com.copernicotv.app.ui.TAG_RESULTADOS
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
@@ -69,12 +71,18 @@ class BusquedaFiltrosTest {
         composeRule.onNodeWithTag(PREFIJO_TAG_GRUPO + grupoUno).performScrollTo().performClick()
         esperarTexto(indice = 0, texto = TEXTO)
         composeRule.waitUntil(TIEMPO_ESPERA) {
+            runCatching {
+                composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(1)
+            }
             composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isEmpty()
         }
 
         composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performScrollTo().performClick()
         composeRule.waitUntil(TIEMPO_ESPERA) {
-            composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isNotEmpty()
+            runCatching {
+                composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(1)
+                composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isNotEmpty()
+            }.isSuccess
         }
     }
 

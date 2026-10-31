@@ -401,29 +401,38 @@ class CatalogoUiTest {
         }
     }
 
+    /**
+     * Desplaza la lista y comprueba la cabecera en la misma reintento.
+     *
+     * El reordenamiento de Paging conserva el primer elemento visible por
+     * clave; si se desplaza una sola vez antes de que llegue el nuevo orden,
+     * la lista vuelve a su posición anterior y la cabecera no aparece.
+     */
     private fun esperarCabecera(
         indice: Int,
         tag: String,
     ) {
-        esperarListaCon(indice)
-        esperarTag(PREFIJO_TAG_SECCION_GRUPO + tag)
-    }
-
-    private fun esperarListaCon(indice: Int) {
         esperarHasta {
             runCatching {
                 composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
+                composeRule.onNodeWithTag(PREFIJO_TAG_SECCION_GRUPO + tag).assertExists()
             }.isSuccess
         }
     }
 
+    /**
+     * Desplaza la lista y comprueba el texto en el mismo reintento.
+     *
+     * Paging conserva por clave el primer elemento visible al reordenar; el
+     * desplazamiento debe repetirse hasta que el nuevo orden esté asentado.
+     */
     private fun esperarTexto(
         indice: Int,
         texto: String,
     ) {
-        esperarListaCon(indice)
         esperarHasta {
             runCatching {
+                composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
                 composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + indice).assertTextEquals(texto)
             }.isSuccess
         }

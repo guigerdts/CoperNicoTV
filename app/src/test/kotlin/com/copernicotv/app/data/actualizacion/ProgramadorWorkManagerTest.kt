@@ -5,9 +5,13 @@ import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Configuration
+import androidx.work.ListenableWorker
 import androidx.work.NetworkType
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.Worker
+import androidx.work.WorkerFactory
+import androidx.work.WorkerParameters
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.copernicotv.app.data.db.AppDatabase
@@ -31,16 +35,18 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.File
 import java.time.Instant
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Provider
 
 /**
  * DC-07 puntos 1, 3, 4 y 5: forma de los trabajos, intervalo efectivo por
  * Fuente, actualización de la programación y limpieza de Fuentes eliminadas.
  *
- * Se usa el WorkManager de prueba con ejecutor síncrono. Los trabajos no se
- * ejecutan aquí: el worker es `@HiltWorker` y su lógica ya se prueba en
- * `CoordinadorActualizacionTest`. Esta prueba mira la solicitud, que es lo que
- * decide la política de DC-07.
+ * Se usa el WorkManager de prueba con ejecutor síncrono. La lógica de la
+ * Actualización se prueba en `CoordinadorActualizacionTest`; aquí se mira la
+ * solicitud, que es lo que decide la política de DC-07, y el disparo real al
+ * cumplirse el intervalo, con una fábrica de prueba que sustituye el
+ * `@HiltWorker` porque esta prueba no levanta Hilt.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -52,6 +58,7 @@ class ProgramadorWorkManagerTest {
     private lateinit var archivo: File
     private lateinit var scope: CoroutineScope
     private val contexto: Context = ApplicationProvider.getApplicationContext()
+    private val fabrica = FabricaEspia()
 
     @Before
     fun preparar() {
@@ -68,7 +75,10 @@ class ProgramadorWorkManagerTest {
         reclamo = ReclamoFuenteDataStore(dataStore)
         WorkManagerTestInitHelper.initializeTestWorkManager(
             contexto,
-            Configuration.Builder().setExecutor(SynchronousExecutor()).build(),
+            Configuration.Builder()
+                .setExecutor(SynchronousExecutor())
+                .setWorkerFactory(fabrica)
+                .build(),
         )
         programador =
             ProgramadorWorkManager(
@@ -227,6 +237,22 @@ class ProgramadorWorkManagerTest {
         }
     }
 
+    @Test
+    fun `S3b el trabajo periodico se dispara al cumplirse el intervalo configurado`() {
+        runBlocking {
+            val fuente = crearFuente("Fuente", usarGlobal = false, propio = 15L)
+            programador.reconciliar()
+            val trabajo = periodico(fuente)
+            assertEquals(15L * 60_000L, trabajo.repeatIntervalMillis)
+
+            val driver = checkNotNull(WorkManagerTestInitHelper.getTestDriver(contexto))
+            driver.setAllConstraintsMet(trabajo.id)
+            driver.setPeriodDelayMet(trabajo.id)
+
+            assertEquals("WorkManager dispara el trabajo al cumplirse el intervalo", 1, fabrica.ejecuciones.get())
+        }
+    }
+
     private suspend fun crearFuente(
         nombre: String,
         usarGlobal: Boolean,
@@ -256,5 +282,28 @@ class ProgramadorWorkManagerTest {
         const val NOMBRE_BD = "programador-test.db"
         val ESTADOS_ABIERTOS =
             setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED)
+    }
+}
+
+/**
+ * Sustituye el `@HiltWorker` real: esta prueba no levanta Hilt y lo que
+ * verifica es que WorkManager dispare el trabajo al cumplirse el intervalo, no
+ * la lógica de la Actualización, que cubre `CoordinadorActualizacionTest`.
+ */
+private class FabricaEspia : WorkerFactory() {
+    val ejecuciones = AtomicInteger(0)
+
+    override fun createWorker(
+        appContext: Context,
+        workerClassName: String,
+        workerParameters: WorkerParameters,
+    ): ListenableWorker? {
+        if (workerClassName != ActualizacionWorker::class.java.name) return null
+        return object : Worker(appContext, workerParameters) {
+            override fun doWork(): Result {
+                ejecuciones.incrementAndGet()
+                return Result.success()
+            }
+        }
     }
 }

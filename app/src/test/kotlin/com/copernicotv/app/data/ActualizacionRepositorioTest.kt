@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.data.actualizacion.CausasActualizacion
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.ColeccionCanalEntity
 import com.copernicotv.app.data.db.entities.ColeccionEntity
@@ -352,9 +353,54 @@ class ActualizacionRepositorioTest {
         }
     }
 
-    private suspend fun actualizar(texto: String): ResumenActualizacion {
+    @Test
+    fun `S6b la actualizacion automatica conserva favoritos historial y pks tras reabrir`() {
+        runBlocking {
+            actualizar(
+                """
+                #EXTM3U
+                #EXTINF:-1 tvg-id="uno" group-title="Noticias",Uno
+                https://example.com/uno
+                """.trimIndent(),
+            )
+            val original = requireNotNull(db.canalDao().porTvgId(fuenteId, "uno"))
+            val ahora = Instant.parse("2026-02-01T00:00:00Z")
+            db.favoritoDao().insertar(FavoritoEntity(canalId = original.id, creadoEn = ahora))
+            db.historialDao().insertar(HistorialEntity(canalId = original.id, fecha = ahora))
+
+            actualizar(
+                """
+                #EXTM3U
+                #EXTINF:-1 tvg-id="uno" group-title="Noticias",Uno HD
+                https://example.com/uno-hd
+                """.trimIndent(),
+                causa = CausasActualizacion.AUTOMATICA,
+            )
+
+            // Un reinicio cierra la base y la vuelve a abrir desde el mismo archivo.
+            db.close()
+            db =
+                Room
+                    .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
+                    .allowMainThreadQueries()
+                    .build()
+            repositorio = ActualizacionRepositorio(db, claves, contexto)
+
+            val actualizado = requireNotNull(db.canalDao().porId(original.id))
+            assertEquals(original.id, actualizado.id)
+            assertEquals("Uno HD", actualizado.nombre)
+            assertNotNull("El favorito sobrevive al reinicio", db.favoritoDao().porCanal(original.id))
+            assertEquals(ahora, requireNotNull(db.historialDao().porCanal(original.id)).fecha)
+            assertEquals(1, db.canalDao().porFuente(fuenteId).size)
+        }
+    }
+
+    private suspend fun actualizar(
+        texto: String,
+        causa: String = CausasActualizacion.MANUAL,
+    ): ResumenActualizacion {
         val importado = ImportadorM3U.importar(texto, claves.claveHmac)
-        return repositorio.actualizarConImportado(listaId, importado)
+        return repositorio.actualizarConImportado(listaId, importado, causa)
     }
 
     private suspend fun sembrarFuenteYLista() {

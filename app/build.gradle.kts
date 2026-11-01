@@ -116,7 +116,9 @@ dependencies {
 
     implementation(libs.hilt.android)
     implementation(libs.hilt.navigation.compose)
+    implementation(libs.hilt.work)
     ksp(libs.hilt.compiler)
+    ksp(libs.hilt.compiler.androidx)
 
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
@@ -128,6 +130,7 @@ dependencies {
 
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime.ktx)
 
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
@@ -135,6 +138,7 @@ dependencies {
     testImplementation(libs.room.testing)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.hilt.android.testing)
+    testImplementation(libs.androidx.work.testing)
     kspTest(libs.hilt.compiler)
 
     androidTestImplementation(libs.androidx.test.ext.junit)

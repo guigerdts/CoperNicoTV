@@ -106,13 +106,17 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
+          # Sin perfil, `avdmanager` crea un AVD de 320x640 px a densidad mdpi, que
+          # no representa ningún teléfono real y deja el catálogo sin altura útil.
+          # Se fija un perfil de teléfono real, igual que el job de TV fija el suyo.
+          profile: pixel_2
           disable-animations: true
           # El filtro es una lista explícita: toda prueba instrumentada de móvil
           # nueva debe añadirse aquí o no se ejecutará en CI. `CanarioTvTest` se
           # excluye a propósito porque corre en el job de TV.
           script: >-
             ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.BusquedaFiltrosTest,com.copernicotv.app.CatalogoUiTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.BusquedaFiltrosTest,com.copernicotv.app.CatalogoUiTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest,com.copernicotv.app.ActualizacionManualTest
       - name: Publicar reportes instrumentados
         if: always()
         uses: actions/upload-artifact@v4

@@ -128,7 +128,9 @@ class CatalogoUiTest {
 
         composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performClick()
         esperarTagAusente(PREFIJO_TAG_CANAL + 1)
-        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertExists()
+        // Paging invalida y vuelve a emitir al aplicar el filtro: comprobar la
+        // presencia sin esperar puede caer en la emisión vacía intermedia.
+        esperarTag(PREFIJO_TAG_CANAL + 0)
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performClick()
         esperarTag(TAG_ACCION_OCULTO)

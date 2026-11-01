@@ -82,6 +82,9 @@ const val TAG_ACTUALIZAR = "actualizar-lista"
 /** Etiqueta del resumen de la última Actualización manual. */
 const val TAG_RESULTADO_ACTUALIZACION = "resultado-actualizacion"
 
+/** Etiqueta del botón que abre la pantalla de Fuentes. */
+const val TAG_FUENTES = "abrir-fuentes"
+
 /** Prefijo de las etiquetas de canal del catálogo. */
 const val PREFIJO_TAG_CANAL = "canal-"
 
@@ -309,6 +312,7 @@ data class CatalogoAcciones(
     val onEliminarPerfil: (Long) -> Unit,
     val onAsociarListaAPerfil: (Long, Long) -> Unit,
     val onDesasociarListaDePerfil: (Long, Long) -> Unit,
+    val onAbrirFuentes: () -> Unit,
 )
 
 /**
@@ -499,6 +503,12 @@ private fun Controles(
             modifier = Modifier.testTag(TAG_PERFILES),
         ) {
             Text(stringResource(R.string.catalogo_perfiles))
+        }
+        TextButton(
+            onClick = acciones.onAbrirFuentes,
+            modifier = Modifier.testTag(TAG_FUENTES),
+        ) {
+            Text(stringResource(R.string.catalogo_fuentes))
         }
     }
     estado.mensaje?.let { codigo ->

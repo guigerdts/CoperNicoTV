@@ -1,0 +1,2243 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "4ff961b60db5092a2510442872109ab5",
+    "entities": [
+      {
+        "tableName": "Fuente",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nombre` TEXT NOT NULL, `estado` TEXT NOT NULL, `intervaloMinutos` INTEGER, `usarIntervaloGlobal` INTEGER NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intervaloMinutos",
+            "columnName": "intervaloMinutos",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "usarIntervaloGlobal",
+            "columnName": "usarIntervaloGlobal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Fuente_nombre",
+            "unique": true,
+            "columnNames": [
+              "nombre"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Fuente_nombre` ON `${TABLE_NAME}` (`nombre`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "Lista",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteId` INTEGER NOT NULL, `nombre` TEXT NOT NULL, `ubicacionCifrada` BLOB NOT NULL, `ubicacionHmac` BLOB NOT NULL, `esquema` TEXT NOT NULL, `orden` INTEGER NOT NULL, `estado` TEXT NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL, FOREIGN KEY(`fuenteId`) REFERENCES `Fuente`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteId",
+            "columnName": "fuenteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ubicacionCifrada",
+            "columnName": "ubicacionCifrada",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ubicacionHmac",
+            "columnName": "ubicacionHmac",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "esquema",
+            "columnName": "esquema",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "orden",
+            "columnName": "orden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Lista_fuenteId",
+            "unique": false,
+            "columnNames": [
+              "fuenteId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Lista_fuenteId` ON `${TABLE_NAME}` (`fuenteId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Fuente",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Grupo",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `listaId` INTEGER NOT NULL, `nombre` TEXT NOT NULL, FOREIGN KEY(`listaId`) REFERENCES `Lista`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listaId",
+            "columnName": "listaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Grupo_listaId_nombre",
+            "unique": true,
+            "columnNames": [
+              "listaId",
+              "nombre"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Grupo_listaId_nombre` ON `${TABLE_NAME}` (`listaId`, `nombre`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Lista",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "listaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Canal",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteId` INTEGER NOT NULL, `nombre` TEXT, `urlStreamCifrada` BLOB NOT NULL, `urlStreamHmac` BLOB NOT NULL, `logoUrlCifrada` BLOB, `logoUrlHmac` BLOB, `tvgId` TEXT, `claveCanonica` TEXT, `claveUnicidad` TEXT, `claveDerivable` INTEGER NOT NULL, `estado` TEXT NOT NULL, `atributosExtra` TEXT, `decision` TEXT, `fechaDecision` INTEGER, `evidencia` TEXT, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL, FOREIGN KEY(`fuenteId`) REFERENCES `Fuente`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteId",
+            "columnName": "fuenteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "urlStreamCifrada",
+            "columnName": "urlStreamCifrada",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "urlStreamHmac",
+            "columnName": "urlStreamHmac",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "logoUrlCifrada",
+            "columnName": "logoUrlCifrada",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "logoUrlHmac",
+            "columnName": "logoUrlHmac",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tvgId",
+            "columnName": "tvgId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "claveCanonica",
+            "columnName": "claveCanonica",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "claveUnicidad",
+            "columnName": "claveUnicidad",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "claveDerivable",
+            "columnName": "claveDerivable",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "atributosExtra",
+            "columnName": "atributosExtra",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "decision",
+            "columnName": "decision",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "fechaDecision",
+            "columnName": "fechaDecision",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "evidencia",
+            "columnName": "evidencia",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Canal_fuenteId_claveUnicidad",
+            "unique": true,
+            "columnNames": [
+              "fuenteId",
+              "claveUnicidad"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Canal_fuenteId_claveUnicidad` ON `${TABLE_NAME}` (`fuenteId`, `claveUnicidad`)"
+          },
+          {
+            "name": "index_Canal_fuenteId_claveCanonica",
+            "unique": false,
+            "columnNames": [
+              "fuenteId",
+              "claveCanonica"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Canal_fuenteId_claveCanonica` ON `${TABLE_NAME}` (`fuenteId`, `claveCanonica`)"
+          },
+          {
+            "name": "index_Canal_fuenteId_urlStreamHmac",
+            "unique": false,
+            "columnNames": [
+              "fuenteId",
+              "urlStreamHmac"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Canal_fuenteId_urlStreamHmac` ON `${TABLE_NAME}` (`fuenteId`, `urlStreamHmac`)"
+          },
+          {
+            "name": "index_Canal_fuenteId_tvgId",
+            "unique": false,
+            "columnNames": [
+              "fuenteId",
+              "tvgId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Canal_fuenteId_tvgId` ON `${TABLE_NAME}` (`fuenteId`, `tvgId`)"
+          },
+          {
+            "name": "index_Canal_nombre",
+            "unique": false,
+            "columnNames": [
+              "nombre"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Canal_nombre` ON `${TABLE_NAME}` (`nombre`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Fuente",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Apariencia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `listaId` INTEGER NOT NULL, `canalId` INTEGER NOT NULL, `grupoId` INTEGER, `orden` INTEGER NOT NULL, `groupTitle` TEXT, `tvgName` TEXT, `clavePresentacion` TEXT NOT NULL, `repeticiones` INTEGER NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL, FOREIGN KEY(`listaId`) REFERENCES `Lista`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`grupoId`) REFERENCES `Grupo`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listaId",
+            "columnName": "listaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grupoId",
+            "columnName": "grupoId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "orden",
+            "columnName": "orden",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "groupTitle",
+            "columnName": "groupTitle",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tvgName",
+            "columnName": "tvgName",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "clavePresentacion",
+            "columnName": "clavePresentacion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "repeticiones",
+            "columnName": "repeticiones",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Apariencia_listaId_canalId_clavePresentacion",
+            "unique": true,
+            "columnNames": [
+              "listaId",
+              "canalId",
+              "clavePresentacion"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Apariencia_listaId_canalId_clavePresentacion` ON `${TABLE_NAME}` (`listaId`, `canalId`, `clavePresentacion`)"
+          },
+          {
+            "name": "index_Apariencia_listaId_canalId",
+            "unique": false,
+            "columnNames": [
+              "listaId",
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Apariencia_listaId_canalId` ON `${TABLE_NAME}` (`listaId`, `canalId`)"
+          },
+          {
+            "name": "index_Apariencia_grupoId",
+            "unique": false,
+            "columnNames": [
+              "grupoId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Apariencia_grupoId` ON `${TABLE_NAME}` (`grupoId`)"
+          },
+          {
+            "name": "index_Apariencia_listaId_orden",
+            "unique": false,
+            "columnNames": [
+              "listaId",
+              "orden"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Apariencia_listaId_orden` ON `${TABLE_NAME}` (`listaId`, `orden`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Lista",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "listaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Grupo",
+            "onDelete": "SET NULL",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "grupoId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "AparienciaClavePendiente",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`aparienciaId` INTEGER NOT NULL, `clavePresentacionV2` TEXT NOT NULL, `motivo` TEXT NOT NULL, `creadaEn` INTEGER NOT NULL, `resueltaEn` INTEGER, PRIMARY KEY(`aparienciaId`), FOREIGN KEY(`aparienciaId`) REFERENCES `Apariencia`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "aparienciaId",
+            "columnName": "aparienciaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clavePresentacionV2",
+            "columnName": "clavePresentacionV2",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motivo",
+            "columnName": "motivo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadaEn",
+            "columnName": "creadaEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resueltaEn",
+            "columnName": "resueltaEn",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "aparienciaId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_AparienciaClavePendiente_clavePresentacionV2",
+            "unique": false,
+            "columnNames": [
+              "clavePresentacionV2"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_AparienciaClavePendiente_clavePresentacionV2` ON `${TABLE_NAME}` (`clavePresentacionV2`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Apariencia",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "aparienciaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Favorito",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `canalId` INTEGER NOT NULL, `creadoEn` INTEGER NOT NULL, FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Favorito_canalId",
+            "unique": true,
+            "columnNames": [
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Favorito_canalId` ON `${TABLE_NAME}` (`canalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "OcultacionCanal",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `canalId` INTEGER NOT NULL, `creadoEn` INTEGER NOT NULL, FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_OcultacionCanal_canalId",
+            "unique": true,
+            "columnNames": [
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_OcultacionCanal_canalId` ON `${TABLE_NAME}` (`canalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "OcultacionGrupo",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `grupoId` INTEGER NOT NULL, `creadoEn` INTEGER NOT NULL, FOREIGN KEY(`grupoId`) REFERENCES `Grupo`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "grupoId",
+            "columnName": "grupoId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_OcultacionGrupo_grupoId",
+            "unique": true,
+            "columnNames": [
+              "grupoId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_OcultacionGrupo_grupoId` ON `${TABLE_NAME}` (`grupoId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Grupo",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "grupoId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Historial",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `canalId` INTEGER NOT NULL, `fecha` INTEGER NOT NULL, FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fecha",
+            "columnName": "fecha",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Historial_canalId",
+            "unique": true,
+            "columnNames": [
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Historial_canalId` ON `${TABLE_NAME}` (`canalId`)"
+          },
+          {
+            "name": "index_Historial_fecha_canalId",
+            "unique": false,
+            "columnNames": [
+              "fecha",
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Historial_fecha_canalId` ON `${TABLE_NAME}` (`fecha`, `canalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Coleccion",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nombre` TEXT NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ColeccionCanal",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `coleccionId` INTEGER NOT NULL, `canalId` INTEGER NOT NULL, `posicion` INTEGER NOT NULL, FOREIGN KEY(`coleccionId`) REFERENCES `Coleccion`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "coleccionId",
+            "columnName": "coleccionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "posicion",
+            "columnName": "posicion",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ColeccionCanal_coleccionId_canalId",
+            "unique": false,
+            "columnNames": [
+              "coleccionId",
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_ColeccionCanal_coleccionId_canalId` ON `${TABLE_NAME}` (`coleccionId`, `canalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Coleccion",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "coleccionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Perfil",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nombre` TEXT NOT NULL, `nombreNormalizado` TEXT NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombreNormalizado",
+            "columnName": "nombreNormalizado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Perfil_nombreNormalizado",
+            "unique": true,
+            "columnNames": [
+              "nombreNormalizado"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Perfil_nombreNormalizado` ON `${TABLE_NAME}` (`nombreNormalizado`)"
+          }
+        ],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "PerfilLista",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`perfilId` INTEGER NOT NULL, `listaId` INTEGER NOT NULL, PRIMARY KEY(`perfilId`, `listaId`), FOREIGN KEY(`perfilId`) REFERENCES `Perfil`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`listaId`) REFERENCES `Lista`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "perfilId",
+            "columnName": "perfilId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listaId",
+            "columnName": "listaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "perfilId",
+            "listaId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_PerfilLista_listaId",
+            "unique": false,
+            "columnNames": [
+              "listaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_PerfilLista_listaId` ON `${TABLE_NAME}` (`listaId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Perfil",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "perfilId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Lista",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "listaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "FuenteGuia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `nombre` TEXT NOT NULL, `urlCifrada` BLOB, `urlHmac` BLOB, `generacionPublicadaId` INTEGER, `retencionVentanaPasadoDias` INTEGER, `retencionVentanaFuturoDias` INTEGER, `retencionMaxProgramas` INTEGER, `retencionPresupuestoBytes` INTEGER, `usarRetencionGlobal` INTEGER NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "urlCifrada",
+            "columnName": "urlCifrada",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "urlHmac",
+            "columnName": "urlHmac",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "generacionPublicadaId",
+            "columnName": "generacionPublicadaId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "retencionVentanaPasadoDias",
+            "columnName": "retencionVentanaPasadoDias",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "retencionVentanaFuturoDias",
+            "columnName": "retencionVentanaFuturoDias",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "retencionMaxProgramas",
+            "columnName": "retencionMaxProgramas",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "retencionPresupuestoBytes",
+            "columnName": "retencionPresupuestoBytes",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "usarRetencionGlobal",
+            "columnName": "usarRetencionGlobal",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "GeneracionGuia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteGuiaId` INTEGER NOT NULL, `version` TEXT NOT NULL, `estado` TEXT NOT NULL, `creadoEn` INTEGER NOT NULL, `publicadaEn` INTEGER, FOREIGN KEY(`fuenteGuiaId`) REFERENCES `FuenteGuia`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteGuiaId",
+            "columnName": "fuenteGuiaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicadaEn",
+            "columnName": "publicadaEn",
+            "affinity": "INTEGER",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_GeneracionGuia_fuenteGuiaId",
+            "unique": false,
+            "columnNames": [
+              "fuenteGuiaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_GeneracionGuia_fuenteGuiaId` ON `${TABLE_NAME}` (`fuenteGuiaId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "FuenteGuia",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteGuiaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Programa",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `generacionId` INTEGER NOT NULL, `fuenteGuiaId` INTEGER NOT NULL, `channelIdTexto` TEXT NOT NULL, `titulo` TEXT NOT NULL, `inicio` INTEGER NOT NULL, `fin` INTEGER NOT NULL, `descripcion` TEXT, FOREIGN KEY(`generacionId`) REFERENCES `GeneracionGuia`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`fuenteGuiaId`) REFERENCES `FuenteGuia`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "generacionId",
+            "columnName": "generacionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteGuiaId",
+            "columnName": "fuenteGuiaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channelIdTexto",
+            "columnName": "channelIdTexto",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "titulo",
+            "columnName": "titulo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inicio",
+            "columnName": "inicio",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fin",
+            "columnName": "fin",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descripcion",
+            "columnName": "descripcion",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Programa_generacionId_channelIdTexto_inicio",
+            "unique": false,
+            "columnNames": [
+              "generacionId",
+              "channelIdTexto",
+              "inicio"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Programa_generacionId_channelIdTexto_inicio` ON `${TABLE_NAME}` (`generacionId`, `channelIdTexto`, `inicio`)"
+          },
+          {
+            "name": "index_Programa_fuenteGuiaId_inicio",
+            "unique": false,
+            "columnNames": [
+              "fuenteGuiaId",
+              "inicio"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Programa_fuenteGuiaId_inicio` ON `${TABLE_NAME}` (`fuenteGuiaId`, `inicio`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "GeneracionGuia",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "generacionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "FuenteGuia",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteGuiaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "Asociacion",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `canalId` INTEGER NOT NULL, `fuenteGuiaId` INTEGER NOT NULL, `channelIdTexto` TEXT NOT NULL, `estado` TEXT NOT NULL, `origen` TEXT NOT NULL, `huellaVersion` INTEGER NOT NULL, `huellaValor` TEXT, `senalesFuertes` TEXT NOT NULL, `ultimaObservacion` INTEGER NOT NULL, `confirmadaEn` INTEGER, `actualizadaEn` INTEGER NOT NULL, FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`fuenteGuiaId`) REFERENCES `FuenteGuia`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteGuiaId",
+            "columnName": "fuenteGuiaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "channelIdTexto",
+            "columnName": "channelIdTexto",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "origen",
+            "columnName": "origen",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "huellaVersion",
+            "columnName": "huellaVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "huellaValor",
+            "columnName": "huellaValor",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "senalesFuertes",
+            "columnName": "senalesFuertes",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ultimaObservacion",
+            "columnName": "ultimaObservacion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confirmadaEn",
+            "columnName": "confirmadaEn",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "actualizadaEn",
+            "columnName": "actualizadaEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_Asociacion_fuenteGuiaId_channelIdTexto",
+            "unique": true,
+            "columnNames": [
+              "fuenteGuiaId",
+              "channelIdTexto"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_Asociacion_fuenteGuiaId_channelIdTexto` ON `${TABLE_NAME}` (`fuenteGuiaId`, `channelIdTexto`)"
+          },
+          {
+            "name": "index_Asociacion_canalId",
+            "unique": false,
+            "columnNames": [
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_Asociacion_canalId` ON `${TABLE_NAME}` (`canalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "FuenteGuia",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteGuiaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "EstadoActualizacion",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteId` INTEGER, `listaId` INTEGER, `causa` TEXT NOT NULL, `versionImport` TEXT NOT NULL, `inicio` INTEGER NOT NULL, `fin` INTEGER, `resultado` TEXT, FOREIGN KEY(`fuenteId`) REFERENCES `Fuente`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`listaId`) REFERENCES `Lista`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteId",
+            "columnName": "fuenteId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "listaId",
+            "columnName": "listaId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "causa",
+            "columnName": "causa",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionImport",
+            "columnName": "versionImport",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inicio",
+            "columnName": "inicio",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fin",
+            "columnName": "fin",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "resultado",
+            "columnName": "resultado",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_EstadoActualizacion_fuenteId",
+            "unique": false,
+            "columnNames": [
+              "fuenteId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_EstadoActualizacion_fuenteId` ON `${TABLE_NAME}` (`fuenteId`)"
+          },
+          {
+            "name": "index_EstadoActualizacion_listaId",
+            "unique": false,
+            "columnNames": [
+              "listaId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_EstadoActualizacion_listaId` ON `${TABLE_NAME}` (`listaId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Fuente",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Lista",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "listaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "DetalleAusencia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `estadoActualizacionId` INTEGER NOT NULL, `canalId` INTEGER, `estado` TEXT NOT NULL, `texto` TEXT NOT NULL, `creadoEn` INTEGER NOT NULL, FOREIGN KEY(`estadoActualizacionId`) REFERENCES `EstadoActualizacion`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`canalId`) REFERENCES `Canal`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estadoActualizacionId",
+            "columnName": "estadoActualizacionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "canalId",
+            "columnName": "canalId",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "texto",
+            "columnName": "texto",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_DetalleAusencia_estadoActualizacionId",
+            "unique": false,
+            "columnNames": [
+              "estadoActualizacionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_DetalleAusencia_estadoActualizacionId` ON `${TABLE_NAME}` (`estadoActualizacionId`)"
+          },
+          {
+            "name": "index_DetalleAusencia_canalId",
+            "unique": false,
+            "columnNames": [
+              "canalId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_DetalleAusencia_canalId` ON `${TABLE_NAME}` (`canalId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "EstadoActualizacion",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "estadoActualizacionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Canal",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "canalId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "EvidenciaColision",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `estadoActualizacionId` INTEGER NOT NULL, `claveCanonica` TEXT NOT NULL, `insumos` TEXT NOT NULL, `fecha` INTEGER NOT NULL, `version` TEXT NOT NULL, FOREIGN KEY(`estadoActualizacionId`) REFERENCES `EstadoActualizacion`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estadoActualizacionId",
+            "columnName": "estadoActualizacionId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "claveCanonica",
+            "columnName": "claveCanonica",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "insumos",
+            "columnName": "insumos",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fecha",
+            "columnName": "fecha",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_EvidenciaColision_estadoActualizacionId",
+            "unique": false,
+            "columnNames": [
+              "estadoActualizacionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_EvidenciaColision_estadoActualizacionId` ON `${TABLE_NAME}` (`estadoActualizacionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "EstadoActualizacion",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "estadoActualizacionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "ObservacionPendienteImportacion",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteId` INTEGER NOT NULL, `importOrigen` TEXT NOT NULL, `nombre` TEXT, `urlCifrada` BLOB, `urlHmac` BLOB, `logoUrlCifrada` BLOB, `logoUrlHmac` BLOB, `tvgId` TEXT, `grupo` TEXT, `claveCanonica` TEXT, `huellaDeclaracion` TEXT NOT NULL, `claveDeduplicacion` TEXT NOT NULL, `primeraObservacion` INTEGER NOT NULL, `ultimaObservacion` INTEGER NOT NULL, `conjuntoBc` TEXT, FOREIGN KEY(`fuenteId`) REFERENCES `Fuente`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteId",
+            "columnName": "fuenteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "importOrigen",
+            "columnName": "importOrigen",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "urlCifrada",
+            "columnName": "urlCifrada",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "urlHmac",
+            "columnName": "urlHmac",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "logoUrlCifrada",
+            "columnName": "logoUrlCifrada",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "logoUrlHmac",
+            "columnName": "logoUrlHmac",
+            "affinity": "BLOB",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tvgId",
+            "columnName": "tvgId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "grupo",
+            "columnName": "grupo",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "claveCanonica",
+            "columnName": "claveCanonica",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "huellaDeclaracion",
+            "columnName": "huellaDeclaracion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "claveDeduplicacion",
+            "columnName": "claveDeduplicacion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "primeraObservacion",
+            "columnName": "primeraObservacion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ultimaObservacion",
+            "columnName": "ultimaObservacion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "conjuntoBc",
+            "columnName": "conjuntoBc",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_ObservacionPendienteImportacion_fuenteId_claveDeduplicacion",
+            "unique": true,
+            "columnNames": [
+              "fuenteId",
+              "claveDeduplicacion"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_ObservacionPendienteImportacion_fuenteId_claveDeduplicacion` ON `${TABLE_NAME}` (`fuenteId`, `claveDeduplicacion`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Fuente",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "CacheM3U",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteId` INTEGER NOT NULL, `listaId` INTEGER NOT NULL, `urlCifrada` BLOB NOT NULL, `urlHmac` BLOB NOT NULL, `tipo` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, `expiresAt` INTEGER NOT NULL, `tamanoBytes` INTEGER NOT NULL, `estadoFrescura` TEXT NOT NULL, `archivoRef` TEXT NOT NULL, FOREIGN KEY(`fuenteId`) REFERENCES `Fuente`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`listaId`) REFERENCES `Lista`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteId",
+            "columnName": "fuenteId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "listaId",
+            "columnName": "listaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "urlCifrada",
+            "columnName": "urlCifrada",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "urlHmac",
+            "columnName": "urlHmac",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipo",
+            "columnName": "tipo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAt",
+            "columnName": "expiresAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tamanoBytes",
+            "columnName": "tamanoBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estadoFrescura",
+            "columnName": "estadoFrescura",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivoRef",
+            "columnName": "archivoRef",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_CacheM3U_fuenteId_listaId_tipo_urlHmac",
+            "unique": true,
+            "columnNames": [
+              "fuenteId",
+              "listaId",
+              "tipo",
+              "urlHmac"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_CacheM3U_fuenteId_listaId_tipo_urlHmac` ON `${TABLE_NAME}` (`fuenteId`, `listaId`, `tipo`, `urlHmac`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "Fuente",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "Lista",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "listaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "CacheXmltv",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `fuenteGuiaId` INTEGER NOT NULL, `urlCifrada` BLOB NOT NULL, `urlHmac` BLOB NOT NULL, `tipo` TEXT NOT NULL, `fetchedAt` INTEGER NOT NULL, `expiresAt` INTEGER NOT NULL, `tamanoBytes` INTEGER NOT NULL, `estadoFrescura` TEXT NOT NULL, `archivoRef` TEXT NOT NULL, FOREIGN KEY(`fuenteGuiaId`) REFERENCES `FuenteGuia`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fuenteGuiaId",
+            "columnName": "fuenteGuiaId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "urlCifrada",
+            "columnName": "urlCifrada",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "urlHmac",
+            "columnName": "urlHmac",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipo",
+            "columnName": "tipo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fetchedAt",
+            "columnName": "fetchedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAt",
+            "columnName": "expiresAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tamanoBytes",
+            "columnName": "tamanoBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estadoFrescura",
+            "columnName": "estadoFrescura",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "archivoRef",
+            "columnName": "archivoRef",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_CacheXmltv_fuenteGuiaId_tipo_urlHmac",
+            "unique": true,
+            "columnNames": [
+              "fuenteGuiaId",
+              "tipo",
+              "urlHmac"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_CacheXmltv_fuenteGuiaId_tipo_urlHmac` ON `${TABLE_NAME}` (`fuenteGuiaId`, `tipo`, `urlHmac`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "FuenteGuia",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "fuenteGuiaId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "EstadoIndiceHmac",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `estado` TEXT NOT NULL, `versionActiva` TEXT NOT NULL, `versionObjetivo` TEXT, `iniciadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL, `filasTotales` INTEGER NOT NULL, `filasReconstruidas` INTEGER NOT NULL, `filasPendientes` INTEGER NOT NULL, `ultimoErrorTipo` TEXT, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estado",
+            "columnName": "estado",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionActiva",
+            "columnName": "versionActiva",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionObjetivo",
+            "columnName": "versionObjetivo",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "iniciadoEn",
+            "columnName": "iniciadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filasTotales",
+            "columnName": "filasTotales",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filasReconstruidas",
+            "columnName": "filasReconstruidas",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filasPendientes",
+            "columnName": "filasPendientes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ultimoErrorTipo",
+            "columnName": "ultimoErrorTipo",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "HmacPendiente",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `entidad` TEXT NOT NULL, `entidadId` INTEGER NOT NULL, `columna` TEXT NOT NULL, `versionOrigen` TEXT NOT NULL, `motivo` TEXT NOT NULL, `creadoEn` INTEGER NOT NULL, `actualizadoEn` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entidad",
+            "columnName": "entidad",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "entidadId",
+            "columnName": "entidadId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "columna",
+            "columnName": "columna",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionOrigen",
+            "columnName": "versionOrigen",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motivo",
+            "columnName": "motivo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creadoEn",
+            "columnName": "creadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actualizadoEn",
+            "columnName": "actualizadoEn",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_HmacPendiente_entidad_entidadId_columna",
+            "unique": true,
+            "columnNames": [
+              "entidad",
+              "entidadId",
+              "columna"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_HmacPendiente_entidad_entidadId_columna` ON `${TABLE_NAME}` (`entidad`, `entidadId`, `columna`)"
+          }
+        ],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4ff961b60db5092a2510442872109ab5')"
+    ]
+  }
+}

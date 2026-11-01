@@ -43,23 +43,24 @@ internal object DatosActualizacion {
     fun causa(datos: Data): String? = datos.getString(CLAVE_CAUSA)
 
     /** Resúmenes publicados por la ejecución; vacío si no publicó ninguno. */
-    fun resumenes(datos: Data): List<ResumenActualizacion> =
-        datos.getString(CLAVE_RESUMENES)?.let(::decodificar).orEmpty()
+    fun resumenes(datos: Data): List<ResumenActualizacion> = datos.getString(CLAVE_RESUMENES)?.let(::decodificar).orEmpty()
 
-    private fun codificar(resumenes: List<ResumenActualizacion>): String =
-        (listOf(VERSION) +
-            resumenes.map { resumen ->
-                listOf(
-                    resumen.listaId,
-                    resumen.resultado,
-                    resumen.nuevas,
-                    resumen.actualizadas,
-                    resumen.ausentes,
-                    resumen.ambiguas,
-                    resumen.observaciones,
-                    resumen.error.orEmpty(),
-                ).joinToString(SEPARADOR_CAMPO)
-            }).joinToString(SEPARADOR_REGISTRO)
+    private fun codificar(resumenes: List<ResumenActualizacion>): String {
+        val registros = resumenes.map(::codificarRegistro)
+        return (listOf(VERSION) + registros).joinToString(SEPARADOR_REGISTRO)
+    }
+
+    private fun codificarRegistro(resumen: ResumenActualizacion): String =
+        listOf(
+            resumen.listaId,
+            resumen.resultado,
+            resumen.nuevas,
+            resumen.actualizadas,
+            resumen.ausentes,
+            resumen.ambiguas,
+            resumen.observaciones,
+            resumen.error.orEmpty(),
+        ).joinToString(SEPARADOR_CAMPO)
 
     private fun decodificar(texto: String): List<ResumenActualizacion> {
         val registros = texto.split(SEPARADOR_REGISTRO)
@@ -73,15 +74,15 @@ internal object DatosActualizacion {
         val listaId = campos[0].toLongOrNull() ?: return null
         val cifras = campos.subList(2, CAMPOS_POR_REGISTRO - 1).map { it.toIntOrNull() }
         if (cifras.any { it == null }) return null
-        val (nuevas, actualizadas, ausentes, ambiguas, observaciones) = cifras.filterNotNull()
+        val numeros = cifras.filterNotNull()
         return ResumenActualizacion(
             listaId = listaId,
             resultado = campos[1],
-            nuevas = nuevas,
-            actualizadas = actualizadas,
-            ausentes = ausentes,
-            ambiguas = ambiguas,
-            observaciones = observaciones,
+            nuevas = numeros[0],
+            actualizadas = numeros[1],
+            ausentes = numeros[2],
+            ambiguas = numeros[3],
+            observaciones = numeros[4],
             error = campos[7].ifEmpty { null },
         )
     }

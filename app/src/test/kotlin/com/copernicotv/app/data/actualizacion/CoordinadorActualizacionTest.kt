@@ -220,8 +220,7 @@ class CoordinadorActualizacionTest {
         }
     }
 
-    private fun exito(listaId: Long): ResumenActualizacion =
-        ResumenActualizacion(listaId = listaId, resultado = "completada", nuevas = 1)
+    private fun exito(listaId: Long): ResumenActualizacion = ResumenActualizacion(listaId = listaId, resultado = "completada", nuevas = 1)
 
     private fun fallo(
         listaId: Long,

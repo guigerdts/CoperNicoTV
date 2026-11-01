@@ -245,11 +245,9 @@ class ProgramadorWorkManagerTest {
         )
     }
 
-    private fun periodico(fuenteId: Long): WorkInfo =
-        infos(ProgramadorWorkManager.nombrePeriodico(fuenteId)).single()
+    private fun periodico(fuenteId: Long): WorkInfo = infos(ProgramadorWorkManager.nombrePeriodico(fuenteId)).single()
 
-    private fun infos(nombre: String): List<WorkInfo> =
-        WorkManager.getInstance(contexto).getWorkInfosForUniqueWork(nombre).get()
+    private fun infos(nombre: String): List<WorkInfo> = WorkManager.getInstance(contexto).getWorkInfosForUniqueWork(nombre).get()
 
     private val WorkInfo.repeatIntervalMillis: Long
         get() = checkNotNull(periodicityInfo) { "El trabajo no es periódico" }.repeatIntervalMillis

@@ -105,9 +105,7 @@ object ModuloActualizacion {
      */
     @Provides
     @Singleton
-    fun actualizadorLista(
-        repositorio: ActualizacionRepositorio,
-    ): ActualizadorLista =
+    fun actualizadorLista(repositorio: ActualizacionRepositorio): ActualizadorLista =
         ActualizadorLista { listaId, causa -> repositorio.actualizarLista(listaId, causa) }
 }
 

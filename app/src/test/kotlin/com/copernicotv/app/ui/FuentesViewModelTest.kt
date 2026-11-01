@@ -137,8 +137,7 @@ private class ProgramadorFalso(
 ) : ProgramadorActualizaciones {
     override fun observar(): Flow<Map<Long, EstadoSolicitud>> = estados
 
-    override fun observarLista(listaId: Long): Flow<EstadoSolicitud> =
-        estados.map { it[listaId] ?: EstadoSolicitud() }
+    override fun observarLista(listaId: Long): Flow<EstadoSolicitud> = estados.map { it[listaId] ?: EstadoSolicitud() }
 
     override suspend fun solicitarLista(listaId: Long) = alSolicitar(listaId)
 

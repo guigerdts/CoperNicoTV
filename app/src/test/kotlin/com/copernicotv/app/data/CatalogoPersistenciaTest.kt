@@ -108,6 +108,7 @@ class CatalogoPersistenciaTest {
                     ColeccionRepositorio(db),
                     PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),
                     HistorialRepositorio(db),
+                    ActualizacionRepositorio(db, claves, contexto),
                 )
             val estado = withTimeout(TIEMPO_ESPERA) { viewModel.estado.first { it.canales.size == 3 } }
 

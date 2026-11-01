@@ -2,15 +2,16 @@ package com.copernicotv.app.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.copernicotv.app.data.EjecutorActualizacionFuente
 import com.copernicotv.app.data.IndicadoresFuente
 import com.copernicotv.app.data.IndicadoresFuenteRepositorio
+import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,32 +29,34 @@ data class FuentesUiState(
  * Mantiene separados los tres indicadores de S7: [IndicadoresFuente.cargando]
  * refleja una Actualización en curso, [IndicadoresFuente.actualizacion] el
  * último intento completado y [IndicadoresFuente.disponibilidad] el catálogo
- * persistido. `cargando` vuelve a `false` al terminar tanto en éxito como en
- * fallo, porque vive en el `finally` de la corrutina.
+ * persistido.
+ *
+ * `cargando` ya no vive en un conjunto en memoria: se deriva del estado del
+ * trabajo de WorkManager. Así vuelve a `false` también cuando el proceso se
+ * recrea a mitad de una ejecución, y sigue siendo `false` cuando el intento
+ * terminó en fallo (S7a). `actualizacion` y `disponibilidad` siguen viniendo de
+ * Room y no dependen del trabajo.
  */
 @HiltViewModel
 class FuentesViewModel
     @Inject
     constructor(
         private val repositorio: IndicadoresFuenteRepositorio,
-        private val ejecutor: EjecutorActualizacionFuente,
+        private val programador: ProgramadorActualizaciones,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(FuentesUiState())
         val estado: StateFlow<FuentesUiState> = _estado.asStateFlow()
 
-        /** Fuentes con una Actualización en curso. Solo se toca desde el hilo principal. */
-        private val enCurso = mutableSetOf<Long>()
-
         init {
             viewModelScope.launch {
                 try {
-                    repositorio.observar().collect { fuentes ->
+                    combine(repositorio.observar(), programador.observar()) { fuentes, trabajos ->
+                        fuentes.map { fuente ->
+                            fuente.copy(cargando = trabajos[fuente.fuenteId]?.enCurso == true)
+                        }
+                    }.collect { fuentes ->
                         _estado.update { actual ->
-                            actual.copy(
-                                cargando = false,
-                                fuentes = fuentes.conCargando(enCurso),
-                                error = null,
-                            )
+                            actual.copy(cargando = false, fuentes = fuentes, error = null)
                         }
                     }
                 } catch (cancelacion: CancellationException) {
@@ -64,44 +67,24 @@ class FuentesViewModel
             }
         }
 
-        /** Actualiza todas las Listas de la Fuente; ignora la repetición mientras corre. */
+        /**
+         * Encola la Actualización manual de la Fuente (DC-07 punto 6).
+         *
+         * No espera a que termine: el progreso y el resultado llegan por los
+         * flujos observados. Un trabajo ya encolado para la misma Fuente no se
+         * duplica porque el nombre único lo impide.
+         */
         fun actualizar(fuenteId: Long) {
-            if (!enCurso.add(fuenteId)) return
-            marcarCargando(fuenteId, cargando = true)
             viewModelScope.launch {
                 try {
-                    ejecutor.actualizarFuente(fuenteId)
+                    programador.solicitarFuente(fuenteId)
                 } catch (cancelacion: CancellationException) {
                     throw cancelacion
                 } catch (_: Exception) {
                     _estado.update { it.copy(error = ERROR_ACTUALIZACION) }
-                } finally {
-                    enCurso.remove(fuenteId)
-                    marcarCargando(fuenteId, cargando = false)
                 }
             }
         }
-
-        private fun marcarCargando(
-            fuenteId: Long,
-            cargando: Boolean,
-        ) {
-            _estado.update { actual ->
-                actual.copy(
-                    fuentes =
-                        actual.fuentes.map { fuente ->
-                            if (fuente.fuenteId == fuenteId) {
-                                fuente.copy(cargando = cargando)
-                            } else {
-                                fuente
-                            }
-                        },
-                )
-            }
-        }
-
-        private fun List<IndicadoresFuente>.conCargando(ids: Set<Long>): List<IndicadoresFuente> =
-            map { fuente -> fuente.copy(cargando = fuente.fuenteId in ids) }
 
         private companion object {
             const val ERROR_CARGA = "fuentes_carga_fallida"

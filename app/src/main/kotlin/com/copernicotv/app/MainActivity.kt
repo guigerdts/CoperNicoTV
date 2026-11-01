@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.copernicotv.app.data.actualizacion.InicializadorActualizaciones
 import com.copernicotv.app.ui.CatalogoAcciones
 import com.copernicotv.app.ui.CatalogoScreen
 import com.copernicotv.app.ui.CatalogoViewModel
@@ -22,6 +23,7 @@ import com.copernicotv.app.ui.FuentesScreen
 import com.copernicotv.app.ui.FuentesViewModel
 import com.copernicotv.app.ui.PerfilesUiState
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /** Pantallas de la actividad única. */
 private enum class Pantalla { CATALOGO, FUENTES }
@@ -29,8 +31,14 @@ private enum class Pantalla { CATALOGO, FUENTES }
 /** Única actividad del canario de E1-C. */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject
+    lateinit var inicializador: InicializadorActualizaciones
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Reconciliación de programaciones de DC-07 punto 5. Es idempotente por
+        // proceso, así que una recreación de la Activity no la repite.
+        inicializador.iniciar()
         setContent {
             CoperNicoTheme {
                 var pantalla by rememberSaveable { mutableStateOf(Pantalla.CATALOGO) }

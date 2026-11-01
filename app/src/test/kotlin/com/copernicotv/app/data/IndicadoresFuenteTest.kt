@@ -7,7 +7,6 @@ import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
-import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.m3u.ImportadorM3U
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -84,16 +83,19 @@ class IndicadoresFuenteTest {
             actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.claveHmac))
             assertEquals(DisponibilidadFuente.DISPONIBLE, indicadores.observar().first().single().disponibilidad)
 
-            // La ubicación es un `content://` que no existe: falla sin red y sin
-            // tocar el catálogo, igual que un documento inaccesible real.
+            // La ubicación cifrada de la Lista está corrupta: `leer` falla antes
+            // de tocar la red o el catálogo. Se usa este fallo determinista
+            // porque el ContentResolver de Robolectric no modela un documento
+            // inaccesible: lanza `UnsupportedOperationException` en vez de una
+            // `IOException` y el repositorio solo captura la segunda.
             val resumen = actualizacion.actualizarLista(listaId)
             assertEquals("fallida", resumen.resultado)
-            assertEquals("archivo_inaccesible", resumen.error)
+            assertEquals("ubicacion_invalida", resumen.error)
 
             val indicador = indicadores.observar().first().single()
 
             assertFalse("El fallo queda registrado como intento fallido", indicador.actualizacion?.exito == true)
-            assertEquals("archivo_inaccesible", indicador.actualizacion?.causa)
+            assertEquals("ubicacion_invalida", indicador.actualizacion?.causa)
             assertEquals("El fallo no altera la disponibilidad", DisponibilidadFuente.DISPONIBLE, indicador.disponibilidad)
             assertEquals("El catálogo persiste", 1, db.canalDao().contarPorFuente(fuenteId))
         }
@@ -127,12 +129,10 @@ class IndicadoresFuenteTest {
                 ListaEntity(
                     fuenteId = fuenteId,
                     nombre = "Lista",
-                    ubicacionCifrada =
-                        CifradoAes.cifrar(
-                            claves.claveAes,
-                            CifradoAes.aad("Lista", "ubicacion_cifrada"),
-                            "content://prueba/lista.m3u".toByteArray(),
-                        ),
+                    // Sobre vacío: la ubicación cifrada no se puede descifrar.
+                    // S7b no lee la ubicación (usa el camino con importado) y
+                    // S7c necesita un fallo de lectura determinista.
+                    ubicacionCifrada = ByteArray(0),
                     ubicacionHmac = ByteArray(32),
                     esquema = "content",
                     orden = 0,

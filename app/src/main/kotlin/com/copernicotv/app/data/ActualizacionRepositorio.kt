@@ -486,7 +486,7 @@ class ActualizacionRepositorio
                     nombre = declaracion.nombre,
                     urlCifrada = cifrar(declaracion.urlOriginal, "ObservacionPendienteImportacion", "url_cifrada"),
                     urlHmac = declaracion.urlStreamHmac.toByteArray(Charsets.UTF_8),
-                    logoUrlCifrada = cifrarLogo(declaracion.logoOriginal),
+                    logoUrlCifrada = cifrarLogoObservacion(declaracion.logoOriginal),
                     logoUrlHmac = declaracion.logoHmac?.toByteArray(Charsets.UTF_8),
                     tvgId = declaracion.tvgId,
                     grupo = declaracion.apariencias.firstOrNull()?.groupTitle,
@@ -629,6 +629,9 @@ class ActualizacionRepositorio
             )
 
         private fun cifrarLogo(logo: String?): ByteArray? = logo?.let { cifrar(it, "Canal", "logo_url_cifrada") }
+
+        private fun cifrarLogoObservacion(logo: String?): ByteArray? =
+            logo?.let { cifrar(it, "ObservacionPendienteImportacion", "logo_url_cifrada") }
 
         private fun huellaDe(canal: CanalImportadoM3U): String =
             sha256Hex(

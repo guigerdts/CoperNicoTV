@@ -2,11 +2,14 @@ package com.copernicotv.app.data
 
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
+import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.app.data.db.entities.GrupoEntity
 import com.copernicotv.app.data.db.entities.ObservacionPendienteImportacionEntity
+import com.copernicotv.core.crypto.CifradoAes
+import com.copernicotv.core.crypto.ResultadoDescifrado
 import com.copernicotv.core.identity.ClaveCanal
 import com.copernicotv.core.identity.ClavePresentacion
 import com.copernicotv.core.identity.EstadoCanal
@@ -45,12 +48,18 @@ sealed interface ResultadoResolucionObservacion {
  *
  * Cada resolución corre en una única transacción. Si la clave final choca con
  * una fila ajena, la transacción se revierte y la Observación se conserva.
+ *
+ * Las columnas URL de la Observación se cifran con su propio AAD (DC-04). Al
+ * promover o asignar, el valor se descifra y se vuelve a cifrar con el AAD de
+ * `Canal`, porque el AAD impide mover un sobre entre columnas. Si el sobre no
+ * se puede descifrar, la resolución se rechaza y nada cambia.
  */
 @Singleton
 class ObservacionRepositorio
     @Inject
     constructor(
         private val db: AppDatabase,
+        private val claves: ClavesApp,
     ) {
         private val escritorCanales = CanalEscritor(db)
         private val escritorApariencias = AparienciaEscritor(db)
@@ -97,6 +106,20 @@ class ObservacionRepositorio
                     }
                     val ahora = Instant.now()
                     val clave = claveDe(observacion, canal.fuenteId)
+                    val urlNueva =
+                        if (observacion.urlCifrada == null) {
+                            canal.urlStreamCifrada
+                        } else {
+                            reCifrar(observacion.urlCifrada, AAD_OBSERVACION_URL, AAD_CANAL_URL)
+                                ?: return@withTransaction ResultadoResolucionObservacion.Rechazada(CODIGO_DESCIFRADO_FALLIDO)
+                        }
+                    val logoNuevo =
+                        if (observacion.logoUrlCifrada == null) {
+                            canal.logoUrlCifrada
+                        } else {
+                            reCifrar(observacion.logoUrlCifrada, AAD_OBSERVACION_LOGO, AAD_CANAL_LOGO)
+                                ?: return@withTransaction ResultadoResolucionObservacion.Rechazada(CODIGO_DESCIFRADO_FALLIDO)
+                        }
                     val actualizada =
                         canal.copy(
                             nombre = observacion.nombre,
@@ -105,10 +128,10 @@ class ObservacionRepositorio
                             claveUnicidad = clave,
                             claveDerivable = observacion.claveCanonica != null,
                             estado = EstadoCanal.A,
-                            urlStreamCifrada = observacion.urlCifrada ?: canal.urlStreamCifrada,
+                            urlStreamCifrada = urlNueva,
                             urlStreamHmac = observacion.urlHmac ?: canal.urlStreamHmac,
-                            logoUrlCifrada = observacion.logoUrlCifrada,
-                            logoUrlHmac = observacion.logoUrlHmac,
+                            logoUrlCifrada = logoNuevo,
+                            logoUrlHmac = observacion.logoUrlHmac ?: canal.logoUrlHmac,
                             evidencia = evidenciaDe(observacionId),
                             decision = DECISION_ASIGNADA,
                             fechaDecision = ahora,
@@ -153,14 +176,24 @@ class ObservacionRepositorio
                     }
                     val ahora = Instant.now()
                     val clave = claveDe(observacion, observacion.fuenteId)
+                    val urlCanal =
+                        reCifrar(urlCifrada, AAD_OBSERVACION_URL, AAD_CANAL_URL)
+                            ?: return@withTransaction ResultadoResolucionObservacion.Rechazada(CODIGO_DESCIFRADO_FALLIDO)
+                    val logoCanal =
+                        if (observacion.logoUrlCifrada == null) {
+                            null
+                        } else {
+                            reCifrar(observacion.logoUrlCifrada, AAD_OBSERVACION_LOGO, AAD_CANAL_LOGO)
+                                ?: return@withTransaction ResultadoResolucionObservacion.Rechazada(CODIGO_DESCIFRADO_FALLIDO)
+                        }
                     val canalId =
                         escritorCanales.insertar(
                             CanalEntity(
                                 fuenteId = observacion.fuenteId,
                                 nombre = observacion.nombre,
-                                urlStreamCifrada = urlCifrada,
+                                urlStreamCifrada = urlCanal,
                                 urlStreamHmac = urlHmac,
-                                logoUrlCifrada = observacion.logoUrlCifrada,
+                                logoUrlCifrada = logoCanal,
                                 logoUrlHmac = observacion.logoUrlHmac,
                                 tvgId = observacion.tvgId,
                                 claveCanonica = observacion.claveCanonica,
@@ -237,6 +270,23 @@ class ObservacionRepositorio
 
         private fun evidenciaDe(observacionId: Long): String = "observacion:v1;id=$observacionId"
 
+        /**
+         * Descifra un sobre de la Observación y lo vuelve a cifrar para `Canal`.
+         *
+         * Devuelve `null` si el sobre no se puede descifrar con la clave y el AAD
+         * de origen; el llamador debe rechazar la resolución sin escribir nada.
+         */
+        private fun reCifrar(
+            sobre: ByteArray,
+            aadOrigen: String,
+            aadDestino: String,
+        ): ByteArray? {
+            val claro =
+                (CifradoAes.descifrar(claves.claveAes, aadOrigen, sobre) as? ResultadoDescifrado.Ok)?.bytes
+                    ?: return null
+            return CifradoAes.cifrar(claves.claveAes, aadDestino, claro)
+        }
+
         private suspend fun resolverConConflicto(bloque: suspend () -> ResultadoResolucionObservacion): ResultadoResolucionObservacion =
             try {
                 bloque()
@@ -253,6 +303,14 @@ class ObservacionRepositorio
             const val CODIGO_FUENTE_DISTINTA: String = "fuente_distinta"
             const val CODIGO_URL_AUSENTE: String = "url_ausente"
             const val CODIGO_CLAVE_EN_CONFLICTO: String = "clave_en_conflicto"
+            const val CODIGO_DESCIFRADO_FALLIDO: String = "descifrado_fallido"
             const val DECISION_ASIGNADA: String = "observacion_asignada"
+
+            private val AAD_OBSERVACION_URL: String =
+                CifradoAes.aad("ObservacionPendienteImportacion", "url_cifrada")
+            private val AAD_OBSERVACION_LOGO: String =
+                CifradoAes.aad("ObservacionPendienteImportacion", "logo_url_cifrada")
+            private val AAD_CANAL_URL: String = CifradoAes.aad("Canal", "url_stream_cifrada")
+            private val AAD_CANAL_LOGO: String = CifradoAes.aad("Canal", "logo_url_cifrada")
         }
     }

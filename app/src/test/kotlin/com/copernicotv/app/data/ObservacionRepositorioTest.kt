@@ -55,7 +55,7 @@ class ObservacionRepositorioTest {
                 .allowMainThreadQueries()
                 .build()
         actualizacion = ActualizacionRepositorio(db, claves, contexto)
-        resolucion = ObservacionRepositorio(db)
+        resolucion = ObservacionRepositorio(db, claves)
         runBlocking { sembrarFuenteYLista() }
     }
 
@@ -82,7 +82,7 @@ class ObservacionRepositorioTest {
                 ImportadorM3U.importar(
                     """
                     #EXTM3U
-                    #EXTINF:-1 tvg-id="nuevo" group-title="G",Uno
+                    #EXTINF:-1 tvg-id="nuevo" group-title="G" tvg-logo="https://example.com/logo.png",Uno
                     https://example.com/uno
                     """.trimIndent(),
                     claves.claveHmac,
@@ -111,6 +111,7 @@ class ObservacionRepositorioTest {
             assertEquals("tvg:v1:nuevo", promovido.claveUnicidad)
             assertEquals("Uno", promovido.nombre)
             assertEquals("https://example.com/uno", descifrar(promovido.urlStreamCifrada))
+            assertEquals("https://example.com/logo.png", descifrarLogo(requireNotNull(promovido.logoUrlCifrada)))
             assertEquals(1, db.aparienciaDao().porCanalEnLista(listaId, promovido.id).size)
             assertEquals(0, db.observacionPendienteDao().contarPorFuente(fuenteId))
             assertEquals(2, db.canalDao().contarPorFuente(fuenteId))
@@ -124,7 +125,7 @@ class ObservacionRepositorioTest {
             actualizar(
                 """
                 #EXTM3U
-                #EXTINF:-1 tvg-id="uno" group-title="G",Uno
+                #EXTINF:-1 tvg-id="uno" group-title="G" tvg-logo="https://example.com/uno.png",Uno
                 https://example.com/uno
                 """.trimIndent(),
             )
@@ -162,6 +163,7 @@ class ObservacionRepositorioTest {
             assertEquals(reaparecida.canales.single().claveCanonica, resuelto.claveUnicidad)
             assertEquals("Uno", resuelto.nombre)
             assertEquals("https://example.com/uno?x=1", descifrar(resuelto.urlStreamCifrada))
+            assertEquals("https://example.com/uno.png", descifrarLogo(requireNotNull(resuelto.logoUrlCifrada)))
             assertEquals(ObservacionRepositorio.DECISION_ASIGNADA, resuelto.decision)
             assertTrue(requireNotNull(resuelto.evidencia).startsWith("observacion:v1;id="))
             assertNotNull(db.favoritoDao().porCanal(original.id))
@@ -188,6 +190,30 @@ class ObservacionRepositorioTest {
             val resultado = resolucion.asignarComoEvidencia(9999L, 1L)
             assertEquals(ResultadoResolucionObservacion.Rechazada("observacion_no_existe"), resultado)
             assertEquals(0, db.observacionPendienteDao().contar())
+        }
+    }
+
+    @Test
+    fun `asignar una observacion con url ilegible no modifica el canal`() {
+        runBlocking {
+            val observacionId = crearObservacionConB()
+            val antes = requireNotNull(db.canalDao().porFuente(fuenteId).single())
+            val observacion = requireNotNull(db.observacionPendienteDao().porId(observacionId))
+            db.observacionPendienteDao().actualizar(
+                observacion.copy(urlCifrada = byteArrayOf(CifradoAes.VERSION) + ByteArray(40) { 0x7F }),
+            )
+
+            val resultado = resolucion.asignarComoEvidencia(observacionId, antes.id)
+
+            assertEquals(
+                ResultadoResolucionObservacion.Rechazada(ObservacionRepositorio.CODIGO_DESCIFRADO_FALLIDO),
+                resultado,
+            )
+            val despues = requireNotNull(db.canalDao().porId(antes.id))
+            assertEquals(antes.estado, despues.estado)
+            assertEquals(antes.claveUnicidad, despues.claveUnicidad)
+            assertEquals(antes.urlStreamCifrada.toList(), despues.urlStreamCifrada.toList())
+            assertEquals(1, db.observacionPendienteDao().contarPorFuente(fuenteId))
         }
     }
 
@@ -254,6 +280,16 @@ class ObservacionRepositorioTest {
             CifradoAes.descifrar(
                 claves.claveAes,
                 CifradoAes.aad("Canal", "url_stream_cifrada"),
+                cifrado,
+            )
+        return (resultado as ResultadoDescifrado.Ok).bytes.toString(Charsets.UTF_8)
+    }
+
+    private fun descifrarLogo(cifrado: ByteArray): String {
+        val resultado =
+            CifradoAes.descifrar(
+                claves.claveAes,
+                CifradoAes.aad("Canal", "logo_url_cifrada"),
                 cifrado,
             )
         return (resultado as ResultadoDescifrado.Ok).bytes.toString(Charsets.UTF_8)

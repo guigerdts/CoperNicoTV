@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.copernicotv.app.data.db.dao.AparienciaDao
+import com.copernicotv.app.data.db.dao.AsociacionDao
 import com.copernicotv.app.data.db.dao.CacheM3UDao
 import com.copernicotv.app.data.db.dao.CacheXmltvDao
 import com.copernicotv.app.data.db.dao.CanalDao
@@ -15,6 +16,7 @@ import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
 import com.copernicotv.app.data.db.dao.EvidenciaColisionDao
 import com.copernicotv.app.data.db.dao.FavoritoDao
 import com.copernicotv.app.data.db.dao.FuenteDao
+import com.copernicotv.app.data.db.dao.FuenteGuiaDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
@@ -107,6 +109,8 @@ abstract class AppDatabase : RoomDatabase() {
 
     abstract fun fuenteDao(): FuenteDao
 
+    abstract fun fuenteGuiaDao(): FuenteGuiaDao
+
     abstract fun listaDao(): ListaDao
 
     abstract fun grupoDao(): GrupoDao
@@ -118,6 +122,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cacheXmltvDao(): CacheXmltvDao
 
     abstract fun aparienciaDao(): AparienciaDao
+
+    abstract fun asociacionDao(): AsociacionDao
 
     abstract fun coleccionDao(): ColeccionDao
 

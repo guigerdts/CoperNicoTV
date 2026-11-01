@@ -27,6 +27,16 @@ interface AparienciaDao {
         canalId: Long,
     ): List<AparienciaEntity>
 
+    /** Todas las Apariencias de un Canal, de cualquier Lista (fusión de Canales). */
+    @Query("SELECT * FROM Apariencia WHERE canalId = :canalId ORDER BY listaId, clavePresentacion, id")
+    suspend fun porCanal(canalId: Long): List<AparienciaEntity>
+
+    @Query("UPDATE Apariencia SET canalId = :canalId WHERE id = :id")
+    suspend fun actualizarCanal(
+        id: Long,
+        canalId: Long,
+    ): Int
+
     @Query("DELETE FROM Apariencia WHERE id = :id")
     suspend fun eliminar(id: Long): Int
 

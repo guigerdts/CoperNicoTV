@@ -3081,3 +3081,25 @@ El mismo run `41286393001` dejó `static-analysis` en rojo por una causa ajena a
 **Validación real.** Run `41304729736` sobre `483c801`: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` verdes; `p1-performance` y `p1-android` omitidos por diseño. `instrumented-mobile` ejecutó 28 pruebas con `ActualizacionManualTest` incluida en el filtro y `BUILD SUCCESSFUL`; `TV emulator trial` `41304730015` verde.
 
 **Estado.** E4-T4/T5 cerradas con CI verde. E4-T6 implementada y validada: el camino manual completo, incluido el resumen de Actualización, corre en el job móvil. E4-T7/T8 siguen pendientes. No se inicia E5, E6 ni E7. No se declara el MVP terminado.
+
+### L63 — E4-T8: indicadores de Fuente y pantalla de Fuentes (2026-11-01)
+
+Se continúa E4 sobre `feat/e1-bootstrap` sin tocar `main` (`d419fdf`).
+
+**Indicadores (S7).** `IndicadoresFuente` y `IndicadoresFuenteRepositorioRoom` (`app/data`) combinan cuatro flujos de solo lectura: Fuentes, Listas, intentos cerrados y conteo de Canales por Fuente. `cargando` es estado del ViewModel y vuelve a `false` al terminar el intento, con éxito o sin él. `actualizacion` es el último intento completado y conserva la causa del fallo. `disponibilidad` se deriva del catálogo persistido (Fuente con al menos un Canal → `DISPONIBLE`; si no, `SIN_CONTENIDO`) y no del resultado de la Actualización. Las consultas nuevas viven en `IndicadoresFuenteDao`, de solo lectura, para no ampliar los DAOs del catálogo.
+
+**Pantalla y navegación.** `FuentesViewModel` expone `FuentesUiState` y una guardia `enCurso` por Fuente; `FuentesScreen` muestra los tres indicadores y el disparador de Actualización con tags estables. `MainActivity` navega entre Catálogo y Fuentes con `rememberSaveable` y un `enum` local, sin dependencias nuevas; `Controles` del Catálogo suma el acceso a Fuentes.
+
+**Pruebas.** `IndicadoresFuenteTest` cubre S7b/S7c/S7d sobre Room en memoria; `FuentesViewModelTest` cubre el estado de carga y la guardia; `FuentesUiTest` recorre la pantalla real en el emulador y verifica que una Actualización correcta no altera la disponibilidad. `FuentesUiTest` se agregó al filtro explícito del job móvil.
+
+**Tres commits.** `966e174` modelo de lectura y DAO; `435f805` pantalla, ViewModel y navegación; `9bae58d` pruebas y alta en CI.
+
+**Fallos del primer run y correcciones.** El run `41317464904` sobre `9bae58d` dejó `jvm-tests` e `instrumented-mobile` en rojo por tres causas distintas:
+
+1. `IndicadoresFuenteTest` S7c usaba una ubicación `content://` inexistente para simular un documento inaccesible; el `ContentResolver` de Robolectric lanza `UnsupportedOperationException` y el repositorio solo captura `SecurityException` e `IOException`. La prueba pasa a un sobre cifrado corrupto, que falla de forma determinista con `ubicacion_invalida` sin tocar la red ni el proveedor de contenido.
+2. `FuentesUiTest` esperaba "Actualización: sin intentos" al abrir la pantalla, pero `importarFixture()` registra un intento completado al importar. La prueba siembra Fuente, Lista y Canal directamente, sin intentos, y apunta la Lista al proveedor de fixture de `debug`: así la transición `sin intentos → última correcta` es observable y la disponibilidad se deriva del catálogo.
+3. `CatalogoUiTest.favoritoYocultacionFiltranYseRevierten` ya fallaba antes de este cambio (mismo fallo en `41305651122`, sobre `8df133d`, y en los runs anteriores). Es una carrera: tras aplicar el filtro de Favoritos, Paging invalida y emite una lista vacía intermedia, y `assertExists` corría sin esperar. Se reemplaza por `esperarTag`, que reintenta hasta que el Canal reaparece.
+
+**Validación real.** Run `41320190738` sobre `aac2938`: `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` verdes; `p1-performance` y `p1-android` omitidos por diseño. `TV emulator trial` `41320190848` verde. `:app:detekt` y `:app:ktlintCheck` verdes en local; `git diff --check` sin hallazgos.
+
+**Estado.** E4-T8 cerrada con CI verde. E4-T7 (WorkManager/DC-07) sigue pendiente y requiere autorización explícita para dependencias y para migrar el camino manual. No se inicia E5, E6 ni E7. No se declara el MVP terminado.

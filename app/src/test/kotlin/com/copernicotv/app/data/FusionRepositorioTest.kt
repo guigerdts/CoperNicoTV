@@ -19,6 +19,7 @@ import com.copernicotv.core.identity.EstadoCanal
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -354,6 +355,45 @@ class FusionRepositorioTest {
                 ResultadoPlanFusion.Rechazado(FusionRepositorio.CODIGO_FUENTES_DISTINTAS),
                 fusion.planear(ambiguo, ajeno),
             )
+        }
+    }
+
+    @Test
+    fun `confirmar rechaza un plan obsoleto sin escribir`() {
+        runBlocking {
+            val superviviente = crearCanal("Uno", "canon:v2:uno")
+            val perdedora = crearCanal("Uno bis", "canon:v2:uno")
+            db.favoritoDao().insertar(FavoritoEntity(canalId = perdedora, creadoEn = AHORA))
+            val plan = planear(superviviente, perdedora)
+            assertFalse(plan.favoritoDuplicado)
+
+            db.favoritoDao().insertar(FavoritoEntity(canalId = superviviente, creadoEn = AHORA))
+
+            assertEquals(
+                ResultadoConfirmacionFusion.Rechazada(FusionRepositorio.CODIGO_PLAN_DESACTUALIZADO),
+                fusion.confirmar(plan),
+            )
+            assertNotNull(db.canalDao().porId(perdedora))
+            assertEquals(perdedora, db.favoritoDao().porCanal(perdedora)?.canalId)
+            assertEquals(2, db.favoritoDao().contar())
+        }
+    }
+
+    @Test
+    fun `confirmar exige decision explicita para un conflicto con perdida`() {
+        runBlocking {
+            val superviviente = crearCanal("Uno", "canon:v2:uno")
+            val perdedora = crearCanal("Uno bis", "canon:v2:uno")
+            db.ocultacionCanalDao().insertar(OcultacionCanalEntity(canalId = perdedora, creadoEn = AHORA))
+
+            val plan = planear(superviviente, perdedora)
+            assertEquals(
+                ResultadoConfirmacionFusion.Rechazada(FusionRepositorio.CODIGO_CONFLICTO_SIN_RESOLVER),
+                fusion.confirmar(plan),
+            )
+            assertNotNull(db.canalDao().porId(perdedora))
+            assertEquals(perdedora, db.ocultacionCanalDao().porCanal(perdedora)?.canalId)
+            assertNull(db.ocultacionCanalDao().porCanal(superviviente))
         }
     }
 

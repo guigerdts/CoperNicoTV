@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -379,43 +378,47 @@ fun CatalogoScreen(
                 )
             }
         } else {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-                // En pantallas bajas los controles no deben dejar sin altura a los
-                // resultados: se acotan y pasan a hacer scroll, y la lista conserva
-                // un mínimo visible para seguir siendo usable.
-                val altoMaximoControles =
-                    (maxHeight - ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp).coerceAtLeast(0.dp)
+            // En pantallas bajas los controles no deben dejar sin altura a los
+            // resultados: se acotan y pasan a hacer scroll, y la lista conserva
+            // un mínimo visible para seguir siendo usable. El tope se calcula
+            // desde la configuración para no introducir una subcomposición: el
+            // foco inicial se pide en un `LaunchedEffect` y necesita que el nodo
+            // con `focusRequester` ya esté adjunto en el primer frame.
+            val altoMaximoControles =
+                (
+                    configuracion.screenHeightDp.dp - 48.dp -
+                        ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp
+                ).coerceAtLeast(0.dp)
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier =
+                        Modifier
+                            .heightIn(max = altoMaximoControles)
+                            .verticalScroll(rememberScrollState()),
                 ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .heightIn(max = altoMaximoControles)
-                                .verticalScroll(rememberScrollState()),
-                    ) {
-                        Controles(
-                            estado = estado,
-                            criterios = criterios,
-                            grupos = grupos,
-                            listas = listas,
-                            listaActiva = listaActiva,
-                            recientes = recientes,
-                            acciones = acciones,
-                            focoInicial = focoInicial,
-                            onDialogo = { dialogo = it },
-                        )
-                    }
-                    Resultados(
-                        modo = criterios.modo,
-                        resultados = resultados,
-                        hayFiltros = hayFiltros,
-                        onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
-                        onReintentar = { resultados.retry() },
-                        modifier = Modifier.weight(1f),
+                    Controles(
+                        estado = estado,
+                        criterios = criterios,
+                        grupos = grupos,
+                        listas = listas,
+                        listaActiva = listaActiva,
+                        recientes = recientes,
+                        acciones = acciones,
+                        focoInicial = focoInicial,
+                        onDialogo = { dialogo = it },
                     )
                 }
+                Resultados(
+                    modo = criterios.modo,
+                    resultados = resultados,
+                    hayFiltros = hayFiltros,
+                    onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
+                    onReintentar = { resultados.retry() },
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }

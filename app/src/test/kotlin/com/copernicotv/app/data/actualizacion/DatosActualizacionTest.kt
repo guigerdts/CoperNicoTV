@@ -1,5 +1,6 @@
 package com.copernicotv.app.data.actualizacion
 
+import androidx.work.Data
 import com.copernicotv.app.data.ResumenActualizacion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -62,14 +63,14 @@ class DatosActualizacionTest {
 
     @Test
     fun `una fuente ausente o invalida no se interpreta`() {
-        assertNull(DatosActualizacion.fuenteId(androidx.work.Data.EMPTY))
+        assertNull(DatosActualizacion.fuenteId(Data.EMPTY))
         assertNull(DatosActualizacion.fuenteId(DatosActualizacion.de(0L, CausasActualizacion.MANUAL, emptyList())))
     }
 
     @Test
     fun `una version desconocida no se interpreta como resumen`() {
         val datos =
-            androidx.work.Data
+            Data
                 .Builder()
                 .putLong(DatosActualizacion.CLAVE_FUENTE, 1L)
                 .putString(DatosActualizacion.CLAVE_RESUMENES, "v9\n1,completada,0,0,0,0,0,")
@@ -81,7 +82,7 @@ class DatosActualizacionTest {
     @Test
     fun `un registro corrupto se descarta sin perder los validos`() {
         val datos =
-            androidx.work.Data
+            Data
                 .Builder()
                 .putLong(DatosActualizacion.CLAVE_FUENTE, 1L)
                 .putString(

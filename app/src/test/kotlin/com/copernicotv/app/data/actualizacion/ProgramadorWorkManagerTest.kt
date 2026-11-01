@@ -12,6 +12,7 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
+import com.copernicotv.app.data.db.entities.ListaEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -194,7 +195,7 @@ class ProgramadorWorkManagerTest {
             val fuente = crearFuente("Fuente", usarGlobal = true, propio = null)
             val lista =
                 db.listaDao().insertar(
-                    com.copernicotv.app.data.db.entities.ListaEntity(
+                    ListaEntity(
                         fuenteId = fuente,
                         nombre = "Lista",
                         ubicacionCifrada = ByteArray(0),

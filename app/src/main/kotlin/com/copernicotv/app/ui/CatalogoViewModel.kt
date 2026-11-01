@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.copernicotv.app.data.ActualizacionRepositorio
 import com.copernicotv.app.data.BusquedaCatalogoRepositorio
 import com.copernicotv.app.data.CanalBusqueda
 import com.copernicotv.app.data.CatalogoCrudRepositorio
@@ -21,6 +22,7 @@ import com.copernicotv.app.data.PerfilRepositorio
 import com.copernicotv.app.data.PerfilResumen
 import com.copernicotv.app.data.PreferenciasOrden
 import com.copernicotv.app.data.ResultadoAccion
+import com.copernicotv.app.data.ResumenActualizacion
 import com.copernicotv.app.data.ResumenImportacion
 import com.copernicotv.app.diagnostico.detalleTecnico
 import com.copernicotv.core.orden.DireccionOrden
@@ -53,9 +55,11 @@ import javax.inject.Inject
 data class CatalogoUiState(
     val canales: List<String> = emptyList(),
     val importando: Boolean = false,
+    val actualizando: Boolean = false,
     val listaId: Long? = null,
     val mensaje: String? = null,
     val mensajeAccion: String? = null,
+    val actualizacion: ResumenActualizacion? = null,
 )
 
 /**
@@ -80,6 +84,7 @@ class CatalogoViewModel
         private val coleccionesRepositorio: ColeccionRepositorio,
         private val perfilesRepositorio: PerfilRepositorio,
         private val historialRepositorio: HistorialRepositorio,
+        private val actualizacionRepositorio: ActualizacionRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
@@ -443,6 +448,35 @@ class CatalogoViewModel
         }
 
         /**
+         * Ejecuta la Actualización manual de la Lista activa (E4-T6).
+         *
+         * La descarga y la reconciliación corren en el repositorio; aquí solo se
+         * refleja el progreso y el resumen. Un fallo inesperado no propaga la
+         * excepción a la UI: se registra el detalle técnico y se devuelve un
+         * resumen con `error` para que la pantalla muestre un código estable.
+         */
+        fun actualizarListaActiva() {
+            if (_estado.value.actualizando || _estado.value.importando) return
+            val listaId = listas.value.firstOrNull { it.activa }?.id ?: return
+            _estado.value =
+                _estado.value.copy(actualizando = true, actualizacion = null, mensaje = null)
+            viewModelScope.launch {
+                val resumen =
+                    runCatching { actualizacionRepositorio.actualizarLista(listaId) }
+                        .getOrElse { fallo ->
+                            Log.e(TAG, "Actualización fallida\n${detalleTecnico(fallo)}")
+                            ResumenActualizacion(
+                                listaId = listaId,
+                                resultado = CODIGO_ACTUALIZACION_FALLIDA,
+                                error = CODIGO_ACTUALIZACION_FALLIDA,
+                            )
+                        }
+                _estado.value =
+                    _estado.value.copy(actualizando = false, actualizacion = resumen)
+            }
+        }
+
+        /**
          * Observa la preferencia de la Lista activa y la refleja en los criterios.
          *
          * Al cambiar de Lista, el flujo se cambia sin perder el modo y la
@@ -495,6 +529,7 @@ class CatalogoViewModel
         private companion object {
             const val CODIGO_FALLO = "importacion_fallida"
             const val CODIGO_SIN_LISTA = "importacion_sin_lista"
+            const val CODIGO_ACTUALIZACION_FALLIDA = "actualizacion_fallida"
             const val ESPERA_TECLEO_MS = 150L
             const val TIEMPO_SIN_SUSCRIPTORES = 5_000L
             const val TAG = "CatalogoViewModel"

@@ -75,6 +75,12 @@ const val TAG_IMPORTAR = "importar-fixture"
 /** Etiqueta del disparador de selección de documento SAF. */
 const val TAG_ABRIR_DOCUMENTO = "abrir-documento"
 
+/** Etiqueta del disparador de Actualización manual de la Lista activa. */
+const val TAG_ACTUALIZAR = "actualizar-lista"
+
+/** Etiqueta del resumen de la última Actualización manual. */
+const val TAG_RESULTADO_ACTUALIZACION = "resultado-actualizacion"
+
 /** Prefijo de las etiquetas de canal del catálogo. */
 const val PREFIJO_TAG_CANAL = "canal-"
 
@@ -267,6 +273,7 @@ data class PerfilesUiState(
 data class CatalogoAcciones(
     val onImportar: () -> Unit,
     val onAbrirDocumento: () -> Unit,
+    val onActualizar: () -> Unit,
     val onTexto: (String) -> Unit,
     val onGrupo: (Long?) -> Unit,
     val onFavoritos: () -> Unit,
@@ -422,7 +429,7 @@ private fun Controles(
     )
     Button(
         onClick = acciones.onAbrirDocumento,
-        enabled = !estado.importando,
+        enabled = !estado.importando && !estado.actualizando,
         modifier =
             Modifier
                 .focusRequester(focoInicial)
@@ -432,7 +439,7 @@ private fun Controles(
     }
     Button(
         onClick = acciones.onImportar,
-        enabled = !estado.importando,
+        enabled = !estado.importando && !estado.actualizando,
         modifier = Modifier.testTag(TAG_IMPORTAR),
     ) {
         Text(stringResource(R.string.catalogo_importar))
@@ -449,6 +456,7 @@ private fun Controles(
             listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
         },
     )
+    AccionActualizar(estado, listaActiva, acciones)
     AccesoRapido(
         recientes = recientes,
         onCanal = { reciente -> onDialogo(DialogoCatalogo.AccionesCanal(reciente.aCanalBusqueda())) },
@@ -515,6 +523,49 @@ private fun Controles(
         modifier = Modifier.testTag(TAG_NUEVO_CANAL),
     ) {
         Text(stringResource(R.string.catalogo_nuevo_canal))
+    }
+}
+
+/**
+ * Acción de Actualización manual de la Lista activa (E4-T6).
+ *
+ * Se separa de `Controles` para mantener esa composición dentro del límite de
+ * longitud y para que el resumen de la última Actualización viva junto al
+ * disparador que lo produce.
+ */
+@Composable
+private fun AccionActualizar(
+    estado: CatalogoUiState,
+    listaActiva: ListaResumen?,
+    acciones: CatalogoAcciones,
+) {
+    Button(
+        onClick = acciones.onActualizar,
+        enabled = listaActiva != null && !estado.importando && !estado.actualizando,
+        modifier = Modifier.testTag(TAG_ACTUALIZAR),
+    ) {
+        Text(stringResource(R.string.catalogo_actualizar))
+    }
+    estado.actualizacion?.let { resumen ->
+        val error = resumen.error
+        val texto =
+            if (error != null) {
+                stringResource(R.string.catalogo_actualizacion_error, error)
+            } else {
+                stringResource(
+                    R.string.catalogo_actualizacion_ok,
+                    resumen.nuevas,
+                    resumen.actualizadas,
+                    resumen.ausentes,
+                    resumen.ambiguas,
+                    resumen.observaciones,
+                )
+            }
+        Text(
+            text = texto,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.testTag(TAG_RESULTADO_ACTUALIZACION),
+        )
     }
 }
 

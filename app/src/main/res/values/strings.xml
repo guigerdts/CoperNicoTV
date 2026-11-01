@@ -3,6 +3,9 @@
     <string name="app_name">CoperNicoTV</string>
     <string name="catalogo_titulo">Catálogo</string>
     <string name="catalogo_importar">Importar lista de prueba</string>
+    <string name="catalogo_actualizar">Actualizar lista</string>
+    <string name="catalogo_actualizacion_ok">Actualización: %1$d nuevas, %2$d actualizadas, %3$d ausentes, %4$d ambiguas, %5$d observaciones</string>
+    <string name="catalogo_actualizacion_error">No se pudo actualizar: %1$s</string>
     <string name="catalogo_abrir_documento">Abrir documento</string>
     <string name="catalogo_vacio">Todavía no hay canales en esta lista.</string>
     <string name="catalogo_error">No se pudo importar: %1$s</string>

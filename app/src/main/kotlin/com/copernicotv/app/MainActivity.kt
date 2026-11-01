@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                         CatalogoAcciones(
                             onImportar = viewModel::importarFixture,
                             onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
+                            onActualizar = viewModel::actualizarListaActiva,
                             onTexto = viewModel::actualizarTexto,
                             onGrupo = viewModel::seleccionarGrupo,
                             onFavoritos = viewModel::alternarFavoritos,

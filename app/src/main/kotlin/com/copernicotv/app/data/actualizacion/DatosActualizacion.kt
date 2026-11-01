@@ -71,11 +71,9 @@ internal object DatosActualizacion {
         val campos = registro.split(SEPARADOR_CAMPO)
         if (campos.size != CAMPOS_POR_REGISTRO) return null
         val listaId = campos[0].toLongOrNull() ?: return null
-        val nuevas = campos[2].toIntOrNull() ?: return null
-        val actualizadas = campos[3].toIntOrNull() ?: return null
-        val ausentes = campos[4].toIntOrNull() ?: return null
-        val ambiguas = campos[5].toIntOrNull() ?: return null
-        val observaciones = campos[6].toIntOrNull() ?: return null
+        val cifras = campos.subList(2, CAMPOS_POR_REGISTRO - 1).map { it.toIntOrNull() }
+        if (cifras.any { it == null }) return null
+        val (nuevas, actualizadas, ausentes, ambiguas, observaciones) = cifras.filterNotNull()
         return ResumenActualizacion(
             listaId = listaId,
             resultado = campos[1],

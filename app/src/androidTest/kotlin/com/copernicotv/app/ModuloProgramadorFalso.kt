@@ -9,7 +9,6 @@ import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.di.ModuloProgramador
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.hilt.testing.TestInstallIn
 import kotlinx.coroutines.flow.Flow
@@ -31,7 +30,6 @@ import javax.inject.Singleton
  * con la base y el fixture reales.
  */
 @Module
-@InstallIn(SingletonComponent::class)
 @TestInstallIn(components = [SingletonComponent::class], replaces = [ModuloProgramador::class])
 object ModuloProgramadorFalso {
     @Provides

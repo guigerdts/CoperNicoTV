@@ -6,11 +6,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -119,6 +121,9 @@ const val TAG_CARGANDO = "cargando-catalogo"
 
 /** Etiqueta de la lista de resultados del catálogo. */
 const val TAG_RESULTADOS = "resultados-catalogo"
+
+/** Altura mínima (dp) que conserva la lista de resultados en pantallas bajas. */
+private const val ALTO_MINIMO_RESULTADOS_DP = 96
 
 /** Etiqueta del mensaje de error de una acción CRUD. */
 const val TAG_ERROR_ACCION = "error-accion"
@@ -374,29 +379,43 @@ fun CatalogoScreen(
                 )
             }
         } else {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Controles(
-                    estado = estado,
-                    criterios = criterios,
-                    grupos = grupos,
-                    listas = listas,
-                    listaActiva = listaActiva,
-                    recientes = recientes,
-                    acciones = acciones,
-                    focoInicial = focoInicial,
-                    onDialogo = { dialogo = it },
-                )
-                Resultados(
-                    modo = criterios.modo,
-                    resultados = resultados,
-                    hayFiltros = hayFiltros,
-                    onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
-                    onReintentar = { resultados.retry() },
-                    modifier = Modifier.weight(1f),
-                )
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+                // En pantallas bajas los controles no deben dejar sin altura a los
+                // resultados: se acotan y pasan a hacer scroll, y la lista conserva
+                // un mínimo visible para seguir siendo usable.
+                val altoMaximoControles =
+                    (maxHeight - ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp).coerceAtLeast(0.dp)
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .heightIn(max = altoMaximoControles)
+                                .verticalScroll(rememberScrollState()),
+                    ) {
+                        Controles(
+                            estado = estado,
+                            criterios = criterios,
+                            grupos = grupos,
+                            listas = listas,
+                            listaActiva = listaActiva,
+                            recientes = recientes,
+                            acciones = acciones,
+                            focoInicial = focoInicial,
+                            onDialogo = { dialogo = it },
+                        )
+                    }
+                    Resultados(
+                        modo = criterios.modo,
+                        resultados = resultados,
+                        hayFiltros = hayFiltros,
+                        onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
+                        onReintentar = { resultados.retry() },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }

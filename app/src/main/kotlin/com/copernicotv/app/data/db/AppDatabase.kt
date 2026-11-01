@@ -20,6 +20,7 @@ import com.copernicotv.app.data.db.dao.FuenteGuiaDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
+import com.copernicotv.app.data.db.dao.IndicadoresFuenteDao
 import com.copernicotv.app.data.db.dao.ListaDao
 import com.copernicotv.app.data.db.dao.ObservacionPendienteDao
 import com.copernicotv.app.data.db.dao.OcultacionCanalDao
@@ -138,6 +139,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun ocultacionGrupoDao(): OcultacionGrupoDao
 
     abstract fun perfilDao(): PerfilDao
+
+    abstract fun indicadoresFuenteDao(): IndicadoresFuenteDao
 
     companion object {
         const val NOMBRE = "copernicotv.db"

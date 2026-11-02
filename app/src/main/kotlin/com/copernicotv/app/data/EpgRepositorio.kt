@@ -149,13 +149,14 @@ class EpgRepositorio
                                 resultado = resultado,
                             )
                         }
-                        if (resultado.errorGlobal != null) {
+                        val errorGlobal = resultado.errorGlobal
+                        if (errorGlobal != null) {
                             limpiarStaging(generacionId)
                             return@withContext fallo(
                                 fuenteGuiaId = fuenteGuiaId,
                                 generacionId = null,
                                 causa = causa,
-                                codigo = resultado.errorGlobal.codigo,
+                                codigo = errorGlobal.codigo,
                                 version = version,
                                 resultado = resultado,
                             )

@@ -1050,11 +1050,11 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 
 ### 8.5 E5 — EPG XMLTV
 
-E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La huella `huella:v2`, las señales y la reconfirmación de DC-06 están implementadas y cubiertas en `:core`; la representación aprobada es la asociación por `(fuente_guia_id, channel_id_texto)`, sin `CanalXmltv`. La validación remota del HEAD `9908c2d` terminó con `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` verdes; `p1-performance` y `p1-android` quedaron omitidos por diseño. Por tanto, la condición (a) de L66 —`:app` y los instrumentados solo validables en CI— queda cumplida. Sigue pendiente (b): S24 exige un baseline XMLTV versionado y aprobado; la medición local es cruda y no hay baseline aprobado. No se altera ningún criterio para declarar cierre.
+E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La huella `huella:v2`, las señales y la reconfirmación de DC-06 están implementadas y cubiertas en `:core`; la representación aprobada es la asociación por `(fuente_guia_id, channel_id_texto)`, sin `CanalXmltv`. La validación remota del HEAD `9908c2d` terminó con `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` verdes; `p1-performance` y `p1-android` quedaron omitidos por diseño. Por tanto, la condición (a) de L66 —`:app` y los instrumentados solo validables en CI— queda cumplida. Sigue pendiente (b): S24 exige un baseline XMLTV versionado y aprobado. Los fixtures F24a–F24c están versionados y el job `p1-performance` ejecutó tres corridas verdes consecutivas sobre `b5605f1`; la propuesta de baseline XMLTV (p95 de referencia 71.081 ms, heap 22.502 MiB) está en `docs/evidence/p1/p1-baseline-xmltv-propuesta.json`, pendiente de revisión humana. No se altera ningún criterio para declarar cierre.
 
 | ID | Objetivo | Criterio de aceptación |
 |---|---|---|
-| E5-T1 | Parser XMLTV streaming | XML válido, malformado e incompleto. ADR-0003:16: un elemento recuperable genera error tipado con su ubicación y el parseo continúa; un error global (encoding, EOF abrupto, raíz inválida) reporta error de importación con cantidad de elementos recuperados y descartados. Cancelación cooperativa: staging descartado y guía publicada intacta. S24; sin dependencia de D1(a). **Implementado** en `ParserXmltv` y `ParserXmltvTest`. La medición P1 XMLTV local (100 canales, 10 000 programas) dio p95 278.477 ms y pico de heap 46.664 MiB, dentro de los límites P1, pero **S24 sigue pendiente de baseline XMLTV aprobado** |
+| E5-T1 | Parser XMLTV streaming | XML válido, malformado e incompleto. ADR-0003:16: un elemento recuperable genera error tipado con su ubicación y el parseo continúa; un error global (encoding, EOF abrupto, raíz inválida) reporta error de importación con cantidad de elementos recuperados y descartados. Cancelación cooperativa: staging descartado y guía publicada intacta. S24; sin dependencia de D1(a). **Implementado** en `ParserXmltv` y `ParserXmltvTest`. La medición P1 XMLTV local (100 canales, 10 000 programas) dio p95 278.477 ms y pico de heap 46.664 MiB, dentro de los límites P1. Esa calibración fue superada por tres corridas verdes consecutivas del job `p1-performance` sobre `b5605f1`: p95 46.427 / 55.584 / 71.081 ms y pico de heap 22.502 / 22.141 / 21.539 MiB. La propuesta de baseline XMLTV está en `docs/evidence/p1/p1-baseline-xmltv-propuesta.json`, pendiente de revisión humana; **S24 sigue abierta** |
 | E5-T2 | Generaciones y publicación | Éxito publica atómicamente; fallo conserva la guía anterior; S29 en su parte de publicación; sin dependencia de D1(a). **Implementado** en `EpgRepositorio` (staging, confirmación atómica y rollback); pruebas escritas en `EpgRepositorioTest`. **Verificado en CI**: `EpgRepositorioTest` se ejecuta en `jvm-tests`; `:app` 238 pruebas, 0 fallos, 1 omitida (run `41489388599`) |
 | E5-T3 | Retención | ADR-0002:48–50: ventana temporal, máximo por canal y presupuesto total configurables; los valores globales de DataStore son el default; una excepción por `FuenteGuia` solo aplica si existe, y «usar global» devuelve el global; cambiar el global no corrompe excepciones. Valores iniciales de especificación (ADR-0003:43–45; no implementados ni validados experimentalmente): ventana de 1 día de pasado + 7 días de futuro, relativa al momento de importación de cada FuenteGuia, conservando los programas que se solapen con la ventana; máximo de 500 programas por `(fuente_guia_id, channel_id_texto)` en la generación publicada, con evicción oldest-first dentro de esa asociación; presupuesto de 200 MB por FuenteGuia sobre la generación publicada, medido como tamaño lógico serializado de los `Programa` retenidos (bytes UTF-8 de `channel_id_texto`, título y descripción + 8 bytes por `inicio` y 8 bytes por `fin` + prefijo de longitud de 4 bytes por campo variable; se excluyen PK, FK de generación, índices, páginas SQLite y metadatos de fila; se calcula antes de publicar), con evicción oldest-first dentro de esa fuente; no se equipara al espacio físico de SQLite. El presupuesto no es un límite global del dispositivo ni garantiza que todas las fuentes consuman 200 MB simultáneamente; el staging queda fuera del presupuesto pero consume espacio físico; la caché XMLTV tiene presupuesto independiente de 256 MiB total, 96 MiB por `FuenteGuia` y por archivo (DC-09), y no se computa contra la generación publicada. La retención se aplica durante la importación; no se introduce purga periódica automática en esta decisión. Los valores quedan pendientes de calibración con datos reales, especialmente para guías de 15 minutos. Sin dependencia de D1(a). **Implementado** con retención global en DataStore (`retencion_epg`), excepción por `FuenteGuia` y presupuesto lógico en SQL; `RetencionEpgTest` verde en `:core` y pruebas de retención global/excepción en `EpgRepositorioTest`. **Verificado en CI**: `EpgRepositorioTest` se ejecuta en `jvm-tests`; `:app` 238 pruebas, 0 fallos, 1 omitida (run `41489388599`) |
 | E5-T4 | Asociación configurable | Heurística, confirmación, edición y remoción persistentes; S27. D1(a) aprobada: `(fuente_guia_id, channel_id_texto)`, sin `CanalXmltv`; las reglas de estabilidad/reconfirmación se resuelven en DC-06. **Implementado**: `huella:v2`, señales, heurística, reconfirmación, confirmación/edición/revocación y persistencia tras reabrir la base (`AsociacionPersistenciaTest`); `EstabilidadAsociacionTest` e `HuellaAsociacionTest` verdes en `:core`. **Verificado en CI**: `AsociacionPersistenciaTest` en `jvm-tests` y `GuiaUiTest` en `instrumented-mobile`; `instrumented-mobile` 30/30 (run `41489388599`) |
@@ -3233,3 +3233,70 @@ aprobación del propietario.
 **Estado.** E5 queda implementada y validada en CI; **no se declara cerrada**
 porque S24 exige el baseline XMLTV aprobado. No se inicia E6 ni E7 y no se
 declara el MVP terminado.
+
+### L68 — S24: fixtures XMLTV y propuesta de baseline P1 (2026-11-02)
+
+Se materializan los fixtures contractuales de S24 y se mide el parseo XMLTV en
+el runner de referencia, sin cerrar S24 ni aprobar un baseline.
+
+**Fixtures y generador.** `F24a.xml` (1 533 410 bytes, SHA-256
+`20c0417f83b5f3534e3229b2c423ad6bdd3f54bc1c92e7776efbb655c0f74bf1`),
+`F24b.xml` (259 bytes, SHA-256
+`f2f60ce1dfff28574bbc801c160c3357e59d7915d58321295a281df2e8db89ca`) y
+`F24c.xml` (383 bytes, SHA-256
+`e19031d8cd8be09f2b86add11fc1aaa15edfd79c81edbd020e1fe9230a7e2053`).
+`tools/fixtures/generar_f24_xmltv.py` reproduce los tres hashes.
+`FixtureP1Xmltv.kt`, `FixtureF24Test.kt` y `MedicionP1XmltvTest.kt` cargan los
+archivos versionados y verifican integridad; la medición ya no genera XMLTV en
+memoria.
+
+**Mapping contractual.** S24 no fija el contenido literal de F24a–F24c. Se usó
+el orden de S24 y los casos ya existentes en `ParserXmltvTest`: F24a es el
+fixture válido de 100 canales y 10 000 programas y conserva exactamente el
+SHA-256 del generador anterior; F24b y F24c son los casos malformado e
+incompleto. Está documentado en `docs/evidence/p1/fixture-f24.md`. No se
+sustituyó XMLTV por M3U ni se agregó semántica nueva al parser.
+
+**Verificación local (2026-11-02).** `./gradlew :core:test`: 325 pruebas, 0
+fallos, 2 omitidas. `./gradlew :core:p1XmltvPerformance` pasó.
+`./gradlew ktlintCheck detekt` pasó. Es calibración local, no baseline.
+
+**CI push sobre `b5605f1`.** `CI` `41502676899`, `Android APK` `41502676878` y
+`TV emulator trial` `41502677032`, todos verdes; `p1-performance` quedó
+`skipped` por diseño en un `push`.
+
+**Corridas de referencia.** Solo se usan corridas completas verdes desde el
+inicio, todas sobre `b5605f1`:
+
+- `41519220751`: full green; mediana 34.535 ms, p95 46.427 ms, máximo 48.017
+  ms, pico de heap 22.502 MiB; job `125530610438`; artifact `13176013585`.
+- `41520808801`: full green; mediana 44.788 ms, p95 55.584 ms, máximo 80.099
+  ms, pico de heap 22.141 MiB; job `125536023632`; artifact `13177343151`.
+- `41522305743`: full green; mediana 51.241 ms, p95 71.081 ms, máximo 82.927
+  ms, pico de heap 21.539 MiB; job `125541138512`; artifact `13177598812`.
+
+**Corrida descartada.** `41503973319`: `p1-performance` fue `success` (mediana
+54.542 ms, p95 70.875 ms, máximo 86.628 ms, pico de heap 21.595 MiB), pero el
+run completo falló de entrada en `instrumented-mobile` por un timeout de UI
+ajeno a P1. Se reejecutó solo el job móvil; la medición no se repitió. Se
+descarta para la terna por el mismo criterio que el baseline M3U.
+
+**Propuesta.** `docs/evidence/p1/p1-baseline-xmltv-propuesta.json` y
+`docs/evidence/p1/p1-baseline-xmltv-propuesta.md` toman el peor valor de las
+tres corridas: p95 de referencia 71.081 ms (umbral de regresión 85.297 ms) y
+pico de heap 22.502 MiB (umbral 25.877 MiB). El baseline M3U aprobado
+`docs/evidence/p1/p1-baseline.json` no se modificó. La evidencia cruda está en
+`docs/evidence/p1/medicion-xmltv-b5605f1-r{1-descartada,2,3,4}.json` y sus CSV.
+
+**Diferencias respecto del contrato.** (1) El workflow usa `ubuntu-latest`,
+pero `ImageOS` reportó `ubuntu26`; el baseline M3U aprobado se midió en
+`ubuntu24`, así que los valores XMLTV no se comparan con los de M3U. (2) No se
+reinicia la JVM entre las tres lecturas de heap; se aplica `System.gc()` antes
+de muestrear, la misma limitación metodológica del baseline M3U, permitida por
+DC-10 §3 cuando el entorno no lo permite. (3) S24 no fija el contenido literal
+de F24a–F24c; el mapping está documentado y no agrega semántica nueva.
+
+**Estado.** S24 sigue abierta pendiente de revisión humana de DC-10 §5. No se
+aprueba el baseline, no se cierra S24, no se abre PR, no se hace merge y no se
+inicia E6 ni E7. Commit medido: `b5605f1`; la evidencia y este registro se
+publican en un commit posterior.

@@ -94,7 +94,7 @@ class EpgRepositorioTest {
             val fallida = importar(fuenteGuiaId, "<tv><channel id=\"c1\">")
 
             assertEquals(EpgRepositorio.RESULTADO_FALLIDA, fallida.resultado)
-            assertEquals("xml_malformado", fallida.errorGlobal?.codigo)
+            assertEquals("eof_abrupto", fallida.errorGlobal?.codigo)
             assertEquals(generacion, db.fuenteGuiaDao().porId(fuenteGuiaId)?.generacionPublicadaId)
             assertEquals(1, db.programaDao().contar(generacion))
             assertEquals(1, db.generacionGuiaDao().porFuente(fuenteGuiaId).size)
@@ -102,7 +102,7 @@ class EpgRepositorioTest {
                 db.estadoActualizacionDao().ultimoDeVersion(
                     "xmltv:$fuenteGuiaId:${AHORA.toEpochMilli()}",
                 )
-            assertEquals("fallida:xml_malformado", estado?.resultado)
+            assertEquals("fallida:eof_abrupto", estado?.resultado)
         }
 
     @Test
@@ -234,7 +234,7 @@ class EpgRepositorioTest {
             val guia = GuiaRepositorio(db)
             val fila = guia.actualYSiguiente(canalId, fuenteGuiaId, AHORA)
             assertNotNull(fila)
-            assertEquals("Programa", fila?.actual?.titulo)
+            assertEquals("Uno", fila?.actual?.titulo)
             assertNull(fila?.siguiente)
             assertEquals(
                 1,

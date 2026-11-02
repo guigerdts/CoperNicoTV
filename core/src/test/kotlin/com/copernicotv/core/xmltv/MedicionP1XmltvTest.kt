@@ -12,10 +12,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.ByteArrayInputStream
 import java.io.File
-import java.security.MessageDigest
 import java.time.Instant
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.ceil
@@ -32,8 +29,8 @@ import kotlin.test.assertTrue
  * `-Xmx512m`. Los límites absolutos son los de P1 hasta que exista un baseline
  * XMLTV aprobado; este test no declara un baseline nuevo.
  *
- * El fixture es determinista y se genera en memoria para no versionar un
- * archivo de varios MiB: 100 canales y 10 000 programas.
+ * El fixture F24a está versionado en `core/src/test/resources/fixtures/` y
+ * conserva la semántica determinista de 100 canales y 10 000 programas.
  */
 class MedicionP1XmltvTest {
     @BeforeEach
@@ -47,6 +44,7 @@ class MedicionP1XmltvTest {
     @Test
     fun `mide el parseo de 10 000 programas XMLTV dentro de los limites de P1`() {
         val bytes = FixtureP1Xmltv.bytes()
+        assertEquals(FixtureP1Xmltv.SHA256, FixtureP1Xmltv.sha256(bytes))
         val tiempos = medirTiempos(bytes)
         val picoHeapMiB = medirPicoHeap(bytes)
         val p95 = percentil95(tiempos)
@@ -136,7 +134,7 @@ class MedicionP1XmltvTest {
         raiz.mkdirs()
         File(raiz, "mediciones.csv").writeText(csv(tiempos))
         File(raiz, "medicion.json").writeText(
-            json(mediana, p95, maximo, picoHeapMiB, cumple, sha256(bytes)),
+            json(mediana, p95, maximo, picoHeapMiB, cumple, FixtureP1Xmltv.sha256(bytes)),
         )
     }
 
@@ -166,7 +164,8 @@ class MedicionP1XmltvTest {
             appendLine("    \"heapMaximoBytes\": ${Runtime.getRuntime().maxMemory()}")
             appendLine("  },")
             appendLine("  \"fixture\": {")
-            appendLine("    \"descripcion\": \"F24a-F24c XMLTV generado\",")
+            appendLine("    \"ruta\": \"core/src/test/resources${FixtureP1Xmltv.RUTA}\",")
+            appendLine("    \"descripcion\": \"F24a XMLTV válido: 100 canales y 10 000 programas\",")
             appendLine("    \"canales\": ${FixtureP1Xmltv.CANALES},")
             appendLine("    \"programas\": ${FixtureP1Xmltv.PROGRAMAS},")
             appendLine("    \"sha256\": \"$sha256\"")
@@ -190,12 +189,6 @@ class MedicionP1XmltvTest {
             appendLine("}")
         }
 
-    private fun sha256(bytes: ByteArray): String =
-        MessageDigest
-            .getInstance("SHA-256")
-            .digest(bytes)
-            .joinToString("") { byte -> "%02x".format(byte) }
-
     private fun formatear(valor: Double): String = String.format(Locale.ROOT, "%.3f", valor)
 
     private companion object {
@@ -208,33 +201,4 @@ class MedicionP1XmltvTest {
         const val LIMITE_HEAP_MIB = 256.0
         const val DESCONOCIDO = "desconocido"
     }
-}
-
-/** Fixture XMLTV determinista de la medición P1. */
-object FixtureP1Xmltv {
-    const val CANALES: Int = 100
-    const val PROGRAMAS: Int = 10_000
-
-    private val FORMATO = DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z", Locale.ROOT)
-    private val INICIO: Instant = Instant.parse("2026-01-01T00:00:00Z")
-
-    fun bytes(): ByteArray =
-        buildString {
-            appendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
-            appendLine("<tv>")
-            for (canal in 0 until CANALES) {
-                appendLine("<channel id=\"c$canal\"><display-name>Canal $canal</display-name></channel>")
-            }
-            for (indice in 0 until PROGRAMAS) {
-                val canal = indice % CANALES
-                val inicio = INICIO.plusSeconds(indice.toLong() * 900L)
-                val fin = inicio.plusSeconds(900)
-                append("<programme channel=\"c$canal\" start=\"${formatear(inicio)}\" stop=\"${formatear(fin)}\">")
-                append("<title>Programa $indice</title><desc>Descripción $indice</desc></programme>")
-                appendLine()
-            }
-            appendLine("</tv>")
-        }.toByteArray(Charsets.UTF_8)
-
-    private fun formatear(instante: Instant): String = FORMATO.format(instante.atZone(ZoneOffset.UTC))
 }

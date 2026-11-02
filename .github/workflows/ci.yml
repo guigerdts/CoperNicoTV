@@ -178,9 +178,9 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Medicion P1 de parseo y busqueda JVM
+      - name: Medicion P1 de parseo M3U, XMLTV y busqueda JVM
         run: >-
-          ./gradlew :core:p1Performance :app:testDebugUnitTest
+          ./gradlew :core:p1Performance :core:p1XmltvPerformance :app:testDebugUnitTest
           -Pp1.busqueda=true -Pp1.commit="$GITHUB_SHA" --no-parallel --stacktrace
       - name: Publicar evidencia P1
         if: always()
@@ -189,12 +189,14 @@ jobs:
           name: p1-medicion
           path: |
             core/build/p1/
+            core/build/p1-xmltv/
             app/build/p1-busqueda/
           if-no-files-found: ignore
       - name: Resumen de la medicion
         if: always()
         run: |
           cat core/build/p1/medicion.json || true
+          cat core/build/p1-xmltv/medicion.json || true
           cat app/build/p1-busqueda/medicion.json || true
 
   p1-android:

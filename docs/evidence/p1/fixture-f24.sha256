@@ -1,0 +1,11 @@
+# Registro de integridad de los fixtures XMLTV F24a-F24c de S24
+# Repositorio: CoperNicoTV
+# Generado por: tools/fixtures/generar_f24_xmltv.py
+20c0417f83b5f3534e3229b2c423ad6bdd3f54bc1c92e7776efbb655c0f74bf1  core/src/test/resources/fixtures/F24a.xml
+f2f60ce1dfff28574bbc801c160c3357e59d7915d58321295a281df2e8db89ca  core/src/test/resources/fixtures/F24b.xml
+e19031d8cd8be09f2b86add11fc1aaa15edfd79c81edbd020e1fe9230a7e2053  core/src/test/resources/fixtures/F24c.xml
+# Algoritmo: SHA-256
+# Alcance: bytes exactos de cada archivo
+# F24a: XMLTV válido, 100 canales y 10 000 programas, usado por :core:p1XmltvPerformance
+# F24b: XMLTV malformado, error global tolerado y un programa recuperado
+# F24c: XMLTV incompleto, un programa completo y dos descartados

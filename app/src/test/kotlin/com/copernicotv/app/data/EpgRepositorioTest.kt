@@ -284,7 +284,7 @@ class EpgRepositorioTest {
         val fuenteId =
             db.fuenteDao().insertar(
                 FuenteEntity(
-                    nombre = "Fuente",
+                    nombre = "Fuente $tvgId",
                     estado = "activa",
                     usarIntervaloGlobal = true,
                     creadoEn = AHORA,

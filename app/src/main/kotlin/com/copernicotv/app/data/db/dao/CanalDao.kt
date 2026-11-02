@@ -36,6 +36,20 @@ interface CanalDao {
         tvgId: String,
     ): CanalEntity?
 
+    /**
+     * Canales que declaran `tvg-id`, para la heurística de E5-T4.
+     *
+     * La búsqueda es global porque una `FuenteGuia` puede asociarse con Canales
+     * de cualquier Fuente M3U; el `tvg-id` sigue siendo la única señal de la
+     * heurística (DC-06).
+     */
+    @Query("SELECT * FROM Canal WHERE tvgId IS NOT NULL AND tvgId != '' ORDER BY id")
+    suspend fun todosConTvgId(): List<CanalEntity>
+
+    /** Catálogo completo para resolver una Asociación a otro Canal. */
+    @Query("SELECT * FROM Canal ORDER BY nombre, id")
+    suspend fun todos(): List<CanalEntity>
+
     @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId AND claveUnicidad = :clave LIMIT 1")
     suspend fun porClaveUnicidad(
         fuenteId: Long,

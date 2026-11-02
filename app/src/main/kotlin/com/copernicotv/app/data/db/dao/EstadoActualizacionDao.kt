@@ -27,6 +27,18 @@ interface EstadoActualizacionDao {
     @Query("SELECT * FROM EstadoActualizacion WHERE id = :id")
     suspend fun porId(id: Long): EstadoActualizacionEntity?
 
+    /**
+     * Último intento de importación de guía.
+     *
+     * `EstadoActualizacion` no tiene `fuenteGuiaId`: la importación de guía se
+     * registra con `fuenteId`/`listaId` nulos y un `versionImport` con prefijo
+     * `xmltv:<fuenteGuiaId>:`. Así el esquema v1 no cambia.
+     */
+    @Query(
+        "SELECT * FROM EstadoActualizacion WHERE versionImport = :versionImport ORDER BY inicio DESC, id DESC LIMIT 1",
+    )
+    suspend fun ultimoDeVersion(versionImport: String): EstadoActualizacionEntity?
+
     @Query("SELECT * FROM EstadoActualizacion WHERE listaId = :listaId ORDER BY inicio DESC, id DESC")
     suspend fun porLista(listaId: Long): List<EstadoActualizacionEntity>
 

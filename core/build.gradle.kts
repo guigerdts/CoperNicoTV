@@ -14,6 +14,10 @@ detekt {
 }
 
 dependencies {
+    // Parser XMLTV streaming (ADR-0003): XmlPullParser portable JVM/Android.
+    implementation(libs.kxml2)
+    implementation(libs.kotlinx.coroutines.core)
+
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.core)
@@ -45,6 +49,29 @@ val p1Performance by tasks.registering(Test::class) {
     systemProperty("repoRoot", rootProject.projectDir.absolutePath)
     filter {
         includeTestsMatching("com.copernicotv.core.m3u.MedicionP1Test")
+    }
+    outputs.upToDateWhen { false }
+}
+
+/**
+ * Medición P1 de XMLTV para S24/E5-T1.
+ *
+ * Se separa de [p1Performance] porque el fixture y el objeto medido son
+ * distintos. No sustituye la aprobación de un baseline XMLTV: publica la
+ * medición cruda para revisión.
+ */
+val p1XmltvPerformance by tasks.registering(Test::class) {
+    description = "Medición P1 de parseo XMLTV de 10 000 programas"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    maxHeapSize = "512m"
+    systemProperty("p1.medir", "true")
+    systemProperty("p1.commit", providers.gradleProperty("p1.commit").getOrElse("desconocido"))
+    systemProperty("repoRoot", rootProject.projectDir.absolutePath)
+    filter {
+        includeTestsMatching("com.copernicotv.core.xmltv.MedicionP1XmltvTest")
     }
     outputs.upToDateWhen { false }
 }

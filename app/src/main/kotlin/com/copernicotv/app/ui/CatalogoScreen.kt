@@ -85,6 +85,9 @@ const val TAG_RESULTADO_ACTUALIZACION = "resultado-actualizacion"
 /** Etiqueta del botón que abre la pantalla de Fuentes. */
 const val TAG_FUENTES = "abrir-fuentes"
 
+/** Etiqueta del botón que abre la Guía. */
+const val TAG_GUIA = "abrir-guia"
+
 /** Prefijo de las etiquetas de canal del catálogo. */
 const val PREFIJO_TAG_CANAL = "canal-"
 
@@ -313,6 +316,7 @@ data class CatalogoAcciones(
     val onAsociarListaAPerfil: (Long, Long) -> Unit,
     val onDesasociarListaDePerfil: (Long, Long) -> Unit,
     val onAbrirFuentes: () -> Unit,
+    val onAbrirGuia: () -> Unit,
 )
 
 /**
@@ -509,6 +513,12 @@ private fun Controles(
             modifier = Modifier.testTag(TAG_FUENTES),
         ) {
             Text(stringResource(R.string.catalogo_fuentes))
+        }
+        TextButton(
+            onClick = acciones.onAbrirGuia,
+            modifier = Modifier.testTag(TAG_GUIA),
+        ) {
+            Text(stringResource(R.string.catalogo_guia))
         }
     }
     estado.mensaje?.let { codigo ->

@@ -162,3 +162,29 @@ internal object FixturesF15 {
         ruta: String,
     ): String = "http://127.0.0.1:${servidor.puerto}/$ruta"
 }
+
+/** Fixtures de E6-T3: audio y subtítulos múltiples, uno solo y ninguno. */
+internal object FixturesF19 {
+    /** Dos pistas de audio (spa/eng) y dos subtítulos (spa/eng). */
+    const val PISTAS = "f19/f19_pistas.mp4"
+
+    /** Un audio y un subtítulo en español; no contiene inglés. */
+    const val SOLO_ESPANOL = "f19/f19_solo_espanol.mp4"
+
+    /** Solo vídeo: sin pistas que ofrecer. */
+    const val SIN_PISTAS = "f19/f19_sin_pistas.mp4"
+
+    fun verificar(assets: AssetManager) {
+        listOf(PISTAS, SOLO_ESPANOL, SIN_PISTAS).forEach { ruta ->
+            val primerByte = runCatching { assets.open(ruta).use { it.read() } }.getOrNull()
+            if (primerByte == null || primerByte < 0) {
+                throw AssertionError("Fixture ausente o vacío en el APK de pruebas: $ruta")
+            }
+        }
+    }
+
+    fun url(
+        servidor: ServidorMedios,
+        ruta: String,
+    ): String = "http://127.0.0.1:${servidor.puerto}/$ruta"
+}

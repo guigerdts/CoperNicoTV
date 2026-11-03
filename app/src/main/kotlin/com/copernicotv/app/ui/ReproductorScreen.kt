@@ -7,8 +7,6 @@ import android.content.res.Configuration
 import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -25,7 +23,6 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -43,10 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -60,8 +55,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -74,6 +67,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.copernicotv.app.R
+import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.app.player.ModoAspecto
@@ -126,6 +120,36 @@ const val TAG_REPRODUCTOR_ASPECTO = "reproductor-aspecto"
 /** Etiqueta del indicador de búfer. */
 const val TAG_REPRODUCTOR_BUFFER = "reproductor-buffer"
 
+/** Etiqueta del selector de pista de audio (E6-T3). */
+const val TAG_REPRODUCTOR_AUDIO = "reproductor-audio"
+
+/** Etiqueta del selector de subtítulos (E6-T3). */
+const val TAG_REPRODUCTOR_SUBTITULOS = "reproductor-subtitulos"
+
+/** Etiqueta del panel de pistas abierto. */
+const val TAG_REPRODUCTOR_PANEL_PISTAS = "reproductor-panel-pistas"
+
+/** Etiqueta del aviso de preferencia de pista no disponible. */
+const val TAG_REPRODUCTOR_AVISO_PISTAS = "reproductor-aviso-pistas"
+
+/** Etiqueta de la línea «Preferida: …» dentro del panel de pistas. */
+const val TAG_REPRODUCTOR_PREFERENCIA_GUARDADA = "reproductor-preferencia-guardada"
+
+/** Etiqueta de la opción de audio automático. */
+const val TAG_REPRODUCTOR_AUDIO_AUTO = "reproductor-audio-auto"
+
+/** Etiqueta de la opción de subtítulos automáticos. */
+const val TAG_REPRODUCTOR_SUBTITULOS_AUTO = "reproductor-subtitulos-auto"
+
+/** Etiqueta de la opción de subtítulos desactivados. */
+const val TAG_REPRODUCTOR_SUBTITULOS_DESACTIVADOS = "reproductor-subtitulos-desactivados"
+
+/** Etiqueta de la opción de audio en la posición [indice] de la lista visible. */
+fun tagPistaAudio(indice: Int): String = "$TAG_REPRODUCTOR_AUDIO-$indice"
+
+/** Etiqueta de la opción de subtítulos en la posición [indice] de la lista visible. */
+fun tagPistaSubtitulos(indice: Int): String = "$TAG_REPRODUCTOR_SUBTITULOS-$indice"
+
 /**
  * Pantalla de reproducción de un Canal con Media3 (E6-T1, ampliada en E6-T2).
  *
@@ -142,6 +166,7 @@ fun ReproductorScreen(
 ) {
     val estado by viewModel.estado.collectAsStateWithLifecycle()
     val sesionEstado by viewModel.sesionEstado.collectAsStateWithLifecycle()
+    val estadoPistas by viewModel.estadoPistas.collectAsStateWithLifecycle()
     LaunchedEffect(canalId) { viewModel.cargar(canalId) }
     val salir = {
         viewModel.cerrar()
@@ -166,11 +191,20 @@ fun ReproductorScreen(
                 SuperficieReproductor(
                     datos = actual,
                     estado = sesionEstado,
+                    pistas = estadoPistas,
                     motor = viewModel.motor,
                     onAlternar = viewModel::alternar,
                     onDesplazar = viewModel::desplazar,
                     onBuscarA = viewModel::buscarA,
                     onSalir = salir,
+                    accionesPistas =
+                        AccionesPistas(
+                            alSeleccionarAudio = viewModel::seleccionarAudio,
+                            alAudioAutomatico = viewModel::usarAudioAutomatico,
+                            alSeleccionarSubtitulos = viewModel::seleccionarSubtitulos,
+                            alSubtitulosAutomaticos = viewModel::usarSubtitulosAutomaticos,
+                            alDesactivarSubtitulos = viewModel::desactivarSubtitulos,
+                        ),
                 )
         }
     }
@@ -180,11 +214,13 @@ fun ReproductorScreen(
 private fun SuperficieReproductor(
     datos: ReproductorUiState.Listo,
     estado: EstadoSesion,
+    pistas: EstadoPistas,
     motor: ExoPlayer?,
     onAlternar: () -> Unit,
     onDesplazar: (Long) -> Unit,
     onBuscarA: (Long) -> Unit,
     onSalir: () -> Unit,
+    accionesPistas: AccionesPistas,
 ) {
     val vista = LocalView.current
     val fase = estado.estado
@@ -198,10 +234,20 @@ private fun SuperficieReproductor(
     val modo = ModoAspecto.valueOf(modoGuardado)
     val enfoqueRaiz = remember { FocusRequester() }
     val enfoqueAlternar = remember { FocusRequester() }
+    val enfoques =
+        remember {
+            EnfoquesControles(
+                alternar = enfoqueAlternar,
+                audio = FocusRequester(),
+                subtitulos = FocusRequester(),
+                primeraOpcion = FocusRequester(),
+            )
+        }
     val revelar = {
         interacciones += 1
         controlesVisibles = true
     }
+    val panelPistas = recordarPanelPistas(enfoques, revelar)
 
     InmersivoPantallaCompleta(vista)
     EfectosReproductor(
@@ -209,11 +255,15 @@ private fun SuperficieReproductor(
         fase = fase,
         controlesVisibles = controlesVisibles,
         interacciones = interacciones,
+        panelAbierto = panelPistas.tipo != null,
         esTelevision = esTelevision,
         enfoqueRaiz = enfoqueRaiz,
         enfoqueAlternar = enfoqueAlternar,
         alTerminar = revelar,
-        alOcultar = { controlesVisibles = false },
+        alOcultar = {
+            panelPistas.alCerrar()
+            controlesVisibles = false
+        },
     )
     Box(
         modifier =
@@ -224,7 +274,10 @@ private fun SuperficieReproductor(
                 .toquesReproductor(
                     fase = fase,
                     controlesVisibles = controlesVisibles,
-                    alOcultar = { controlesVisibles = false },
+                    alOcultar = {
+                        panelPistas.alCerrar()
+                        controlesVisibles = false
+                    },
                     alRevelar = revelar,
                 )
                 .focusable(),
@@ -239,7 +292,9 @@ private fun SuperficieReproductor(
                 fase = fase,
                 modo = modo,
                 arrastreMs = arrastreMs,
-                enfoqueAlternar = enfoqueAlternar,
+                pistas = pistas,
+                panelPistas = panelPistas,
+                enfoques = enfoques,
                 acciones =
                     AccionesReproductor(
                         alAlternar = {
@@ -267,6 +322,7 @@ private fun SuperficieReproductor(
                             onSalir()
                         },
                     ),
+                accionesPistas = accionesPistas,
             )
         }
     }
@@ -289,8 +345,11 @@ private fun BoxScope.Controles(
     fase: EstadoReproductor,
     modo: ModoAspecto,
     arrastreMs: Long?,
-    enfoqueAlternar: FocusRequester,
+    pistas: EstadoPistas,
+    panelPistas: EstadoPanelPistas,
+    enfoques: EnfoquesControles,
     acciones: AccionesReproductor,
+    accionesPistas: AccionesPistas,
 ) {
     Box(
         modifier =
@@ -299,7 +358,17 @@ private fun BoxScope.Controles(
                 .testTag(TAG_REPRODUCTOR_CONTROLES),
     ) {
         BarraSuperior(datos, fase, acciones.alSalir)
-        BarraInferior(estado, fase, modo, arrastreMs, enfoqueAlternar, acciones)
+        BarraInferior(
+            estado = estado,
+            fase = fase,
+            modo = modo,
+            arrastreMs = arrastreMs,
+            pistas = pistas,
+            panelPistas = panelPistas,
+            enfoques = enfoques,
+            acciones = acciones,
+            accionesPistas = accionesPistas,
+        )
     }
 }
 
@@ -359,8 +428,11 @@ private fun BoxScope.BarraInferior(
     fase: EstadoReproductor,
     modo: ModoAspecto,
     arrastreMs: Long?,
-    enfoqueAlternar: FocusRequester,
+    pistas: EstadoPistas,
+    panelPistas: EstadoPanelPistas,
+    enfoques: EnfoquesControles,
     acciones: AccionesReproductor,
+    accionesPistas: AccionesPistas,
 ) {
     val duracion = estado.duracionMs
     val posicion = (arrastreMs ?: estado.posicionMs).coerceIn(0L, maxOf(duracion, 0L))
@@ -378,10 +450,17 @@ private fun BoxScope.BarraInferior(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        panelPistas.tipo?.let { tipo ->
+            PanelPistas(tipo, pistas, enfoques.primeraOpcion, accionesPistas, panelPistas.alCerrar)
+        }
+        AvisoPistas(pistas)
         FilaProgreso(duracion, posicion, estado.puedeBuscar, acciones)
-        FilaBotones(fase, modo, estado.puedeBuscar, enfoqueAlternar, acciones)
+        FilaBotones(fase, modo, estado.puedeBuscar, enfoques.alternar, acciones)
+        FilaPistas(pistas, enfoques, panelPistas.alAbrir)
     }
 }
+
+/** Aviso persistente de preferencia guardada que el contenido no ofrece (S44d). */
 
 @Composable
 private fun FilaProgreso(
@@ -530,6 +609,7 @@ private fun EfectosReproductor(
     fase: EstadoReproductor,
     controlesVisibles: Boolean,
     interacciones: Long,
+    panelAbierto: Boolean,
     esTelevision: Boolean,
     enfoqueRaiz: FocusRequester,
     enfoqueAlternar: FocusRequester,
@@ -541,13 +621,15 @@ private fun EfectosReproductor(
             fase == EstadoReproductor.REPRODUCIENDO || fase == EstadoReproductor.BUFFERING
         if (fase == EstadoReproductor.TERMINADO) alTerminar()
     }
-    LaunchedEffect(controlesVisibles, interacciones, fase) {
-        if (controlesVisibles && debeOcultarse(fase)) {
+    LaunchedEffect(controlesVisibles, interacciones, fase, panelAbierto) {
+        if (controlesVisibles && !panelAbierto && debeOcultarse(fase)) {
             delay(TIEMPO_AUTO_OCULTAR_MS)
             alOcultar()
         }
     }
-    LaunchedEffect(controlesVisibles, esTelevision, fase) {
+    // El foco solo se mueve cuando aparecen o desaparecen los controles: una
+    // fase nueva o un panel abierto no deben robarlo.
+    LaunchedEffect(controlesVisibles, esTelevision) {
         if (!esTelevision) return@LaunchedEffect
         val objetivo = if (controlesVisibles) enfoqueAlternar else enfoqueRaiz
         runCatching { objetivo.requestFocus() }
@@ -566,38 +648,6 @@ private fun Modifier.toquesReproductor(
             if (controlesVisibles && debeOcultarse(fase)) alOcultar() else alRevelar()
         }
     }
-
-@Composable
-private fun BotonControl(
-    etiqueta: String,
-    tag: String,
-    onClick: () -> Unit,
-    habilitado: Boolean = true,
-    modifier: Modifier = Modifier,
-    contenido: @Composable () -> Unit,
-) {
-    var enfocado by remember { mutableStateOf(false) }
-    val forma = RoundedCornerShape(8.dp)
-    Box(
-        modifier =
-            modifier
-                .testTag(tag)
-                .onFocusChanged { enfocado = it.isFocused }
-                .clip(forma)
-                .border(
-                    width = if (enfocado) 2.dp else 1.dp,
-                    color = if (enfocado) Color.White else Color.White.copy(alpha = 0.32f),
-                    shape = forma,
-                )
-                .clickable(enabled = habilitado, onClick = onClick)
-                .semantics { contentDescription = etiqueta }
-                .alpha(if (habilitado) 1f else 0.45f)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        contenido()
-    }
-}
 
 @Composable
 private fun etiquetaFase(fase: EstadoReproductor): String =

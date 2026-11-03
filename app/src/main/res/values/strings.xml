@@ -135,4 +135,21 @@
     <string name="reproductor_fase_pausado">Pausado</string>
     <string name="reproductor_fase_terminado">Finalizado</string>
     <string name="reproductor_fase_error">Error</string>
+    <string name="reproductor_audio">Audio</string>
+    <string name="reproductor_subtitulos">Subtítulos</string>
+    <string name="reproductor_audio_etiqueta">Audio: %1$s</string>
+    <string name="reproductor_subtitulos_etiqueta">Subtítulos: %1$s</string>
+    <string name="reproductor_selector_audio">Seleccionar pista de audio</string>
+    <string name="reproductor_selector_subtitulos">Seleccionar pista de subtítulos</string>
+    <string name="reproductor_pista_automatica">Automático</string>
+    <string name="reproductor_subtitulos_desactivados">Desactivados</string>
+    <string name="reproductor_pista_seleccionada">Seleccionada</string>
+    <string name="reproductor_pista_activa">%1$s · activa</string>
+    <string name="reproductor_pista_forzada">%1$s · forzada</string>
+    <string name="reproductor_pista_no_soportada">%1$s · no compatible</string>
+    <string name="reproductor_pista_numero">Pista %1$d</string>
+    <string name="reproductor_idioma_no_indicado">Idioma no indicado</string>
+    <string name="reproductor_preferencia_guardada">Preferida: %1$s (no disponible)</string>
+    <string name="reproductor_aviso_audio">La pista de audio preferida (%1$s) no está disponible; se usa automático.</string>
+    <string name="reproductor_aviso_subtitulos">La pista de subtítulos preferida (%1$s) no está disponible; se usa automático.</string>
 </resources>

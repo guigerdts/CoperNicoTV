@@ -312,7 +312,7 @@ class SesionMedia3(
                         tipo = tipo,
                         idioma = formato.language,
                         etiqueta = formato.label,
-                        canales = if (formato.channelCount == C.CHANNEL_COUNT_UNSET) 0 else formato.channelCount,
+                        canales = formato.channelCount.coerceAtLeast(0),
                         forzada = formato.selectionFlags and C.SELECTION_FLAG_FORCED != 0,
                         activa = grupo.isTrackSelected(indicePista),
                         soportada = grupo.isTrackSupported(indicePista),

@@ -105,8 +105,9 @@ class ReproductorReintentosTest {
         val texto = composeRule.textoDeTag(TAG_REPRODUCTOR_ERROR)
         assertTrue("El error debe tipar el 4xx: $texto", texto.contains("http_cliente"))
         assertEquals(0, PuertaReintentos.esperasRegistradas)
-        assertEquals(1, servidor.peticionesDe("f15/ausente.mp4"))
         assertNull(composeRule.viewModelReproductor().sesionActual())
+        // Una sola petición: ni la aplicación ni Media3 reintentan un 4xx.
+        assertEquals(1, servidor.peticionesDe("f15/ausente.mp4"))
     }
 
     @Test
@@ -133,7 +134,8 @@ class ReproductorReintentosTest {
         composeRule.esperarTagAusente(TAG_REPRODUCTOR_REINTENTO)
         val texto = composeRule.textoDeTag(TAG_REPRODUCTOR_ERROR)
         assertTrue("El error definitivo debe tipar el 5xx: $texto", texto.contains("http_servidor"))
-        assertTrue(servidor.peticionesDe(FixturesF15.MP4) >= 4)
+        // Un intento por cada prepare: el inicial más los tres de S20.
+        assertEquals(4, servidor.peticionesDe(FixturesF15.MP4))
         assertNull(composeRule.viewModelReproductor().sesionActual())
     }
 

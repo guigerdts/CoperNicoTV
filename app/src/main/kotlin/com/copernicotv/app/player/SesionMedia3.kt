@@ -10,7 +10,6 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -32,9 +31,9 @@ import java.util.concurrent.atomic.AtomicBoolean
  * liberación es idempotente para sobrevivir a dobles llamadas del ciclo de vida.
  *
  * La recuperación de S20 reintenta sobre la misma instancia con `prepare()`:
- * nunca se recrea la sesión. Los reintentos de Media3 se desactivan en el
- * `MediaSourceFactory` para que la política observable sea exactamente la de
- * S20 y no una suma de reintentos internos más los propios.
+ * nunca se recrea la sesión. Los reintentos internos de Media3 se desactivan
+ * con [PoliticaErroresMedia3] para que la política observable sea exactamente
+ * la de S20 y no una suma de reintentos internos más los propios.
  *
  * La URL vive únicamente dentro de `MediaItem`; el estado publicado no la
  * expone ni se registra en logs (S57a).
@@ -65,7 +64,7 @@ class SesionMedia3(
         ExoPlayer.Builder(contexto)
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(contexto)
-                    .setLoadErrorHandlingPolicy(DefaultLoadErrorHandlingPolicy(0)),
+                    .setLoadErrorHandlingPolicy(PoliticaErroresMedia3()),
             )
             .build()
 

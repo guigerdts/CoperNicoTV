@@ -116,7 +116,7 @@ jobs:
           # excluye a propósito porque corre en el job de TV.
           script: >-
             ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.BusquedaFiltrosTest,com.copernicotv.app.CatalogoUiTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest,com.copernicotv.app.ActualizacionManualTest,com.copernicotv.app.FuentesUiTest,com.copernicotv.app.GuiaUiTest,com.copernicotv.app.ReproductorUiTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioMovilTest,com.copernicotv.app.BusquedaFiltrosTest,com.copernicotv.app.CatalogoUiTest,com.copernicotv.app.ClavesKeystoreTest,com.copernicotv.app.CredencialesEnReposoTest,com.copernicotv.app.ImportacionSafTest,com.copernicotv.app.ActualizacionManualTest,com.copernicotv.app.FuentesUiTest,com.copernicotv.app.GuiaUiTest,com.copernicotv.app.ReproductorUiTest,com.copernicotv.app.ReproductorControlesTest
       - name: Publicar reportes instrumentados
         if: always()
         uses: actions/upload-artifact@v4
@@ -155,7 +155,7 @@ jobs:
           disable-animations: true
           script: >-
             ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest
+            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ReproductorTvTest
       - name: Publicar reportes instrumentados de TV
         if: always()
         uses: actions/upload-artifact@v4

@@ -47,12 +47,23 @@ internal fun sembrarCanal(
 
 /** Abre el primer Canal sembrado y espera a la pantalla de reproducción. */
 internal fun ReglaPrincipal.abrirReproductor() {
+    abrirPantallaReproductor()
+    esperarTag(TAG_REPRODUCTOR_ESTADO)
+}
+
+/**
+ * Abre el primer Canal sembrado y espera solo la raíz de la pantalla.
+ *
+ * Sirve cuando el contenido falla de inmediato: el error definitivo de S20
+ * sustituye al reproductor y el diagnóstico de E6-T2 nunca llega a existir, así
+ * que esperar [TAG_REPRODUCTOR_ESTADO] sería una carrera contra el fallo.
+ */
+internal fun ReglaPrincipal.abrirPantallaReproductor() {
     esperarTag(PREFIJO_TAG_CANAL + 0)
     onNodeWithTag(PREFIJO_TAG_CANAL + 0).performClick()
     esperarTag(TAG_ACCION_REPRODUCIR)
     onNodeWithTag(TAG_ACCION_REPRODUCIR).performClick()
     esperarTag(TAG_REPRODUCTOR)
-    esperarTag(TAG_REPRODUCTOR_ESTADO)
 }
 
 /** Texto visible de la semántica con [tag], o cadena vacía si no existe. */

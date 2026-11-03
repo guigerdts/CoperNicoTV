@@ -90,7 +90,9 @@ class ReproductorViewModel
          * recomposición o una actividad recreada no vuelven a abrir el motor.
          */
         fun cargar(canalId: Long) {
-            if (canalCargado == canalId && sesion != null) return
+            // Una carga en curso para el mismo Canal ya es dueña de la sesión:
+            // repetirla la liberaría y reiniciaría el presupuesto de S20.
+            if (canalCargado == canalId && (sesion != null || carga?.isActive == true)) return
             canalCargado = canalId
             carga?.cancel()
             carga =
@@ -109,8 +111,10 @@ class ReproductorViewModel
                             preferenciasActuales =
                                 runCatching { preferenciasPista.leer() }
                                     .getOrDefault(PreferenciasPista())
-                            abrirSesion(datos.url, preferenciasActuales)
-                            _estado.value = datos
+                            val nueva = abrirSesion(datos.url, preferenciasActuales)
+                            // Si la sesión falló antes de publicar el Canal, el
+                            // error definitivo ya ganó: no lo pisamos con Listo.
+                            if (sesion === nueva) _estado.value = datos
                         }
                         is ResultadoStream.Error -> {
                             _estado.value = ReproductorUiState.Error(resultado.codigo)
@@ -192,7 +196,7 @@ class ReproductorViewModel
         private fun abrirSesion(
             url: String,
             preferencias: PreferenciasPista,
-        ) {
+        ): SesionMedia3 {
             val nueva = SesionMedia3(contexto, url, preferencias, politica = politicaReintentos)
             sesion = nueva
             recolector?.cancel()
@@ -222,6 +226,7 @@ class ReproductorViewModel
                             )
                     }
                 }
+            return nueva
         }
 
         private fun guardarPreferencias(preferencias: PreferenciasPista) {

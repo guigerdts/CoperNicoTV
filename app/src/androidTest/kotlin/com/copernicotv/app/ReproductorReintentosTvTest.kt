@@ -11,6 +11,7 @@ import com.copernicotv.app.ui.TAG_REPRODUCTOR_REINTENTO
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_VOLVER
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -21,6 +22,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 /**
@@ -47,6 +49,9 @@ class ReproductorReintentosTvTest {
 
     private lateinit var servidor: ServidorMedios
 
+    /** Fallo transitorio controlado por la prueba; se apaga al recuperar. */
+    private val fallar = AtomicBoolean(true)
+
     @Before
     fun preparar() {
         hiltRule.inject()
@@ -54,9 +59,10 @@ class ReproductorReintentosTvTest {
         val assets = InstrumentationRegistry.getInstrumentation().context.assets
         FixturesF15.verificar(assets)
         PuertaReintentos.reiniciar()
+        fallar.set(true)
         servidor =
-            ServidorMedios(assets) { ruta, peticion ->
-                if (ruta == FixturesF15.MP4 && peticion == 1) 500 else null
+            ServidorMedios(assets) { ruta, _ ->
+                if (ruta == FixturesF15.MP4 && fallar.get()) 500 else null
             }.also { it.iniciar() }
     }
 
@@ -71,7 +77,7 @@ class ReproductorReintentosTvTest {
         composeRule.abrirReproductor()
         composeRule.mostrarControlesConDpad()
 
-        val reintento = esperarSesion { it.estado == EstadoReproductor.REINTENTANDO }
+        val reintento = esperarSesion("primer reintento en TV") { it.estado == EstadoReproductor.REINTENTANDO }
         assertEquals(1, reintento.reintento)
         assertEquals(3, reintento.reintentosMaximos)
         composeRule.mostrarControlesConDpad()
@@ -81,9 +87,10 @@ class ReproductorReintentosTvTest {
         composeRule.esperarFocoEnAlternar()
         val sesion = requireNotNull(composeRule.viewModelReproductor().sesionActual())
 
+        fallar.set(false)
         PuertaReintentos.liberar()
 
-        esperarSesion {
+        esperarSesion("recuperación tras el reintento en TV") {
             it.estado == EstadoReproductor.REPRODUCIENDO || it.estado == EstadoReproductor.PAUSADO
         }
         composeRule.esperarTagAusente(TAG_REPRODUCTOR_REINTENTO)
@@ -93,7 +100,7 @@ class ReproductorReintentosTvTest {
     @Test
     fun elErrorDefinitivoSeMuestraConVolverEnTv() {
         sembrarCanal(catalogo, FixturesF15.url(servidor, "f15/ausente.mp4"))
-        composeRule.abrirReproductor()
+        composeRule.abrirPantallaReproductor()
 
         composeRule.esperarTag(TAG_REPRODUCTOR_ERROR)
         composeRule.esperarTag(TAG_REPRODUCTOR_VOLVER)
@@ -102,11 +109,26 @@ class ReproductorReintentosTvTest {
         composeRule.esperarTagAusente(TAG_REPRODUCTOR_REINTENTO)
     }
 
-    private fun esperarSesion(predicado: (EstadoSesion) -> Boolean): EstadoSesion =
-        runBlocking {
-            withTimeout(ESPERA_ESTADO_MS) {
-                composeRule.viewModelReproductor().sesionEstado.first(predicado)
+    private fun esperarSesion(
+        descripcion: String,
+        predicado: (EstadoSesion) -> Boolean,
+    ): EstadoSesion =
+        try {
+            runBlocking {
+                withTimeout(ESPERA_ESTADO_MS) {
+                    composeRule.viewModelReproductor().sesionEstado.first(predicado)
+                }
             }
+        } catch (error: TimeoutCancellationException) {
+            val viewModel = composeRule.viewModelReproductor()
+            throw AssertionError(
+                "No se alcanzó «$descripcion» en $ESPERA_ESTADO_MS ms." +
+                    " estadoSesion=${viewModel.sesionEstado.value}" +
+                    " haySesion=${viewModel.sesionActual() != null}" +
+                    " esperasRegistradas=${PuertaReintentos.esperasRegistradas}" +
+                    " peticionesMp4=${servidor.peticionesDe(FixturesF15.MP4)}",
+                error,
+            )
         }
 
     private companion object {

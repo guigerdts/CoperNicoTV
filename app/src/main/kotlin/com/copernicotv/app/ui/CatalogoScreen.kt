@@ -160,6 +160,9 @@ const val TAG_ACCIONES_CANAL = "acciones-canal"
 /** Etiqueta de la acción Favorito. */
 const val TAG_ACCION_FAVORITO = "accion-favorito"
 
+/** Etiqueta de la acción Reproducir (E6-T1). */
+const val TAG_ACCION_REPRODUCIR = "accion-reproducir"
+
 /** Etiqueta de la acción Ocultar/Mostrar. */
 const val TAG_ACCION_OCULTO = "accion-oculto"
 
@@ -301,6 +304,7 @@ data class CatalogoAcciones(
     val onCrearCanal: (String?, String) -> Unit,
     val onEditarNombreCanal: (Long, String?) -> Unit,
     val onEliminarCanal: (Long) -> Unit,
+    val onReproducir: (Long) -> Unit,
     val onAlternarFavorito: (Long) -> Unit,
     val onAlternarOculto: (Long) -> Unit,
     val onMoverCanal: (Long, Int) -> Unit,
@@ -796,6 +800,10 @@ private fun DialogoCatalogoActivo(
         is DialogoCatalogo.AccionesCanal ->
             DialogoAccionesCanal(
                 canal = actual.canal,
+                onReproducir = {
+                    acciones.onReproducir(actual.canal.id)
+                    onDialogo(null)
+                },
                 onFavorito = {
                     acciones.onAlternarFavorito(actual.canal.id)
                     onDialogo(null)
@@ -1714,6 +1722,7 @@ private fun DialogoConfirmar(
 @Composable
 private fun DialogoAccionesCanal(
     canal: CanalBusqueda,
+    onReproducir: () -> Unit,
     onFavorito: () -> Unit,
     onOculto: () -> Unit,
     onEditar: () -> Unit,
@@ -1732,6 +1741,12 @@ private fun DialogoAccionesCanal(
                 modifier = Modifier.width(320.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                TextButton(
+                    onClick = onReproducir,
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_ACCION_REPRODUCIR),
+                ) {
+                    Text(stringResource(R.string.catalogo_reproducir))
+                }
                 TextButton(
                     onClick = onFavorito,
                     modifier = Modifier.fillMaxWidth().testTag(TAG_ACCION_FAVORITO),

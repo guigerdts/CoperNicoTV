@@ -118,4 +118,7 @@
     <string name="guia_canal_sin_nombre">Sin nombre</string>
     <string name="guia_estado">Estado: %1$s</string>
     <string name="guia_channel_id">ID de guía: %1$s</string>
+    <string name="catalogo_reproducir">Reproducir</string>
+    <string name="reproductor_volver">Volver</string>
+    <string name="reproductor_error">No se pudo reproducir: %1$s</string>
 </resources>

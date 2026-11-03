@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Solo en debug: las pruebas instrumentadas de reproducción (E6-T1) sirven
+    los fixtures por HTTP en la interfaz de loopback del emulador. Release no
+    hereda esta política: el manifiesto de producción no la declara.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

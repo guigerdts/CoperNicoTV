@@ -25,11 +25,12 @@ import com.copernicotv.app.ui.FuentesViewModel
 import com.copernicotv.app.ui.GuiaScreen
 import com.copernicotv.app.ui.GuiaViewModel
 import com.copernicotv.app.ui.PerfilesUiState
+import com.copernicotv.app.ui.ReproductorScreen
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /** Pantallas de la actividad única. */
-private enum class Pantalla { CATALOGO, FUENTES, GUIA }
+private enum class Pantalla { CATALOGO, FUENTES, GUIA, REPRODUCTOR }
 
 /** Única actividad del canario de E1-C. */
 @AndroidEntryPoint
@@ -45,11 +46,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             CoperNicoTheme {
                 var pantalla by rememberSaveable { mutableStateOf(Pantalla.CATALOGO) }
+                var canalReproduciendo by rememberSaveable { mutableStateOf(-1L) }
                 when (pantalla) {
                     Pantalla.CATALOGO ->
                         PantallaCatalogo(
                             onAbrirFuentes = { pantalla = Pantalla.FUENTES },
                             onAbrirGuia = { pantalla = Pantalla.GUIA },
+                            onAbrirReproductor = { canalId ->
+                                canalReproduciendo = canalId
+                                pantalla = Pantalla.REPRODUCTOR
+                            },
                         )
                     Pantalla.FUENTES -> {
                         val fuentesViewModel: FuentesViewModel = hiltViewModel()
@@ -81,6 +87,11 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                    Pantalla.REPRODUCTOR ->
+                        ReproductorScreen(
+                            canalId = canalReproduciendo,
+                            onVolver = { pantalla = Pantalla.CATALOGO },
+                        )
                 }
             }
         }
@@ -91,6 +102,7 @@ class MainActivity : ComponentActivity() {
 private fun PantallaCatalogo(
     onAbrirFuentes: () -> Unit,
     onAbrirGuia: () -> Unit,
+    onAbrirReproductor: (Long) -> Unit,
 ) {
     val viewModel: CatalogoViewModel = hiltViewModel()
     val estado by viewModel.estado.collectAsStateWithLifecycle()
@@ -150,6 +162,7 @@ private fun PantallaCatalogo(
                 onCrearCanal = viewModel::crearCanal,
                 onEditarNombreCanal = viewModel::editarNombreCanal,
                 onEliminarCanal = viewModel::eliminarCanal,
+                onReproducir = onAbrirReproductor,
                 onAlternarFavorito = viewModel::alternarFavorito,
                 onAlternarOculto = viewModel::alternarOculto,
                 onMoverCanal = viewModel::moverCanal,

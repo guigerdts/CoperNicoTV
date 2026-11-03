@@ -64,7 +64,24 @@ class ReproductorUiTest {
         hiltRule.inject()
         runBlocking { db.clearAllTables() }
         val assets = InstrumentationRegistry.getInstrumentation().context.assets
+        verificarFixtures(assets)
         servidor = ServidorMedios(assets).also { it.iniciar() }
+    }
+
+    /**
+     * Comprueba que los fixtures viajaron en el APK de pruebas.
+     *
+     * Sin esto, una ruta de asset equivocada se manifiesta como un `http_error`
+     * genérico tras 30 s de espera; aquí el fallo dice exactamente qué ruta
+     * falta.
+     */
+    private fun verificarFixtures(assets: AssetManager) {
+        listOf("f15/f15.mp4", "f15/f15.m3u8", "f15/f15_000.ts").forEach { ruta ->
+            val primerByte = runCatching { assets.open(ruta).use { it.read() } }.getOrNull()
+            if (primerByte == null || primerByte < 0) {
+                throw AssertionError("Fixture ausente o vacío en el APK de pruebas: $ruta")
+            }
+        }
     }
 
     @After
@@ -74,7 +91,7 @@ class ReproductorUiTest {
 
     @Test
     fun unMp4ProgresivoReproduceYAvanceLaPosicion() {
-        sembrarCanal("http://127.0.0.1:${servidor.puerto}/f15.mp4")
+        sembrarCanal("http://127.0.0.1:${servidor.puerto}/f15/f15.mp4")
 
         abrirReproductor()
 
@@ -83,7 +100,7 @@ class ReproductorUiTest {
 
     @Test
     fun unHlsReproduceYAvanceLaPosicion() {
-        sembrarCanal("http://127.0.0.1:${servidor.puerto}/f15.m3u8")
+        sembrarCanal("http://127.0.0.1:${servidor.puerto}/f15/f15.m3u8")
 
         abrirReproductor()
 
@@ -92,7 +109,7 @@ class ReproductorUiTest {
 
     @Test
     fun unRecursoAusenteMuestraUnCodigoPropioSinUrl() {
-        sembrarCanal("http://127.0.0.1:${servidor.puerto}/ausente.mp4")
+        sembrarCanal("http://127.0.0.1:${servidor.puerto}/f15/ausente.mp4")
 
         abrirReproductor()
 

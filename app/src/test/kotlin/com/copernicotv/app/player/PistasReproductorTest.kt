@@ -112,7 +112,7 @@ class PistasReproductorTest {
     }
 
     private fun pista(
-        indice: Int,
+        indice: Int = 0,
         idioma: String? = "spa",
         etiqueta: String? = null,
         activa: Boolean = false,

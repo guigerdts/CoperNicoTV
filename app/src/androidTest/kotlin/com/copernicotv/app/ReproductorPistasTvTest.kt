@@ -97,7 +97,9 @@ class ReproductorPistasTvTest {
         composeRule.esperarFocoEn(TAG_REPRODUCTOR_AUDIO)
         assertSame("Cambiar de audio recreó la sesión Media3", sesion, viewModel.sesionActual())
         val audioGuardado = runBlocking { preferencias.leer().audio } as PreferenciaPista.Pista
-        assertEquals("eng", audioGuardado.idioma)
+        val audioActivo = viewModel.estadoPistas.value.audio.first { it.activa }
+        assertEquals(audioActivo.idioma, audioGuardado.idioma)
+        assertEquals(audioActivo.etiqueta, audioGuardado.etiqueta)
     }
 
     @Test

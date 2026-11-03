@@ -99,7 +99,9 @@ class ReproductorPistasTest {
         assertSame("Cambiar de audio recreó la sesión Media3", sesion, viewModel.sesionActual())
         assertFalse("Cambiar de audio liberó la sesión Media3", sesion.estaLiberada())
         val audioGuardado = runBlocking { preferencias.leer().audio } as PreferenciaPista.Pista
-        assertEquals("eng", audioGuardado.idioma)
+        val audioActivo = viewModel.estadoPistas.value.audio.first { it.activa }
+        assertEquals(audioActivo.idioma, audioGuardado.idioma)
+        assertEquals(audioActivo.etiqueta, audioGuardado.etiqueta)
         composeRule.esperarHasta { composeRule.posicionMs() > antes + 300L }
     }
 

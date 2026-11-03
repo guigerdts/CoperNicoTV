@@ -1,6 +1,7 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
@@ -26,6 +27,7 @@ import javax.inject.Inject
  * control play/pausa, que el botón central alterna la reproducción y que las
  * flechas buscan cuando los controles están ocultos.
  */
+@OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
 class ReproductorTvTest {
     @get:Rule(order = 0)

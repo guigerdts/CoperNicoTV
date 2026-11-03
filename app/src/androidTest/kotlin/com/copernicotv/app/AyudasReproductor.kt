@@ -3,7 +3,9 @@ package com.copernicotv.app
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.AndroidComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -137,6 +139,7 @@ internal fun ReglaPrincipal.mostrarControlesConToque() {
 }
 
 /** Revela los controles con el D-pad cuando el auto-ocultado ya actuó. */
+@OptIn(ExperimentalTestApi::class)
 internal fun ReglaPrincipal.mostrarControlesConDpad() {
     if (hayControles()) return
     onNodeWithTag(TAG_REPRODUCTOR).performKeyInput { pressKey(Key.DirectionDown) }

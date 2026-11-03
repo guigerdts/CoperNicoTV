@@ -10,18 +10,30 @@ import java.io.Closeable
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Servidor HTTP mínimo con soporte de `Range` sobre los fixtures del APK de
  * pruebas. Atiende cada conexión en una corrutina de IO; no usa hilos
  * manuales. Lo comparten las pruebas de reproducción móvil y de Android TV.
+ *
+ * [decidirFallo] permite simular respuestas de error por ruta y número de
+ * petición (E6-T4): devolver un estado fuerza esa respuesta sin servir el
+ * fixture; devolver `null` deja el comportamiento normal. [peticionesDe] cuenta
+ * las peticiones de una ruta para comprobar cuántos reintentos hubo.
  */
 internal class ServidorMedios(
     private val assets: AssetManager,
+    private val decidirFallo: (ruta: String, peticion: Int) -> Int? = { _, _ -> null },
 ) : Closeable {
     private val socket = ServerSocket(0, 0, InetAddress.getByName("127.0.0.1"))
     private val alcance = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val contadores = ConcurrentHashMap<String, AtomicInteger>()
     val puerto: Int = socket.localPort
+
+    /** Peticiones recibidas para [ruta] desde que se creó el servidor. */
+    fun peticionesDe(ruta: String): Int = contadores[ruta]?.get() ?: 0
 
     fun iniciar() {
         alcance.launch {
@@ -51,6 +63,12 @@ internal class ServidorMedios(
                 if (cabecera.startsWith("Range:", ignoreCase = true)) {
                     rango = cabecera.substringAfter(':').trim()
                 }
+            }
+            val numero = contadores.computeIfAbsent(ruta) { AtomicInteger() }.incrementAndGet()
+            val estadoForzado = decidirFallo(ruta, numero)
+            if (estadoForzado != null) {
+                responder(abierta, metodo, estadoForzado, "text/plain", "fallo simulado".toByteArray(), null)
+                return
             }
             val contenido = leer(ruta)
             if (contenido == null) {
@@ -128,7 +146,12 @@ internal class ServidorMedios(
         when (estado) {
             200 -> "OK"
             206 -> "Partial Content"
-            else -> "Not Found"
+            400 -> "Bad Request"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            500 -> "Internal Server Error"
+            503 -> "Service Unavailable"
+            else -> if (estado >= 500) "Server Error" else "Error"
         }
 
     private companion object {

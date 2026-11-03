@@ -12,6 +12,7 @@ import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.app.player.PistaDisponible
+import com.copernicotv.app.player.PoliticaReintentos
 import com.copernicotv.app.player.PreferenciaPista
 import com.copernicotv.app.player.PreferenciasPista
 import com.copernicotv.app.player.SesionMedia3
@@ -62,6 +63,7 @@ class ReproductorViewModel
         private val repositorio: ReproductorRepositorio,
         @ApplicationContext private val contexto: Context,
         private val preferenciasPista: RepositorioPreferenciasPista,
+        private val politicaReintentos: PoliticaReintentos,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -191,12 +193,14 @@ class ReproductorViewModel
             url: String,
             preferencias: PreferenciasPista,
         ) {
-            val nueva = SesionMedia3(contexto, url, preferencias)
+            val nueva = SesionMedia3(contexto, url, preferencias, politica = politicaReintentos)
             sesion = nueva
             recolector?.cancel()
             recolector =
                 viewModelScope.launch {
                     nueva.estado.collect { estadoSesion ->
+                        // Un callback de la sesión anterior no debe tocar la nueva (E6-T4).
+                        if (sesion !== nueva) return@collect
                         _sesionEstado.value = estadoSesion
                         if (estadoSesion.estado == EstadoReproductor.ERROR) {
                             _estado.value =
@@ -209,6 +213,7 @@ class ReproductorViewModel
             recolectorPistas =
                 viewModelScope.launch {
                     nueva.estadoPistas.collect { pistas ->
+                        if (sesion !== nueva) return@collect
                         _estadoPistas.value = pistas
                         preferenciasActuales =
                             PreferenciasPista(
@@ -227,12 +232,15 @@ class ReproductorViewModel
         }
 
         private fun cerrarSesion() {
+            // La sesión deja de ser la vigente antes de cancelar los recolectores:
+            // así una entrega en vuelo no puede escribir estado de la anterior.
+            val anterior = sesion
+            sesion = null
             recolector?.cancel()
             recolector = null
             recolectorPistas?.cancel()
             recolectorPistas = null
-            sesion?.liberar()
-            sesion = null
+            anterior?.liberar()
             _sesionEstado.value = EstadoSesion()
             _estadoPistas.value = EstadoPistas()
         }

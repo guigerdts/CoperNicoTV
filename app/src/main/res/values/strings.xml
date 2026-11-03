@@ -134,7 +134,9 @@
     <string name="reproductor_fase_reproduciendo">Reproduciendo</string>
     <string name="reproductor_fase_pausado">Pausado</string>
     <string name="reproductor_fase_terminado">Finalizado</string>
+    <string name="reproductor_fase_reintentando">Reintentando</string>
     <string name="reproductor_fase_error">Error</string>
+    <string name="reproductor_reintento">Sin conexión. Reintentando %1$d de %2$d…</string>
     <string name="reproductor_audio">Audio</string>
     <string name="reproductor_subtitulos">Subtítulos</string>
     <string name="reproductor_audio_etiqueta">Audio: %1$s</string>

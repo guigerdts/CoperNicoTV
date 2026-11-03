@@ -76,6 +76,9 @@ const val TAG_IMPORTAR = "importar-fixture"
 /** Etiqueta del disparador de selección de documento SAF. */
 const val TAG_ABRIR_DOCUMENTO = "abrir-documento"
 
+/** Etiqueta del disparador de alta de Fuente por URL. */
+const val TAG_IMPORTAR_URL = "importar-url"
+
 /** Etiqueta del disparador de Actualización manual de la Lista activa. */
 const val TAG_ACTUALIZAR = "actualizar-lista"
 
@@ -283,6 +286,7 @@ data class PerfilesUiState(
 data class CatalogoAcciones(
     val onImportar: () -> Unit,
     val onAbrirDocumento: () -> Unit,
+    val onImportarUrl: (String, String) -> Unit,
     val onActualizar: () -> Unit,
     val onTexto: (String) -> Unit,
     val onGrupo: (Long?) -> Unit,
@@ -457,23 +461,12 @@ private fun Controles(
         text = stringResource(R.string.catalogo_titulo),
         style = MaterialTheme.typography.headlineMedium,
     )
-    Button(
-        onClick = acciones.onAbrirDocumento,
-        enabled = !estado.importando && !estado.actualizando,
-        modifier =
-            Modifier
-                .focusRequester(focoInicial)
-                .testTag(TAG_ABRIR_DOCUMENTO),
-    ) {
-        Text(stringResource(R.string.catalogo_abrir_documento))
-    }
-    Button(
-        onClick = acciones.onImportar,
-        enabled = !estado.importando && !estado.actualizando,
-        modifier = Modifier.testTag(TAG_IMPORTAR),
-    ) {
-        Text(stringResource(R.string.catalogo_importar))
-    }
+    AccionesImportacion(
+        estado = estado,
+        acciones = acciones,
+        focoInicial = focoInicial,
+        onDialogo = onDialogo,
+    )
     SelectorLista(
         listas = listas,
         listaActiva = listaActiva,
@@ -565,6 +558,41 @@ private fun Controles(
         modifier = Modifier.testTag(TAG_NUEVO_CANAL),
     ) {
         Text(stringResource(R.string.catalogo_nuevo_canal))
+    }
+}
+
+/** Alta de Fuente por documento SAF, URL o fixtures de prueba. */
+@Composable
+private fun AccionesImportacion(
+    estado: CatalogoUiState,
+    acciones: CatalogoAcciones,
+    focoInicial: FocusRequester,
+    onDialogo: (DialogoCatalogo) -> Unit,
+) {
+    val habilitado = !estado.importando && !estado.actualizando
+    Button(
+        onClick = acciones.onAbrirDocumento,
+        enabled = habilitado,
+        modifier =
+            Modifier
+                .focusRequester(focoInicial)
+                .testTag(TAG_ABRIR_DOCUMENTO),
+    ) {
+        Text(stringResource(R.string.catalogo_abrir_documento))
+    }
+    Button(
+        onClick = { onDialogo(DialogoCatalogo.ImportarUrl) },
+        enabled = habilitado,
+        modifier = Modifier.testTag(TAG_IMPORTAR_URL),
+    ) {
+        Text(stringResource(R.string.catalogo_importar_url))
+    }
+    Button(
+        onClick = acciones.onImportar,
+        enabled = habilitado,
+        modifier = Modifier.testTag(TAG_IMPORTAR),
+    ) {
+        Text(stringResource(R.string.catalogo_importar))
     }
 }
 
@@ -745,6 +773,14 @@ private fun DialogoCatalogoActivo(
                 onAsociar = acciones.onAsociarListaAPerfil,
                 onDesasociar = acciones.onDesasociarListaDePerfil,
                 onCerrar = { onDialogo(null) },
+            )
+        DialogoCatalogo.ImportarUrl ->
+            DialogoImportarUrl(
+                onGuardar = { nombre, url ->
+                    acciones.onImportarUrl(nombre, url)
+                    onDialogo(null)
+                },
+                onCancelar = { onDialogo(null) },
             )
         DialogoCatalogo.NuevoCanal ->
             DialogoCanal(
@@ -1547,6 +1583,54 @@ private fun DialogoTexto(
 }
 
 @Composable
+private fun DialogoImportarUrl(
+    onGuardar: (String, String) -> Unit,
+    onCancelar: () -> Unit,
+) {
+    var nombre by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text(stringResource(R.string.catalogo_importar_url)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = nombre,
+                    onValueChange = { nombre = it },
+                    label = { Text(stringResource(R.string.catalogo_nombre_fuente)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_DIALOGO_NOMBRE),
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text(stringResource(R.string.catalogo_url_lista)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_DIALOGO_URL),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onGuardar(nombre.trim(), url.trim()) },
+                enabled = nombre.isNotBlank() && url.isNotBlank(),
+                modifier = Modifier.testTag(TAG_DIALOGO_GUARDAR),
+            ) {
+                Text(stringResource(R.string.catalogo_guardar))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onCancelar,
+                modifier = Modifier.testTag(TAG_DIALOGO_CANCELAR),
+            ) {
+                Text(stringResource(R.string.catalogo_cancelar))
+            }
+        },
+    )
+}
+
+@Composable
 private fun DialogoCanal(
     titulo: String,
     nombreInicial: String,
@@ -1724,6 +1808,8 @@ private sealed interface DialogoCatalogo {
     data class AgregarAColeccion(val canal: CanalBusqueda) : DialogoCatalogo
 
     data object Perfiles : DialogoCatalogo
+
+    data object ImportarUrl : DialogoCatalogo
 
     data object NuevoCanal : DialogoCatalogo
 

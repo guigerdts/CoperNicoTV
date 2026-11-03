@@ -135,6 +135,7 @@ private fun PantallaCatalogo(
             CatalogoAcciones(
                 onImportar = viewModel::importarFixture,
                 onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
+                onImportarUrl = viewModel::importarDesdeUrl,
                 onActualizar = viewModel::actualizarListaActiva,
                 onTexto = viewModel::actualizarTexto,
                 onGrupo = viewModel::seleccionarGrupo,

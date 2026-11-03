@@ -156,6 +156,22 @@ class ImportacionE2Test {
     }
 
     @Test
+    fun `una url http valida persiste la fuente y su lista`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_E2) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente URL", url)
+
+                assertEquals(1, resumen.canales)
+                assertEquals(1, db.canalDao().contar())
+                val fuente = requireNotNull(db.fuenteDao().porNombre("Fuente URL"))
+                val lista = db.listaDao().porFuente(fuente.id).single()
+                assertEquals("http", lista.esquema)
+                assertEquals("completada", db.estadoActualizacionDao().ultimoDeLista(lista.id)?.resultado)
+            }
+        }
+    }
+
+    @Test
     fun `un 404 devuelve error tipado sin escribir`() {
         runBlocking {
             conServidor(404) { url ->
@@ -232,6 +248,29 @@ class ImportacionE2Test {
         }
     }
 
+    /** Servidor HTTP de un solo uso que responde [codigo] con [cuerpo]. */
+    private suspend fun conServidorConCuerpo(
+        codigo: Int,
+        cuerpo: String,
+        bloque: suspend (String) -> Unit,
+    ) {
+        val servidor = ServerSocket(0)
+        coroutineScope {
+            val respuesta =
+                async(Dispatchers.IO) {
+                    servidor.use {
+                        it.accept().use { socket -> responderConCuerpo(socket, codigo, cuerpo) }
+                    }
+                }
+            try {
+                bloque("http://127.0.0.1:${servidor.localPort}/lista.m3u")
+            } finally {
+                servidor.close()
+                withTimeoutOrNull(TIEMPO_ESPERA_MS) { respuesta.await() }
+            }
+        }
+    }
+
     /** Acepta la conexión y no responde: el cliente vence por tiempo de lectura. */
     private suspend fun conServidorMudo(bloque: suspend (String) -> Unit) {
         val servidor = ServerSocket(0)
@@ -266,6 +305,30 @@ class ImportacionE2Test {
         val cabecera = "HTTP/1.1 $codigo Prueba\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
         socket.getOutputStream().apply {
             write(cabecera.toByteArray(Charsets.ISO_8859_1))
+            flush()
+        }
+    }
+
+    private fun responderConCuerpo(
+        socket: Socket,
+        codigo: Int,
+        cuerpo: String,
+    ) {
+        socket.soTimeout = TIEMPO_ESPERA_MS.toInt()
+        val lector = socket.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+        var linea = lector.readLine()
+        while (linea != null && linea.isNotEmpty()) {
+            linea = lector.readLine()
+        }
+        val bytes = cuerpo.toByteArray(Charsets.UTF_8)
+        val cabecera =
+            "HTTP/1.1 $codigo Prueba\r\n" +
+                "Content-Type: audio/x-mpegurl; charset=utf-8\r\n" +
+                "Content-Length: ${bytes.size}\r\n" +
+                "Connection: close\r\n\r\n"
+        socket.getOutputStream().apply {
+            write(cabecera.toByteArray(Charsets.ISO_8859_1))
+            write(bytes)
             flush()
         }
     }

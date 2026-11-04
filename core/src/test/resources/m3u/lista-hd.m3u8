@@ -1,0 +1,6 @@
+#EXTM3U
+#EXTINF:-1 tvg-id='cine-1' group-title='Cine',Cine Uno, HD
+https://example.com/cine1.m3u8?token=abc
+#EXTINF:-1 tvg-name="Series, Todo",Series
+#EXTGRP:Series
+https://example.com/series.m3u8

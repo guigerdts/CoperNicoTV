@@ -14,6 +14,7 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.requestFocus
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
+import com.copernicotv.app.ui.TAG_ABRIR_DOCUMENTO
 import com.copernicotv.app.ui.TAG_IMPORTAR
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -25,9 +26,10 @@ import javax.inject.Inject
 /**
  * Canario de Android TV de E1-C.
  *
- * No usa toque: el foco inicial cae en el único control enfocable, se activa
- * con DPAD_CENTER y el catálogo se recorre con DPAD_DOWN. Si el foco no existe
- * o no se mueve, la prueba falla.
+ * No usa toque: el foco inicial cae en el primer control, se baja con
+ * DPAD_DOWN hasta el disparador de importación, se activa con DPAD_CENTER y el
+ * catálogo se recorre con DPAD_DOWN. Si el foco no existe o no se mueve, la
+ * prueba falla.
  */
 @OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
@@ -49,6 +51,11 @@ class CanarioTvTest {
 
     @Test
     fun importaYRecorreElCatalogoSoloConDpad() {
+        // La pantalla tiene dos controles: el foco inicial cae en el primero y
+        // se baja con D-pad hasta el disparador de importación. Así el canario
+        // recorre la UI real y no una versión con un solo botón.
+        composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertIsFocused()
+        composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag(TAG_IMPORTAR).assertIsFocused()
         composeRule.onNodeWithTag(TAG_IMPORTAR).performKeyInput { pressKey(Key.DirectionCenter) }
 

@@ -1,0 +1,31 @@
+{
+  "esquema": "p1-medicion/v1",
+  "fecha": "2026-10-29T12:56:22.970367378Z",
+  "commit": "b186c3a29283472d4f0e63cf4cf6f1bad75479b1",
+  "entorno": {
+    "runner": "ubuntu24",
+    "arquitectura": "X64",
+    "jdk": "17.0.21",
+    "heapMaximoBytes": 536870912
+  },
+  "fixture": {
+    "ruta": "core/src/test/resources/fixtures/F-P1-10k.m3u",
+    "entradas": 10000,
+    "sha256": "45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c"
+  },
+  "metricas": {
+    "parseo": {
+      "calentamientos": 10,
+      "mediciones": 30,
+      "medianaMs": 7.403,
+      "p95Ms": 10.334,
+      "maximoMs": 12.260,
+      "picoHeapMiB": 44.836
+    }
+  },
+  "limites": {
+    "parseoP95Ms": 1200.000,
+    "heapMiB": 256.000
+  },
+  "cumple": true
+}

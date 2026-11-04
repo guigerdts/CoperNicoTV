@@ -4,14 +4,20 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.copernicotv.app.data.db.dao.AparienciaDao
+import com.copernicotv.app.data.db.dao.CacheM3UDao
+import com.copernicotv.app.data.db.dao.CacheXmltvDao
 import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
+import com.copernicotv.app.data.db.dao.EstadoActualizacionDao
+import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
 import com.copernicotv.app.data.db.dao.FuenteDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
+import com.copernicotv.app.data.db.dao.HmacPendienteDao
 import com.copernicotv.app.data.db.dao.ListaDao
 import com.copernicotv.app.data.db.dao.PerfilDao
+import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.db.entities.AparienciaClavePendienteEntity
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.AsociacionEntity
@@ -79,6 +85,14 @@ import com.copernicotv.app.data.db.entities.ProgramaEntity
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun estadoActualizacionDao(): EstadoActualizacionDao
+
+    abstract fun estadoIndiceHmacDao(): EstadoIndiceHmacDao
+
+    abstract fun hmacPendienteDao(): HmacPendienteDao
+
+    abstract fun reconstruccionHmacDao(): ReconstruccionHmacDao
+
     abstract fun fuenteDao(): FuenteDao
 
     abstract fun listaDao(): ListaDao
@@ -86,6 +100,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun grupoDao(): GrupoDao
 
     abstract fun canalDao(): CanalDao
+
+    abstract fun cacheM3UDao(): CacheM3UDao
+
+    abstract fun cacheXmltvDao(): CacheXmltvDao
 
     abstract fun aparienciaDao(): AparienciaDao
 

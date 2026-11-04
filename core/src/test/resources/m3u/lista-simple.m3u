@@ -1,0 +1,5 @@
+#EXTM3U
+#EXTINF:-1,Noticias 24
+http://example.com/noticias.m3u8
+#EXTINF:-1 tvg-id="dep-1" tvg-name="Deportes Uno" tvg-logo="http://example.com/logo.png" group-title="Deportes",Deportes Uno
+http://example.com/deportes.m3u8

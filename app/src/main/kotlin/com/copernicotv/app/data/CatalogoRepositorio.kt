@@ -1,0 +1,248 @@
+package com.copernicotv.app.data
+
+import android.content.Context
+import androidx.room.withTransaction
+import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.entities.AparienciaEntity
+import com.copernicotv.app.data.db.entities.CanalEntity
+import com.copernicotv.app.data.db.entities.FuenteEntity
+import com.copernicotv.app.data.db.entities.GrupoEntity
+import com.copernicotv.app.data.db.entities.ListaEntity
+import com.copernicotv.core.crypto.CifradoAes
+import com.copernicotv.core.crypto.HmacUrl
+import com.copernicotv.core.identity.CampoUrl
+import com.copernicotv.core.identity.CanonicalizadorUrl
+import com.copernicotv.core.identity.ClaveCanal
+import com.copernicotv.core.identity.ResultadoCanonizacion
+import com.copernicotv.core.m3u.CanalCanario
+import com.copernicotv.core.m3u.ImportadorCanario
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/** Resumen de una importación canaria. */
+data class ResumenImportacion(
+    val listaId: Long?,
+    val canales: Int,
+    val rechazadas: Int,
+    val error: String? = null,
+)
+
+/**
+ * Rechazo del escritor durante una importación; revierte la transacción completa
+ * y se informa como [ResumenImportacion.error] con su código contractual.
+ */
+open class ImportacionRechazada(val codigo: String) : Exception(codigo)
+
+/**
+ * Persistencia del catálogo para el canario de E1-C.
+ *
+ * La importación es transaccional: o queda la Fuente, la Lista, los Canales,
+ * los Grupos y las Apariencias completas, o no queda nada. No implementa
+ * reconciliación de actualizaciones (E4) ni el parser tolerante (E2).
+ */
+@Singleton
+class CatalogoRepositorio
+    @Inject
+    constructor(
+        private val db: AppDatabase,
+        private val claves: ClavesApp,
+        @ApplicationContext private val contexto: Context,
+    ) {
+        private val io = Dispatchers.IO
+        private val escritorApariencias = AparienciaEscritor(db)
+        private val escritorCanales = CanalEscritor(db)
+
+        fun canalesDeLista(listaId: Long): Flow<List<String?>> = db.aparienciaDao().nombresDeLista(listaId)
+
+        /**
+         * Catálogo de la Lista activa más reciente.
+         *
+         * La Lista se resuelve en SQL y no a partir de un identificador en
+         * memoria: un proceso nuevo no recuerda ninguna importación previa y
+         * aun así debe mostrar el catálogo ya persistido.
+         */
+        fun canalesDeListaActiva(): Flow<List<String?>> = db.aparienciaDao().nombresDeListaActiva()
+
+        /** Importa el fixture sintético incluido en assets. */
+        suspend fun importarFixture(): ResumenImportacion {
+            val texto =
+                withContext(io) {
+                    contexto.assets.open(FIXTURE).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                }
+            return importar(texto, NOMBRE_FUENTE, UBICACION_FIXTURE)
+        }
+
+        /**
+         * Importa un texto M3U en una Fuente y una Lista nuevas.
+         *
+         * [ubicacion] es la ubicación original exacta de la lista; se cifra y
+         * se indexa por HMAC sobre su forma canónica, nunca se guarda en claro.
+         *
+         * Si la Fuente ya existe con su Lista, la importación no escribe nada y
+         * devuelve la Lista persistida: repetir el disparador no debe duplicar
+         * ni borrar el catálogo, y menos aún fallar por una clave única.
+         */
+        suspend fun importar(
+            texto: String,
+            nombreFuente: String,
+            ubicacion: String,
+        ): ResumenImportacion =
+            withContext(io) {
+                val canonica =
+                    CanonicalizadorUrl.canonizar(ubicacion, CampoUrl.LISTA_UBICACION)
+                        as? ResultadoCanonizacion.Ok
+                        ?: return@withContext ResumenImportacion(null, 0, 0, "ubicacion_invalida")
+                val importado = ImportadorCanario.importar(texto, claves.claveHmac)
+                val errorImportacion = importado.error
+                if (errorImportacion != null) {
+                    return@withContext ResumenImportacion(
+                        null,
+                        0,
+                        importado.rechazadas.size,
+                        errorImportacion.codigo,
+                    )
+                }
+                val persistida =
+                    try {
+                        db.withTransaction {
+                            listaExistente(nombreFuente)
+                                ?: escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales)
+                        }
+                    } catch (rechazo: ImportacionRechazada) {
+                        return@withContext ResumenImportacion(
+                            null,
+                            0,
+                            importado.rechazadas.size,
+                            rechazo.codigo,
+                        )
+                    }
+                ResumenImportacion(persistida.id, persistida.canales, importado.rechazadas.size)
+            }
+
+        /** Lista ya persistida para [nombreFuente], si la Fuente existe con una Lista. */
+        private suspend fun listaExistente(nombreFuente: String): ListaPersistida? {
+            val fuente = db.fuenteDao().porNombre(nombreFuente) ?: return null
+            val lista = db.listaDao().porFuente(fuente.id).firstOrNull() ?: return null
+            return ListaPersistida(lista.id, db.canalDao().contarPorFuente(fuente.id))
+        }
+
+        private suspend fun escribirCatalogo(
+            nombreFuente: String,
+            ubicacion: String,
+            canonica: ResultadoCanonizacion.Ok,
+            canales: List<CanalCanario>,
+        ): ListaPersistida {
+            val ahora = Instant.now()
+            val fuenteId =
+                db.fuenteDao().porNombre(nombreFuente)?.id
+                    ?: db.fuenteDao().insertar(
+                        FuenteEntity(
+                            nombre = nombreFuente,
+                            estado = "activa",
+                            usarIntervaloGlobal = true,
+                            creadoEn = ahora,
+                            actualizadoEn = ahora,
+                        ),
+                    )
+            val idLista =
+                db.listaDao().insertar(
+                    ListaEntity(
+                        fuenteId = fuenteId,
+                        nombre = nombreFuente,
+                        ubicacionCifrada =
+                            CifradoAes.cifrar(
+                                claves.claveAes,
+                                CifradoAes.aad("Lista", "ubicacion_cifrada"),
+                                ubicacion.toByteArray(Charsets.UTF_8),
+                            ),
+                        ubicacionHmac =
+                            HmacUrl
+                                .calcularSobre(
+                                    clave = claves.claveHmac,
+                                    generacion = ImportadorCanario.GENERACION_HMAC,
+                                    campo = CampoUrl.LISTA_UBICACION,
+                                    clase = canonica.clase,
+                                    urlCanonica = canonica.urlCanonica,
+                                ).toByteArray(Charsets.UTF_8),
+                        esquema = canonica.urlCanonica.substringBefore(':'),
+                        orden = 0,
+                        estado = "activa",
+                        creadoEn = ahora,
+                        actualizadoEn = ahora,
+                    ),
+                )
+            var orden = 0
+            for (canal in canales) {
+                val tvg = canal.tvgId
+                // La forma persistida de la clave de unicidad es la única fuente de
+                // verdad sobre si el tvg-id habilitó la clave (§6.3.2).
+                val tvgUnico = tvg != null && canal.claveUnicidad == ClaveCanal.PREFIJO_TVG + tvg
+                val canalId =
+                    escritorCanales.insertar(
+                        CanalEntity(
+                            fuenteId = fuenteId,
+                            nombre = canal.nombre,
+                            urlStreamCifrada =
+                                CifradoAes.cifrar(
+                                    claves.claveAes,
+                                    CifradoAes.aad("Canal", "url_stream_cifrada"),
+                                    canal.urlOriginal.toByteArray(Charsets.UTF_8),
+                                ),
+                            urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
+                            tvgId = canal.tvgId,
+                            claveCanonica = canal.claveCanonica,
+                            claveUnicidad = canal.claveUnicidad,
+                            claveDerivable = canal.claveDerivable,
+                            creadoEn = ahora,
+                            actualizadoEn = ahora,
+                        ),
+                        tvgIdUnicoEnFuente = tvgUnico,
+                    )
+                for (apariencia in canal.apariencias) {
+                    val grupoId = apariencia.groupTitle?.let { insertarGrupo(idLista, it) }
+                    val escritura =
+                        escritorApariencias.upsert(
+                            AparienciaEntity(
+                                listaId = idLista,
+                                canalId = canalId,
+                                grupoId = grupoId,
+                                orden = orden++,
+                                groupTitle = apariencia.groupTitle,
+                                tvgName = apariencia.tvgName,
+                                clavePresentacion = apariencia.clavePresentacion,
+                                repeticiones = apariencia.repeticiones,
+                                creadoEn = ahora,
+                                actualizadoEn = ahora,
+                            ),
+                            ahora,
+                        )
+                    if (escritura is ResultadoUpsertApariencia.Rechazada) {
+                        throw ImportacionRechazada(escritura.codigo)
+                    }
+                }
+            }
+            return ListaPersistida(idLista, canales.size)
+        }
+
+        private suspend fun insertarGrupo(
+            listaId: Long,
+            nombre: String,
+        ): Long =
+            db.grupoDao().porNombre(listaId, nombre)?.id
+                ?: db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = nombre))
+
+        /** Lista persistida y cantidad de Canales que la Fuente ya tiene. */
+        private data class ListaPersistida(val id: Long, val canales: Int)
+
+        private companion object {
+            const val FIXTURE = "fixture-canario.m3u"
+            const val NOMBRE_FUENTE = "Fixture canario E1"
+            const val UBICACION_FIXTURE = "content://com.copernicotv.app.fixture/fixture-canario.m3u"
+        }
+    }

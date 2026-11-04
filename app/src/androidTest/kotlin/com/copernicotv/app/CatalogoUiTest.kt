@@ -96,6 +96,16 @@ class CatalogoUiTest {
             db.clearAllTables()
             preferencias.barrerHuerfanas(emptySet())
         }
+        // La actividad se lanza antes de @Before y puede haber observado la
+        // Lista del test anterior. Recrearla después de limpiar descarta el
+        // estado de composición y obliga a la UI a volver a observar la base;
+        // la espera de "Sin lista" sola puede cumplirse con el estado inicial
+        // antes de que Room emita la Lista anterior.
+        composeRule.activityRule.scenario.recreate()
+        composeRule.waitForIdle()
+        esperarHasta {
+            composeRule.onAllNodesWithText("Sin lista").fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     @Test
@@ -353,6 +363,9 @@ class CatalogoUiTest {
         grupos: List<String?> = listOf(null, null, null),
         fechas: List<Instant?> = listOf(null, null, null),
     ) {
+        // Nombre único por siembra: la espera de la UI no puede coincidir con
+        // la Lista que dejó el test anterior.
+        val nombreLista = "Lista UI ${System.nanoTime()}"
         runBlocking {
             val ahora = Instant.parse("2026-01-01T00:00:00Z")
             val fuenteId =
@@ -369,7 +382,7 @@ class CatalogoUiTest {
                 db.listaDao().insertar(
                     ListaEntity(
                         fuenteId = fuenteId,
-                        nombre = "Lista UI",
+                        nombre = nombreLista,
                         ubicacionCifrada = byteArrayOf(0x01),
                         ubicacionHmac = byteArrayOf(0x02),
                         esquema = "content",
@@ -428,9 +441,11 @@ class CatalogoUiTest {
             }
         }
         esperarHasta {
-            composeRule.onAllNodesWithText("Lista: Lista UI").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("Lista: $nombreLista").fetchSemanticsNodes().isNotEmpty()
         }
-        esperarTag(PREFIJO_TAG_CANAL + 0)
+        // Además de la Lista, esperar el primer canal ya reordenado: la
+        // preferencia de orden del test anterior puede tardar en propagarse.
+        esperarTexto(0, nombres[0] ?: "Sin nombre")
     }
 
     private fun esperarTag(tag: String) {

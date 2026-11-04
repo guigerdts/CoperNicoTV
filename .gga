@@ -1,4 +1,9 @@
 PROVIDER="opencode"
+
+# Agente de solo lectura para la revisión. El agente por defecto
+# (gentle-orchestrator) arrastra instrucciones y herramientas que hacen que
+# archivos grandes superen el timeout; `plan` revisa el prompt y no escribe.
+OPENCODE_AGENT="plan"
 FILE_PATTERNS="*.kt,*.kts"
 EXCLUDE_PATTERNS="build,.gradle,*.generated.kt"
 RULES_FILE="AGENTS.md"

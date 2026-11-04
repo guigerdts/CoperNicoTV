@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.data.actualizacion.EstadoSolicitud
+import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.CatalogoViewModel
 import com.copernicotv.core.crypto.CifradoAes
@@ -12,7 +14,9 @@ import com.copernicotv.core.crypto.ResultadoDescifrado
 import com.copernicotv.core.identity.CaseFolderCompleto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -108,6 +112,7 @@ class CatalogoPersistenciaTest {
                     ColeccionRepositorio(db),
                     PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),
                     HistorialRepositorio(db),
+                    ProgramadorSinTrabajo,
                 )
             val estado = withTimeout(TIEMPO_ESPERA) { viewModel.estado.first { it.canales.size == 3 } }
 
@@ -204,6 +209,25 @@ class CatalogoPersistenciaTest {
         val resultado = CifradoAes.descifrar(clave, aad, sobre)
         assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
         return String((resultado as ResultadoDescifrado.Ok).bytes, Charsets.UTF_8)
+    }
+
+    /**
+     * Planificador sin trabajo real.
+     *
+     * Esta prueba mira la persistencia del catálogo a través de la recreación
+     * del proceso, no la Actualización: el ViewModel solo necesita el
+     * planificador para construirse.
+     */
+    private object ProgramadorSinTrabajo : ProgramadorActualizaciones {
+        override fun observar(): Flow<Map<Long, EstadoSolicitud>> = flowOf(emptyMap())
+
+        override fun observarLista(listaId: Long): Flow<EstadoSolicitud> = flowOf(EstadoSolicitud())
+
+        override suspend fun solicitarLista(listaId: Long) = Unit
+
+        override suspend fun solicitarFuente(fuenteId: Long) = Unit
+
+        override suspend fun reconciliar() = Unit
     }
 
     /** Claves cuya AES falla al usarse: fuerza un fallo dentro de la transacción. */

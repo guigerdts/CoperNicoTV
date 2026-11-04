@@ -33,6 +33,18 @@ interface FavoritoDao {
 
     @Query("SELECT COUNT(*) FROM Favorito")
     suspend fun contar(): Int
+
+    /**
+     * Traslada la marca al Canal superviviente de una fusión.
+     *
+     * Solo se usa cuando el superviviente no tiene marca propia: el índice
+     * único de `canalId` no admite dos filas para el mismo Canal.
+     */
+    @Query("UPDATE Favorito SET canalId = :hacia WHERE canalId = :desde")
+    suspend fun moverCanal(
+        desde: Long,
+        hacia: Long,
+    ): Int
 }
 
 /** Ocultación de un Canal concreto; no modifica su pertenencia a Listas. */
@@ -55,6 +67,18 @@ interface OcultacionCanalDao {
 
     @Query("SELECT COUNT(*) FROM OcultacionCanal")
     suspend fun contar(): Int
+
+    /**
+     * Traslada la Ocultación al Canal superviviente de una fusión.
+     *
+     * Solo se usa cuando el superviviente no tiene Ocultación propia: el índice
+     * único de `canalId` no admite dos filas para el mismo Canal.
+     */
+    @Query("UPDATE OcultacionCanal SET canalId = :hacia WHERE canalId = :desde")
+    suspend fun moverCanal(
+        desde: Long,
+        hacia: Long,
+    ): Int
 }
 
 /** Ocultación de un Grupo concreto; no afecta a Grupos homónimos de otras Listas. */

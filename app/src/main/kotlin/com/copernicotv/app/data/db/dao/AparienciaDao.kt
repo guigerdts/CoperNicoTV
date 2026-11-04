@@ -9,6 +9,7 @@ import com.copernicotv.app.data.db.entities.AparienciaEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
+@Suppress("TooManyFunctions")
 @Dao
 interface AparienciaDao {
     @Insert
@@ -19,6 +20,45 @@ interface AparienciaDao {
 
     @Query("SELECT * FROM Apariencia WHERE listaId = :listaId ORDER BY orden, id")
     suspend fun porLista(listaId: Long): List<AparienciaEntity>
+
+    @Query("SELECT * FROM Apariencia WHERE listaId = :listaId AND canalId = :canalId ORDER BY orden, id")
+    suspend fun porCanalEnLista(
+        listaId: Long,
+        canalId: Long,
+    ): List<AparienciaEntity>
+
+    /** Todas las Apariencias de un Canal, de cualquier Lista (fusión de Canales). */
+    @Query("SELECT * FROM Apariencia WHERE canalId = :canalId ORDER BY listaId, clavePresentacion, id")
+    suspend fun porCanal(canalId: Long): List<AparienciaEntity>
+
+    @Query("UPDATE Apariencia SET canalId = :canalId WHERE id = :id")
+    suspend fun actualizarCanal(
+        id: Long,
+        canalId: Long,
+    ): Int
+
+    @Query("DELETE FROM Apariencia WHERE id = :id")
+    suspend fun eliminar(id: Long): Int
+
+    @Query(
+        """
+        UPDATE Apariencia
+        SET grupoId = :grupoId,
+            groupTitle = :groupTitle,
+            tvgName = :tvgName,
+            repeticiones = :repeticiones,
+            actualizadoEn = :actualizadoEn
+        WHERE id = :id
+        """,
+    )
+    suspend fun actualizarDatos(
+        id: Long,
+        grupoId: Long?,
+        groupTitle: String?,
+        tvgName: String?,
+        repeticiones: Int,
+        actualizadoEn: Instant,
+    ): Int
 
     @Query("SELECT COUNT(*) FROM Apariencia WHERE listaId = :listaId")
     suspend fun contar(listaId: Long): Int

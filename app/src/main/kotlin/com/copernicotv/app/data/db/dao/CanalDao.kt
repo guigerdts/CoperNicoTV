@@ -8,6 +8,7 @@ import androidx.room.Update
 import com.copernicotv.app.data.CanalBusqueda
 import com.copernicotv.app.data.db.entities.CanalEntity
 import kotlinx.coroutines.flow.Flow
+import java.time.Instant
 
 @Dao
 interface CanalDao {
@@ -28,6 +29,32 @@ interface CanalDao {
 
     @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId ORDER BY id")
     suspend fun porFuente(fuenteId: Long): List<CanalEntity>
+
+    @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId AND tvgId = :tvgId LIMIT 1")
+    suspend fun porTvgId(
+        fuenteId: Long,
+        tvgId: String,
+    ): CanalEntity?
+
+    @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId AND claveUnicidad = :clave LIMIT 1")
+    suspend fun porClaveUnicidad(
+        fuenteId: Long,
+        clave: String,
+    ): CanalEntity?
+
+    /**
+     * Libera la clave de unicidad de todas las filas que pasan a B antes de
+     * escribir la evidencia de colisión (E4-T1).
+     *
+     * El orden es contractual: con el índice único `(fuenteId, claveUnicidad)`,
+     * escribir primero la evidencia o la nueva clave haría fallar la
+     * transacción. La sentencia deja las N filas sin clave en una sola pasada.
+     */
+    @Query("UPDATE Canal SET estado = 'B', claveUnicidad = NULL, actualizadoEn = :actualizadoEn WHERE id IN (:ids)")
+    suspend fun liberarClaves(
+        ids: List<Long>,
+        actualizadoEn: Instant,
+    ): Int
 
     @Query("SELECT COUNT(*) FROM Canal")
     suspend fun contar(): Int

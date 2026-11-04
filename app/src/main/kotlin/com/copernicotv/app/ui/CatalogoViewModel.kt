@@ -21,12 +21,16 @@ import com.copernicotv.app.data.PerfilRepositorio
 import com.copernicotv.app.data.PerfilResumen
 import com.copernicotv.app.data.PreferenciasOrden
 import com.copernicotv.app.data.ResultadoAccion
+import com.copernicotv.app.data.ResumenActualizacion
 import com.copernicotv.app.data.ResumenImportacion
+import com.copernicotv.app.data.actualizacion.EstadoSolicitud
+import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
 import com.copernicotv.app.diagnostico.detalleTecnico
 import com.copernicotv.core.orden.DireccionOrden
 import com.copernicotv.core.orden.ModoOrden
 import com.copernicotv.core.orden.PreferenciaOrden
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -34,6 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -41,6 +46,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -53,9 +59,11 @@ import javax.inject.Inject
 data class CatalogoUiState(
     val canales: List<String> = emptyList(),
     val importando: Boolean = false,
+    val actualizando: Boolean = false,
     val listaId: Long? = null,
     val mensaje: String? = null,
     val mensajeAccion: String? = null,
+    val actualizacion: ResumenActualizacion? = null,
 )
 
 /**
@@ -80,6 +88,7 @@ class CatalogoViewModel
         private val coleccionesRepositorio: ColeccionRepositorio,
         private val perfilesRepositorio: PerfilRepositorio,
         private val historialRepositorio: HistorialRepositorio,
+        private val programador: ProgramadorActualizaciones,
     ) : ViewModel() {
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
@@ -187,6 +196,7 @@ class CatalogoViewModel
             observarCatalogo()
             observarPreferencias()
             sincronizarPreferencias()
+            observarActualizacion()
         }
 
         fun actualizarTexto(texto: String) {
@@ -443,6 +453,76 @@ class CatalogoViewModel
         }
 
         /**
+         * Encola la Actualización manual de la Lista activa (E4-T6, DC-07 punto 6).
+         *
+         * El trabajo corre en WorkManager y el progreso y el resultado llegan por
+         * [observarActualizacion]; aquí solo se valida el estado y se encola. Un
+         * fallo al encolar no se propaga a la UI: se registra el detalle técnico y
+         * se devuelve un resumen con `error` para que la pantalla muestre un
+         * código estable.
+         */
+        fun actualizarListaActiva() {
+            if (_estado.value.actualizando || _estado.value.importando) return
+            val listaId = listas.value.firstOrNull { it.activa }?.id ?: return
+            _estado.value =
+                _estado.value.copy(actualizacion = null, mensaje = null)
+            viewModelScope.launch {
+                try {
+                    programador.solicitarLista(listaId)
+                } catch (cancelacion: CancellationException) {
+                    throw cancelacion
+                } catch (fallo: Exception) {
+                    Log.e(TAG, "No se pudo programar la Actualización\n${detalleTecnico(fallo)}")
+                    _estado.value =
+                        _estado.value.copy(
+                            actualizacion =
+                                ResumenActualizacion(
+                                    listaId = listaId,
+                                    resultado = CODIGO_ACTUALIZACION_FALLIDA,
+                                    error = CODIGO_ACTUALIZACION_FALLIDA,
+                                ),
+                        )
+                }
+            }
+        }
+
+        /**
+         * Refleja el trabajo de la Lista activa (S7a).
+         *
+         * `actualizando` sale del estado del trabajo, no de un indicador
+         * optimista: así también se refleja una ejecución lanzada por el
+         * planificador periódico, y el botón vuelve a habilitarse tanto en éxito
+         * como en fallo. El resumen visible es el de esta Lista; si el trabajo no
+         * publicó ninguno (por ejemplo, se coalesció con otra ejecución), se
+         * conserva el último.
+         */
+        private fun observarActualizacion() {
+            viewModelScope.launch {
+                listas
+                    .map { actuales -> actuales.firstOrNull { it.activa }?.id }
+                    .distinctUntilChanged()
+                    .flatMapLatest { listaId ->
+                        _estado.update { actual -> actual.copy(actualizacion = null) }
+                        val flujo =
+                            if (listaId == null) {
+                                flowOf(EstadoSolicitud())
+                            } else {
+                                programador.observarLista(listaId)
+                            }
+                        flujo.map { solicitud -> listaId to solicitud }
+                    }
+                    .collect { (listaId, solicitud) ->
+                        _estado.update { actual ->
+                            actual.copy(
+                                actualizando = solicitud.enCurso,
+                                actualizacion = solicitud.resumenDe(listaId ?: -1L) ?: actual.actualizacion,
+                            )
+                        }
+                    }
+            }
+        }
+
+        /**
          * Observa la preferencia de la Lista activa y la refleja en los criterios.
          *
          * Al cambiar de Lista, el flujo se cambia sin perder el modo y la
@@ -495,6 +575,7 @@ class CatalogoViewModel
         private companion object {
             const val CODIGO_FALLO = "importacion_fallida"
             const val CODIGO_SIN_LISTA = "importacion_sin_lista"
+            const val CODIGO_ACTUALIZACION_FALLIDA = "actualizacion_fallida"
             const val ESPERA_TECLEO_MS = 150L
             const val TIEMPO_SIN_SUSCRIPTORES = 5_000L
             const val TAG = "CatalogoViewModel"

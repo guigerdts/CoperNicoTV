@@ -4,19 +4,25 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.copernicotv.app.data.db.dao.AparienciaDao
+import com.copernicotv.app.data.db.dao.AsociacionDao
 import com.copernicotv.app.data.db.dao.CacheM3UDao
 import com.copernicotv.app.data.db.dao.CacheXmltvDao
 import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
+import com.copernicotv.app.data.db.dao.DetalleAusenciaDao
 import com.copernicotv.app.data.db.dao.EstadoActualizacionDao
 import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
+import com.copernicotv.app.data.db.dao.EvidenciaColisionDao
 import com.copernicotv.app.data.db.dao.FavoritoDao
 import com.copernicotv.app.data.db.dao.FuenteDao
+import com.copernicotv.app.data.db.dao.FuenteGuiaDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
+import com.copernicotv.app.data.db.dao.IndicadoresFuenteDao
 import com.copernicotv.app.data.db.dao.ListaDao
+import com.copernicotv.app.data.db.dao.ObservacionPendienteDao
 import com.copernicotv.app.data.db.dao.OcultacionCanalDao
 import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
@@ -90,6 +96,12 @@ import com.copernicotv.app.data.db.entities.ProgramaEntity
 abstract class AppDatabase : RoomDatabase() {
     abstract fun estadoActualizacionDao(): EstadoActualizacionDao
 
+    abstract fun detalleAusenciaDao(): DetalleAusenciaDao
+
+    abstract fun evidenciaColisionDao(): EvidenciaColisionDao
+
+    abstract fun observacionPendienteDao(): ObservacionPendienteDao
+
     abstract fun estadoIndiceHmacDao(): EstadoIndiceHmacDao
 
     abstract fun hmacPendienteDao(): HmacPendienteDao
@@ -97,6 +109,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun reconstruccionHmacDao(): ReconstruccionHmacDao
 
     abstract fun fuenteDao(): FuenteDao
+
+    abstract fun fuenteGuiaDao(): FuenteGuiaDao
 
     abstract fun listaDao(): ListaDao
 
@@ -109,6 +123,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun cacheXmltvDao(): CacheXmltvDao
 
     abstract fun aparienciaDao(): AparienciaDao
+
+    abstract fun asociacionDao(): AsociacionDao
 
     abstract fun coleccionDao(): ColeccionDao
 
@@ -123,6 +139,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun ocultacionGrupoDao(): OcultacionGrupoDao
 
     abstract fun perfilDao(): PerfilDao
+
+    abstract fun indicadoresFuenteDao(): IndicadoresFuenteDao
 
     companion object {
         const val NOMBRE = "copernicotv.db"

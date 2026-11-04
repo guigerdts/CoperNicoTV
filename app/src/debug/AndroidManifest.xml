@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+          Solo en debug: sirve el fixture canario en la ubicación que la
+          importación de fixture guarda como origen de su Lista. Permite que la
+          Actualización manual se ejecute de extremo a extremo en los
+          dispositivos de CI sin exponer nada en release.
+        -->
+        <provider
+            android:name=".debug.FixtureProvider"
+            android:authorities="com.copernicotv.app.fixture"
+            android:exported="false" />
+    </application>
+
+</manifest>

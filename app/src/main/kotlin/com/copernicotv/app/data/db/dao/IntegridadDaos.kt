@@ -28,6 +28,21 @@ interface HistorialDao {
         fecha: Instant,
     ): Int
 
+    @Query("DELETE FROM Historial WHERE canalId = :canalId")
+    suspend fun eliminarPorCanal(canalId: Long): Int
+
+    /**
+     * Traslada la fila de Historial al Canal superviviente de una fusión.
+     *
+     * Solo se usa cuando el superviviente no tiene Historial propio: el índice
+     * único de `canalId` no admite dos filas para el mismo Canal.
+     */
+    @Query("UPDATE Historial SET canalId = :hacia WHERE canalId = :desde")
+    suspend fun moverCanal(
+        desde: Long,
+        hacia: Long,
+    ): Int
+
     /**
      * Recorta el Historial persistido a los [limite] Canales más recientes.
      *
@@ -152,6 +167,16 @@ interface ColeccionCanalDao {
         coleccionId: Long,
         canalId: Long,
     ): List<ColeccionCanalEntity>
+
+    /** Todas las pertenencias de un Canal, de cualquier Colección (fusión de Canales). */
+    @Query("SELECT * FROM ColeccionCanal WHERE canalId = :canalId ORDER BY coleccionId, posicion, id")
+    suspend fun porCanal(canalId: Long): List<ColeccionCanalEntity>
+
+    @Query("UPDATE ColeccionCanal SET canalId = :canalId WHERE id = :id")
+    suspend fun actualizarCanal(
+        id: Long,
+        canalId: Long,
+    ): Int
 
     @Query("SELECT COALESCE(MAX(posicion), -1) FROM ColeccionCanal WHERE coleccionId = :coleccionId")
     suspend fun maxPosicion(coleccionId: Long): Int

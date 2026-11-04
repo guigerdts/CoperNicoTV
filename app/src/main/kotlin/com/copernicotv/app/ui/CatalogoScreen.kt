@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -75,6 +76,15 @@ const val TAG_IMPORTAR = "importar-fixture"
 /** Etiqueta del disparador de selección de documento SAF. */
 const val TAG_ABRIR_DOCUMENTO = "abrir-documento"
 
+/** Etiqueta del disparador de Actualización manual de la Lista activa. */
+const val TAG_ACTUALIZAR = "actualizar-lista"
+
+/** Etiqueta del resumen de la última Actualización manual. */
+const val TAG_RESULTADO_ACTUALIZACION = "resultado-actualizacion"
+
+/** Etiqueta del botón que abre la pantalla de Fuentes. */
+const val TAG_FUENTES = "abrir-fuentes"
+
 /** Prefijo de las etiquetas de canal del catálogo. */
 const val PREFIJO_TAG_CANAL = "canal-"
 
@@ -113,6 +123,9 @@ const val TAG_CARGANDO = "cargando-catalogo"
 
 /** Etiqueta de la lista de resultados del catálogo. */
 const val TAG_RESULTADOS = "resultados-catalogo"
+
+/** Altura mínima (dp) que conserva la lista de resultados en pantallas bajas. */
+private const val ALTO_MINIMO_RESULTADOS_DP = 96
 
 /** Etiqueta del mensaje de error de una acción CRUD. */
 const val TAG_ERROR_ACCION = "error-accion"
@@ -267,6 +280,7 @@ data class PerfilesUiState(
 data class CatalogoAcciones(
     val onImportar: () -> Unit,
     val onAbrirDocumento: () -> Unit,
+    val onActualizar: () -> Unit,
     val onTexto: (String) -> Unit,
     val onGrupo: (Long?) -> Unit,
     val onFavoritos: () -> Unit,
@@ -298,6 +312,7 @@ data class CatalogoAcciones(
     val onEliminarPerfil: (Long) -> Unit,
     val onAsociarListaAPerfil: (Long, Long) -> Unit,
     val onDesasociarListaDePerfil: (Long, Long) -> Unit,
+    val onAbrirFuentes: () -> Unit,
 )
 
 /**
@@ -367,21 +382,39 @@ fun CatalogoScreen(
                 )
             }
         } else {
+            // En pantallas bajas los controles no deben dejar sin altura a los
+            // resultados: se acotan y pasan a hacer scroll, y la lista conserva
+            // un mínimo visible para seguir siendo usable. El tope se calcula
+            // desde la configuración para no introducir una subcomposición: el
+            // foco inicial se pide en un `LaunchedEffect` y necesita que el nodo
+            // con `focusRequester` ya esté adjunto en el primer frame.
+            val altoMaximoControles =
+                (
+                    configuracion.screenHeightDp.dp - 48.dp -
+                        ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp
+                ).coerceAtLeast(0.dp)
             Column(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Controles(
-                    estado = estado,
-                    criterios = criterios,
-                    grupos = grupos,
-                    listas = listas,
-                    listaActiva = listaActiva,
-                    recientes = recientes,
-                    acciones = acciones,
-                    focoInicial = focoInicial,
-                    onDialogo = { dialogo = it },
-                )
+                Column(
+                    modifier =
+                        Modifier
+                            .heightIn(max = altoMaximoControles)
+                            .verticalScroll(rememberScrollState()),
+                ) {
+                    Controles(
+                        estado = estado,
+                        criterios = criterios,
+                        grupos = grupos,
+                        listas = listas,
+                        listaActiva = listaActiva,
+                        recientes = recientes,
+                        acciones = acciones,
+                        focoInicial = focoInicial,
+                        onDialogo = { dialogo = it },
+                    )
+                }
                 Resultados(
                     modo = criterios.modo,
                     resultados = resultados,
@@ -422,7 +455,7 @@ private fun Controles(
     )
     Button(
         onClick = acciones.onAbrirDocumento,
-        enabled = !estado.importando,
+        enabled = !estado.importando && !estado.actualizando,
         modifier =
             Modifier
                 .focusRequester(focoInicial)
@@ -432,7 +465,7 @@ private fun Controles(
     }
     Button(
         onClick = acciones.onImportar,
-        enabled = !estado.importando,
+        enabled = !estado.importando && !estado.actualizando,
         modifier = Modifier.testTag(TAG_IMPORTAR),
     ) {
         Text(stringResource(R.string.catalogo_importar))
@@ -449,6 +482,7 @@ private fun Controles(
             listaActiva?.let { onDialogo(DialogoCatalogo.EliminarLista(it)) }
         },
     )
+    AccionActualizar(estado, listaActiva, acciones)
     AccesoRapido(
         recientes = recientes,
         onCanal = { reciente -> onDialogo(DialogoCatalogo.AccionesCanal(reciente.aCanalBusqueda())) },
@@ -469,6 +503,12 @@ private fun Controles(
             modifier = Modifier.testTag(TAG_PERFILES),
         ) {
             Text(stringResource(R.string.catalogo_perfiles))
+        }
+        TextButton(
+            onClick = acciones.onAbrirFuentes,
+            modifier = Modifier.testTag(TAG_FUENTES),
+        ) {
+            Text(stringResource(R.string.catalogo_fuentes))
         }
     }
     estado.mensaje?.let { codigo ->
@@ -515,6 +555,49 @@ private fun Controles(
         modifier = Modifier.testTag(TAG_NUEVO_CANAL),
     ) {
         Text(stringResource(R.string.catalogo_nuevo_canal))
+    }
+}
+
+/**
+ * Acción de Actualización manual de la Lista activa (E4-T6).
+ *
+ * Se separa de `Controles` para mantener esa composición dentro del límite de
+ * longitud y para que el resumen de la última Actualización viva junto al
+ * disparador que lo produce.
+ */
+@Composable
+private fun AccionActualizar(
+    estado: CatalogoUiState,
+    listaActiva: ListaResumen?,
+    acciones: CatalogoAcciones,
+) {
+    Button(
+        onClick = acciones.onActualizar,
+        enabled = listaActiva != null && !estado.importando && !estado.actualizando,
+        modifier = Modifier.testTag(TAG_ACTUALIZAR),
+    ) {
+        Text(stringResource(R.string.catalogo_actualizar))
+    }
+    estado.actualizacion?.let { resumen ->
+        val error = resumen.error
+        val texto =
+            if (error != null) {
+                stringResource(R.string.catalogo_actualizacion_error, error)
+            } else {
+                stringResource(
+                    R.string.catalogo_actualizacion_ok,
+                    resumen.nuevas,
+                    resumen.actualizadas,
+                    resumen.ausentes,
+                    resumen.ambiguas,
+                    resumen.observaciones,
+                )
+            }
+        Text(
+            text = texto,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.testTag(TAG_RESULTADO_ACTUALIZACION),
+        )
     }
 }
 

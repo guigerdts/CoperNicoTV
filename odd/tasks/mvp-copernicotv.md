@@ -1073,7 +1073,7 @@ E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La h
 | E6-T5 | Diagnóstico | Protocolo, pistas, buffer y último error; URL saneada |
 | E6-T6 | Zapeo y volumen | Volumen, siguiente/anterior y cambio sin volver al Catálogo |
 
-E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 a E6-T6 siguen pendientes.
+E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 a E6-T6 siguen pendientes y E6 en conjunto no se declara cerrada.
 
 ### 8.7 E7 — Android TV, móvil y preferencias
 
@@ -3420,4 +3420,96 @@ soportados. E6-T2 (controles y fullscreen), T3 (pistas), T4 (reintentos y
 backoff), T5 (diagnóstico) y T6 (zapeo y volumen) no se implementan en esta
 entrada. Reproducir no registra Historial. E5, S24 y el baseline XMLTV no se
 alteran. Sin PR ni merge; `feat/e1-bootstrap` sigue en `68c9511`.
+
+### L71 — E6-T2: controles completos, fullscreen y aspecto (2026-11-03)
+
+**Autorización y objetivo.** Cerrar E6-T2 en el alcance A–D autorizado
+—controles, pantalla, TV y móvil— sin avanzar a E6-T3..T6 y sin ampliar alcance.
+La meta era que la sesión Media3 de E6-T1 ganara controles propios (play/pausa,
+búsqueda, tiempos, estados y auto-ocultado), fullscreen, orientación y aspecto sin
+recrear la sesión, con D-pad y foco en TV y uso táctil en móvil, todo validado en
+CI.
+
+**Alcance implementado.**
+
+- **Controles.** `PlayerView` con `useController = false` y controles propios en
+  Compose: play/pausa, retroceso y avance de 10 s, barra de progreso con tiempo
+  transcurrido y total, etiqueta de fase (`Cargando`, `En búfer`,
+  `Reproduciendo`, `Pausado`, `Error`), auto-ocultado a los 3 s solo mientras el
+  contenido avanza y reaparición ante cualquier interacción. «Siguiente» y
+  «anterior» no se implementan aquí: pertenecen a E6-T6.
+- **Pantalla.** Fullscreen inmersivo con `WindowInsetsControllerCompat`
+  (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`), `keepScreenOn` mientras la sesión
+  reproduce y restauración de barras y `keepScreenOn` al salir. Aspecto
+  `Ajustar`/`Rellenar`/`Zoom` sobre `RESIZE_MODE_FIT`/`FILL`/`ZOOM`, con ciclo
+  sin recrear la sesión.
+- **Orientación.** No se bloquea: `MainActivity` ya declara
+  `configChanges="orientation|screenSize|keyboardHidden"` y la sesión vive en el
+  `ViewModel`; la prueba gira el dispositivo y comprueba que la posición y el
+  motor sobreviven.
+- **TV.** D-pad sin interceptar la navegación cuando los controles están
+  visibles: cualquier tecla reinicia el auto-ocultado y el foco navega a los
+  botones. Al mostrarse, el foco va a play/pausa; al ocultarse, vuelve a la raíz.
+  Con controles ocultos, izquierda/derecha buscan ±10 s y revelan los controles.
+- **Móvil.** Toque para revelar, botones táctiles y rotación/ventanas sin perder
+  la sesión.
+
+**Arquitectura y decisiones.**
+
+- `SesionMedia3` es la única dueña de `ExoPlayer` y de `EstadoSesion`; sondea
+  posición y fase, y libera de forma idempotente. `ReproductorViewModel` custodia
+  la sesión y su ciclo de vida; `ReproductorScreen` solo cablea UI.
+- `ControlesReproductor` concentra las reglas puras (`formatearTiempo`,
+  `limitarBusqueda`, `debeOcultarse`, constantes) y `ModoAspecto` el ajuste de
+  superficie. Detekt obligó a extraer `AccionesReproductor`, `BarraSuperior`,
+  `BarraInferior`, `FilaProgreso`, `FilaBotones`, `SuperficieVideo`,
+  `IndicadorCarga`, `DiagnosticoEstado`, `EfectosReproductor` y
+  `Modifier.toquesReproductor`.
+- **Siguiente/anterior** del criterio de la fila E6-T2 se difiere a E6-T6
+  (zapeo), dueña del cambio de Canal sin volver al Catálogo; la instrucción de
+  esta entrada enumera solo A–D y prohíbe iniciar T6.
+- **S17b** (preferencia global persistida para ocultar/mostrar controles
+  secundarios) se difiere a E7-T5, dueña de la persistencia de preferencias.
+- El diagnóstico `TAG_REPRODUCTOR_ESTADO` conserva la terminología y la posición
+  de E6-T1; se mantiene con `alpha(0f)` fuera de la barra para no romper esa
+  evidencia.
+- Sin URLs ni credenciales en logs: el diagnóstico muestra estado, posición y
+  duración, nunca la URL resuelta.
+
+**Pruebas y evidencia.**
+
+- JVM: `ControlesReproductorTest` 8/8 en verde (formato de tiempo, límites de
+  búsqueda, ciclo de aspecto, auto-ocultado y terminología del diagnóstico).
+- Instrumentadas móvil: `ReproductorControlesTest` 6/6 —
+  `losControlesSeOcultanSolosYReaparecenConToque`,
+  `playPausaDetieneYReanudaLaPosicion`,
+  `avanzarYRetrocederDesplazanLaPosicion`,
+  `elCambioDeAspectoConservaLaSesionYLaPosicion`,
+  `rotarConservaLaSesionYLaPosicion` y `volverLiberaLaSesionMedia3` —; el filtro
+  `instrumented-mobile` suma 39/39 con `ReproductorUiTest` 3/3.
+- Instrumentadas TV: `ReproductorTvTest` 2/2 —
+  `elDpadAlternaPlayPausaConElFocoEnElControl` y
+  `elDpadBuscaYRevelaLosControlesOcultos` —; el filtro `instrumented-tv` suma
+  3/3 con `CanarioTvTest` 1/1.
+- Soportes: fixtures `f15` extendidos a 20 s (MP4 de 490 KB y 10 segmentos HLS
+  de 2 s); el servidor HTTP con `Range` se extrajo a `ServidorMedios` y las
+  pruebas verifican la presencia de los assets para fallar nombrando la ruta
+  exacta.
+- Implementación `6d2c04d` (26 archivos, +1687/−346). Tres fallos reales de
+  compilación de CI se corrigieron en `3f494b5` (import ambiguo de `KeyEvent`),
+  `b8b19c1` (`click` sin importar y APIs de teclado experimentales sin opt-in) y
+  `de1ff7e` (`pressKey` es extensión y requiere import).
+- **Evidencia CI.** Run `41650055422` sobre `de1ff7e`: `apk`, `jvm-tests`,
+  `static-analysis`, `instrumented-mobile` e `instrumented-tv` en `success`;
+  `reportes-instrumented-mobile` 39/39 con 0 fallos y
+  `reportes-instrumented-tv` 3/3 con 0 fallos. En local, `ktlintCheck` y
+  `detekt` verdes; `:app` no compila en local por AAPT2 x86-64 sobre ARM64, así
+  que su validación es exclusivamente de CI.
+
+**Estado y frontera.** E6-T2 queda **cerrada en el alcance A–D autorizado**
+(controles, pantalla, TV y móvil), con la parte «siguiente/anterior» de su
+criterio diferida a E6-T6. E6-T3 (pistas), T4 (errores y reconexión), T5
+(diagnóstico ampliado) y T6 (zapeo y volumen) siguen pendientes y no se inician.
+E6 en conjunto no se declara cerrada. E5, S24 y el baseline XMLTV no se alteran.
+Sin PR ni merge; `feat/e1-bootstrap` sigue en `68c9511`.
 

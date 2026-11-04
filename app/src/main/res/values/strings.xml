@@ -121,4 +121,18 @@
     <string name="catalogo_reproducir">Reproducir</string>
     <string name="reproductor_volver">Volver</string>
     <string name="reproductor_error">No se pudo reproducir: %1$s</string>
+    <string name="reproductor_play">Play</string>
+    <string name="reproductor_pausar">Pausa</string>
+    <string name="reproductor_retroceder">Retroceder 10 segundos</string>
+    <string name="reproductor_avanzar">Avanzar 10 segundos</string>
+    <string name="reproductor_aspecto">Cambiar ajuste de pantalla</string>
+    <string name="reproductor_modo_ajustar">Ajustar</string>
+    <string name="reproductor_modo_rellenar">Rellenar</string>
+    <string name="reproductor_modo_zoom">Zoom</string>
+    <string name="reproductor_fase_cargando">Cargando</string>
+    <string name="reproductor_fase_buffering">Cargando en búfer</string>
+    <string name="reproductor_fase_reproduciendo">Reproduciendo</string>
+    <string name="reproductor_fase_pausado">Pausado</string>
+    <string name="reproductor_fase_terminado">Finalizado</string>
+    <string name="reproductor_fase_error">Error</string>
 </resources>

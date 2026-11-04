@@ -9,6 +9,7 @@ import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.CatalogoViewModel
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
+import com.copernicotv.core.identity.CaseFolderCompleto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -97,7 +98,17 @@ class CatalogoPersistenciaTest {
             db.close()
             db = abrirBase()
             val repositorioNuevo = CatalogoRepositorio(db, claves, contexto)
-            val viewModel = CatalogoViewModel(repositorioNuevo)
+            val preferencias = PreferenciasOrdenEnMemoria()
+            val viewModel =
+                CatalogoViewModel(
+                    repositorioNuevo,
+                    BusquedaCatalogoRepositorio(db),
+                    CatalogoCrudRepositorio(db, claves, preferencias),
+                    preferencias,
+                    ColeccionRepositorio(db),
+                    PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),
+                    HistorialRepositorio(db),
+                )
             val estado = withTimeout(TIEMPO_ESPERA) { viewModel.estado.first { it.canales.size == 3 } }
 
             assertEquals(listOf("Canario Uno", "Canario Dos", "Canario Tres"), estado.canales)

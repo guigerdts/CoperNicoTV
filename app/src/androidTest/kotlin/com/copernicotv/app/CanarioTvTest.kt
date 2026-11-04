@@ -15,6 +15,7 @@ import androidx.compose.ui.test.requestFocus
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_ABRIR_DOCUMENTO
+import com.copernicotv.app.ui.TAG_BUSCAR
 import com.copernicotv.app.ui.TAG_IMPORTAR
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -51,9 +52,9 @@ class CanarioTvTest {
 
     @Test
     fun importaYRecorreElCatalogoSoloConDpad() {
-        // La pantalla tiene dos controles: el foco inicial cae en el primero y
-        // se baja con D-pad hasta el disparador de importación. Así el canario
-        // recorre la UI real y no una versión con un solo botón.
+        // El foco inicial cae en el primer control y se baja con D-pad hasta el
+        // disparador de importación. Así el canario recorre la UI real y no una
+        // versión con un solo botón.
         composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertIsFocused()
         composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag(TAG_IMPORTAR).assertIsFocused()
@@ -65,10 +66,11 @@ class CanarioTvTest {
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).assertTextEquals("Canario Dos")
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 2).assertTextEquals("Canario Tres")
 
-        // Tras importar, el botón deja de estar enfocado: se recupera el foco
-        // para recorrer el catálogo solo con D-pad, sin toque.
-        composeRule.onNodeWithTag(TAG_IMPORTAR).requestFocus()
-        composeRule.onNodeWithTag(TAG_IMPORTAR).performKeyInput { pressKey(Key.DirectionDown) }
+        // La búsqueda añade controles enfocables entre importar y la lista; el
+        // recorrido de la lista se conserva con D-pad desde su primer resultado.
+        composeRule.onNodeWithTag(TAG_BUSCAR).requestFocus()
+        composeRule.onNodeWithTag(TAG_BUSCAR).assertIsFocused()
+        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).requestFocus()
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertIsFocused()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performKeyInput { pressKey(Key.DirectionDown) }

@@ -1,0 +1,67 @@
+{
+  "esquema": "p1-medicion-busqueda-android/v1",
+  "fecha": "2026-10-30T01:44:39.611706Z",
+  "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
+  "entorno": {
+    "plataforma": "android",
+    "api": 34,
+    "release": "14",
+    "modelo": "sdk_gphone64_x86_64",
+    "dispositivo": "emu64xa",
+    "producto": "sdk_gphone64_x86_64",
+    "hardware": "ranchu",
+    "fingerprint": "google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.050/12077443:userdebug/dev-keys",
+    "anchoPx": 1080,
+    "altoPx": 1920,
+    "densidadDpi": 320,
+    "heapMaximoBytes": 201326592,
+    "memoriaNativaBytes": 9424608
+  },
+  "fixture": {
+    "ruta": "app/src/androidTest/assets/F-P1-10k.m3u",
+    "entradas": 10000,
+    "bytes": 1940008,
+    "sha256": "45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c"
+  },
+  "procedimiento": {
+    "texto": "Canal P1",
+    "tamanoPagina": 50,
+    "calentamientos": 5,
+    "mediciones": 20,
+    "medicionesHeap": 3,
+    "estadistico": "p95 nearest-rank",
+    "ruta": "CanalDao.buscarEnListaActiva -> PagingSource -> Room"
+  },
+  "escenarios": {
+    "primeraPagina": {
+      "calentamientos": 5,
+      "mediciones": 20,
+      "medianaMs": 15.832,
+      "p95Ms": 17.177,
+      "maximoMs": 17.183,
+      "picoHeapMiB": 13.811,
+      "muestrasMs": [15.261, 15.487, 15.984, 16.256, 17.183, 16.890, 16.153, 15.744, 15.921, 15.528, 15.626, 14.382, 15.260, 15.080, 15.512, 15.081, 16.301, 17.177, 16.416, 16.040]
+    },
+    "pagina2": {
+      "calentamientos": 5,
+      "mediciones": 20,
+      "medianaMs": 7.530,
+      "p95Ms": 8.209,
+      "maximoMs": 8.917,
+      "picoHeapMiB": 13.920,
+      "muestrasMs": [8.067, 7.183, 7.541, 7.934, 7.313, 8.168, 7.264, 7.364, 7.738, 8.917, 7.620, 8.209, 6.978, 7.487, 7.429, 7.148, 7.630, 7.519, 7.610, 7.491]
+    }
+  },
+  "limites": {
+    "primeraPaginaP95Ms": 300.000,
+    "pagina2P95Ms": 150.000,
+    "heapMiB": 384.000
+  },
+  "cumplimiento": {
+    "primeraPagina": true,
+    "pagina2": true,
+    "heap": true
+  },
+  "cumple": true,
+  "descartes": []
+}

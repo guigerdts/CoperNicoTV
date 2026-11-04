@@ -19,11 +19,14 @@ import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
 import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
+import com.copernicotv.app.data.db.dao.FavoritoDao
 import com.copernicotv.app.data.db.dao.FuenteDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
 import com.copernicotv.app.data.db.dao.ListaDao
+import com.copernicotv.app.data.db.dao.OcultacionCanalDao
+import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.core.identity.CaseFolder
@@ -76,6 +79,15 @@ object AppModule {
 
     @Provides
     fun historialDao(db: AppDatabase): HistorialDao = db.historialDao()
+
+    @Provides
+    fun favoritoDao(db: AppDatabase): FavoritoDao = db.favoritoDao()
+
+    @Provides
+    fun ocultacionCanalDao(db: AppDatabase): OcultacionCanalDao = db.ocultacionCanalDao()
+
+    @Provides
+    fun ocultacionGrupoDao(db: AppDatabase): OcultacionGrupoDao = db.ocultacionGrupoDao()
 
     @Provides
     fun perfilDao(db: AppDatabase): PerfilDao = db.perfilDao()

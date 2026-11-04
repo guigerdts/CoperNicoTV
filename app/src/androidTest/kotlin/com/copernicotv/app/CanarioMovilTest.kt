@@ -10,13 +10,16 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.requestFocus
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
+import com.copernicotv.app.ui.TAG_BUSCAR
 import com.copernicotv.app.ui.TAG_IMPORTAR
+import com.copernicotv.app.ui.TAG_RESULTADOS
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
@@ -78,12 +81,17 @@ class CanarioMovilTest {
 
         esperarCanales()
 
-        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertTextEquals("Canario Uno")
-        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 1).assertTextEquals("Canario Dos")
-        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 2).assertTextEquals("Canario Tres")
+        assertCanal(0, "Canario Uno")
+        assertCanal(1, "Canario Dos")
+        assertCanal(2, "Canario Tres")
+        // Deja el primer Canal compuesto para el recorrido con D-pad.
+        composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(0)
 
-        composeRule.onNodeWithTag(TAG_IMPORTAR).requestFocus()
-        composeRule.onNodeWithTag(TAG_IMPORTAR).performKeyInput { pressKey(Key.DirectionDown) }
+        // La búsqueda añade controles enfocables entre importar y la lista; el
+        // recorrido de la lista se conserva con D-pad desde su primer resultado.
+        composeRule.onNodeWithTag(TAG_BUSCAR).requestFocus()
+        composeRule.onNodeWithTag(TAG_BUSCAR).assertIsFocused()
+        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).requestFocus()
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertIsFocused()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performKeyInput { pressKey(Key.DirectionDown) }
@@ -101,7 +109,10 @@ class CanarioMovilTest {
         val fallo =
             runCatching {
                 composeRule.waitUntil(TIEMPO_ESPERA) {
-                    composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 2).fetchSemanticsNodes().isNotEmpty()
+                    runCatching {
+                        composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(2)
+                        composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 2).fetchSemanticsNodes().isNotEmpty()
+                    }.isSuccess
                 }
             }.exceptionOrNull()
         if (fallo != null) {
@@ -113,6 +124,14 @@ class CanarioMovilTest {
                 fallo,
             )
         }
+    }
+
+    private fun assertCanal(
+        indice: Int,
+        texto: String,
+    ) {
+        composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
+        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + indice).assertTextEquals(texto)
     }
 
     private companion object {

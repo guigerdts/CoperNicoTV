@@ -5,12 +5,15 @@ import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.entities.FuenteEntity
+import com.copernicotv.app.data.db.entities.ListaEntity
 import com.copernicotv.app.data.db.entities.PerfilEntity
 import com.copernicotv.core.identity.CaseFolderCompleto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -49,7 +52,7 @@ class PerfilRepositorioTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = PerfilRepositorio(db.perfilDao(), CaseFolderCompleto)
+        repositorio = PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto)
     }
 
     @After
@@ -273,6 +276,101 @@ class PerfilRepositorioTest {
         assertEquals(1, resultados.count { it.isSuccess })
         assertEquals(1, resultados.count { it.exceptionOrNull() is SQLiteConstraintException })
         runBlocking { assertEquals(1, db.perfilDao().contar()) }
+    }
+
+    @Test
+    fun `asocia listas n a n y permite perfil vacio y lista sin perfil`() {
+        runBlocking {
+            val lista1 = sembrarLista("L1", 0)
+            val lista2 = sembrarLista("L2", 1)
+            val lista3 = sembrarLista("L3", 2)
+            val perfilA = (repositorio.crear("A", ahora) as ResultadoAltaPerfil.Creado).perfil
+            val perfilB = (repositorio.crear("B", ahora) as ResultadoAltaPerfil.Creado).perfil
+            val perfilVacio = (repositorio.crear("Vacío", ahora) as ResultadoAltaPerfil.Creado).perfil
+
+            assertEquals(ResultadoAccion.Ok, repositorio.asociarLista(perfilA.id, lista1))
+            assertEquals(ResultadoAccion.Ok, repositorio.asociarLista(perfilA.id, lista2))
+            assertEquals(ResultadoAccion.Ok, repositorio.asociarLista(perfilB.id, lista2))
+            assertEquals(ResultadoAccion.Ok, repositorio.asociarLista(perfilB.id, lista3))
+            assertEquals(ResultadoAccion.Ok, repositorio.asociarLista(perfilA.id, lista1))
+
+            assertEquals(listOf(lista1, lista2), repositorio.listasDePerfil(perfilA.id).first())
+            assertEquals(listOf(lista2, lista3), repositorio.listasDePerfil(perfilB.id).first())
+            assertTrue(repositorio.listasDePerfil(perfilVacio.id).first().isEmpty())
+            assertEquals(4, db.perfilDao().contarAsociaciones())
+        }
+    }
+
+    @Test
+    fun `eliminar perfil borra sus asociaciones y conserva las listas`() {
+        runBlocking {
+            val lista = sembrarLista("L1", 0)
+            val perfil = (repositorio.crear("Trabajo", ahora) as ResultadoAltaPerfil.Creado).perfil
+            repositorio.asociarLista(perfil.id, lista)
+
+            assertEquals(ResultadoAccion.Ok, repositorio.eliminarPerfil(perfil.id))
+
+            assertEquals(0, db.perfilDao().contar())
+            assertEquals(0, db.perfilDao().contarAsociaciones())
+            assertNotNull(db.listaDao().porId(lista))
+            assertEquals(ResultadoAccion.Error(PerfilRepositorio.PERFIL_NO_EXISTE), repositorio.eliminarPerfil(perfil.id))
+        }
+    }
+
+    @Test
+    fun `eliminar lista borra su asociacion sin borrar el perfil`() {
+        runBlocking {
+            val lista = sembrarLista("L1", 0)
+            val perfil = (repositorio.crear("Trabajo", ahora) as ResultadoAltaPerfil.Creado).perfil
+            repositorio.asociarLista(perfil.id, lista)
+
+            db.listaDao().eliminar(lista)
+
+            assertEquals(1, db.perfilDao().contar())
+            assertTrue(repositorio.listasDePerfil(perfil.id).first().isEmpty())
+        }
+    }
+
+    @Test
+    fun `asociar una lista inexistente no crea la asociacion`() {
+        runBlocking {
+            val perfil = (repositorio.crear("Trabajo", ahora) as ResultadoAltaPerfil.Creado).perfil
+
+            assertEquals(
+                ResultadoAccion.Error(PerfilRepositorio.LISTA_NO_EXISTE),
+                repositorio.asociarLista(perfil.id, 999L),
+            )
+            assertEquals(0, db.perfilDao().contarAsociaciones())
+        }
+    }
+
+    private suspend fun sembrarLista(
+        nombre: String,
+        orden: Int,
+    ): Long {
+        val fuenteId =
+            db.fuenteDao().insertar(
+                FuenteEntity(
+                    nombre = "Fuente $nombre",
+                    estado = "activa",
+                    usarIntervaloGlobal = true,
+                    creadoEn = ahora,
+                    actualizadoEn = ahora,
+                ),
+            )
+        return db.listaDao().insertar(
+            ListaEntity(
+                fuenteId = fuenteId,
+                nombre = nombre,
+                ubicacionCifrada = byteArrayOf(orden.toByte()),
+                ubicacionHmac = byteArrayOf((orden + 1).toByte()),
+                esquema = "content",
+                orden = orden,
+                estado = if (orden == 0) "activa" else "inactiva",
+                creadoEn = ahora,
+                actualizadoEn = ahora,
+            ),
+        )
     }
 
     private fun entidad(

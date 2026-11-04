@@ -1,0 +1,67 @@
+{
+  "esquema": "p1-medicion-busqueda-android/v1",
+  "fecha": "2026-10-30T02:01:30.886349Z",
+  "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
+  "entorno": {
+    "plataforma": "android",
+    "api": 34,
+    "release": "14",
+    "modelo": "sdk_gphone64_x86_64",
+    "dispositivo": "emu64xa",
+    "producto": "sdk_gphone64_x86_64",
+    "hardware": "ranchu",
+    "fingerprint": "google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.050/12077443:userdebug/dev-keys",
+    "anchoPx": 1080,
+    "altoPx": 1920,
+    "densidadDpi": 320,
+    "heapMaximoBytes": 201326592,
+    "memoriaNativaBytes": 9426256
+  },
+  "fixture": {
+    "ruta": "app/src/androidTest/assets/F-P1-10k.m3u",
+    "entradas": 10000,
+    "bytes": 1940008,
+    "sha256": "45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c"
+  },
+  "procedimiento": {
+    "texto": "Canal P1",
+    "tamanoPagina": 50,
+    "calentamientos": 5,
+    "mediciones": 20,
+    "medicionesHeap": 3,
+    "estadistico": "p95 nearest-rank",
+    "ruta": "CanalDao.buscarEnListaActiva -> PagingSource -> Room"
+  },
+  "escenarios": {
+    "primeraPagina": {
+      "calentamientos": 5,
+      "mediciones": 20,
+      "medianaMs": 29.078,
+      "p95Ms": 30.651,
+      "maximoMs": 35.950,
+      "picoHeapMiB": 11.847,
+      "muestrasMs": [29.396, 28.785, 29.067, 29.669, 28.710, 28.703, 28.793, 30.127, 28.781, 28.658, 35.950, 30.651, 29.483, 29.090, 28.717, 29.378, 28.494, 28.654, 29.275, 29.157]
+    },
+    "pagina2": {
+      "calentamientos": 5,
+      "mediciones": 20,
+      "medianaMs": 14.260,
+      "p95Ms": 16.281,
+      "maximoMs": 16.799,
+      "picoHeapMiB": 11.941,
+      "muestrasMs": [16.799, 15.889, 15.990, 15.792, 13.976, 14.310, 14.355, 14.375, 14.160, 14.209, 14.160, 14.833, 13.950, 14.046, 13.850, 14.195, 14.099, 15.957, 16.281, 14.208]
+    }
+  },
+  "limites": {
+    "primeraPaginaP95Ms": 300.000,
+    "pagina2P95Ms": 150.000,
+    "heapMiB": 384.000
+  },
+  "cumplimiento": {
+    "primeraPagina": true,
+    "pagina2": true,
+    "heap": true
+  },
+  "cumple": true,
+  "descartes": []
+}

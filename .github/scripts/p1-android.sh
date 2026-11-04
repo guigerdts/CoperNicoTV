@@ -1,5 +1,5 @@
 #!/bin/sh
-# Medición P1 de Android de DC-10 (E2-T5).
+# Medición P1 de Android de DC-10 (E2-T5 y E3-T1).
 #
 # La acción del emulador ejecuta cada línea del input `script` en un `sh -c`
 # separado y se detiene en la primera que falla. Por eso este archivo concentra
@@ -21,7 +21,7 @@ if ! adb shell wm density | grep -q "320"; then
 fi
 
 ./gradlew :app:connectedDebugAndroidTest \
-    -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.p1.MedicionP1AndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.p1.MedicionP1AndroidTest,com.copernicotv.app.p1.MedicionP1BusquedaAndroidTest \
     -Pandroid.testInstrumentationRunnerArguments.p1.commit="${GITHUB_SHA:-desconocido}"
 codigo=$?
 
@@ -30,11 +30,13 @@ salida_adicional=app/build/outputs/connected_android_test_additional_output
 if [ -d "$salida_adicional" ]; then
     find "$salida_adicional" -type f -exec cp {} app/build/p1-android/ \;
 fi
-if [ ! -f app/build/p1-android/medicion.json ]; then
-    echo "No se encontro medicion.json en la salida adicional del test" >&2
-    if [ "$codigo" -eq 0 ]; then
-        codigo=1
+for archivo in medicion.json busqueda-medicion.json; do
+    if [ ! -f "app/build/p1-android/$archivo" ]; then
+        echo "No se encontro $archivo en la salida adicional del test" >&2
+        if [ "$codigo" -eq 0 ]; then
+            codigo=1
+        fi
     fi
-fi
+done
 
 exit "$codigo"

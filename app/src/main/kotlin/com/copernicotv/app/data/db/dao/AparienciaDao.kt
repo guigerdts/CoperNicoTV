@@ -14,11 +14,24 @@ interface AparienciaDao {
     @Insert
     suspend fun insertar(apariencia: AparienciaEntity): Long
 
+    @Insert
+    suspend fun insertarTodas(apariencias: List<AparienciaEntity>): List<Long>
+
     @Query("SELECT * FROM Apariencia WHERE listaId = :listaId ORDER BY orden, id")
     suspend fun porLista(listaId: Long): List<AparienciaEntity>
 
     @Query("SELECT COUNT(*) FROM Apariencia WHERE listaId = :listaId")
     suspend fun contar(listaId: Long): Int
+
+    @Query("SELECT COALESCE(MAX(orden), -1) FROM Apariencia WHERE listaId = :listaId")
+    suspend fun maxOrden(listaId: Long): Int
+
+    @Query("UPDATE Apariencia SET orden = :orden, actualizadoEn = :actualizadoEn WHERE id = :id")
+    suspend fun actualizarOrden(
+        id: Long,
+        orden: Int,
+        actualizadoEn: Instant,
+    ): Int
 
     @Query(
         """

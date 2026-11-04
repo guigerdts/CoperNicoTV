@@ -1,0 +1,61 @@
+{
+  "esquema": "p1-medicion-busqueda/v1",
+  "fecha": "2026-10-30T01:43:17.590103533Z",
+  "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
+  "entorno": {
+    "plataforma": "jvm",
+    "runner": "ubuntu24",
+    "arquitectura": "X64",
+    "sistema": "Linux",
+    "jdk": "17.0.21",
+    "robolectricSdk": 34,
+    "heapMaximoBytes": 536870912
+  },
+  "fixture": {
+    "ruta": "core/src/test/resources/fixtures/F-P1-10k.m3u",
+    "entradas": 10000,
+    "bytes": 1940008,
+    "sha256": "45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c"
+  },
+  "procedimiento": {
+    "texto": "Canal P1",
+    "tamanoPagina": 50,
+    "calentamientos": 10,
+    "mediciones": 30,
+    "medicionesHeap": 3,
+    "estadistico": "p95 nearest-rank",
+    "ruta": "CanalDao.buscarEnListaActiva -> PagingSource -> Room"
+  },
+  "escenarios": {
+    "primeraPagina": {
+      "calentamientos": 10,
+      "mediciones": 30,
+      "medianaMs": 21.735,
+      "p95Ms": 24.460,
+      "maximoMs": 24.953,
+      "picoHeapMiB": 70.535,
+      "muestrasMs": [21.700, 22.281, 21.678, 21.639, 24.953, 21.688, 21.611, 21.344, 23.666, 22.081, 22.882, 21.879, 21.478, 24.460, 22.042, 21.631, 22.084, 22.494, 21.787, 21.725, 21.770, 23.324, 23.260, 21.511, 21.245, 21.391, 21.746, 21.702, 21.429, 20.982]
+    },
+    "pagina2": {
+      "calentamientos": 10,
+      "mediciones": 30,
+      "medianaMs": 10.691,
+      "p95Ms": 18.696,
+      "maximoMs": 21.574,
+      "picoHeapMiB": 70.128,
+      "muestrasMs": [10.793, 11.375, 11.273, 13.759, 10.547, 10.772, 10.786, 10.646, 10.992, 10.791, 10.639, 10.683, 10.594, 10.643, 10.775, 10.669, 10.786, 10.678, 11.845, 10.699, 10.558, 18.696, 11.009, 10.454, 21.574, 10.436, 10.594, 10.477, 10.314, 10.573]
+    }
+  },
+  "limites": {
+    "primeraPaginaP95Ms": 150.000,
+    "pagina2P95Ms": 80.000,
+    "heapMiB": 256.000
+  },
+  "cumplimiento": {
+    "primeraPagina": true,
+    "pagina2": true,
+    "heap": true
+  },
+  "cumple": true,
+  "descartes": []
+}

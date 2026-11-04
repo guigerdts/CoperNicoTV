@@ -1,0 +1,41 @@
+{
+  "esquema": "p1-medicion-android/v1",
+  "fecha": "2026-10-30T02:01:26.656254Z",
+  "commit": "418c33f6745ad4667c7e77a77dfc609ecf4f0d5b",
+  "entorno": {
+    "plataforma": "android",
+    "api": 34,
+    "release": "14",
+    "modelo": "sdk_gphone64_x86_64",
+    "dispositivo": "emu64xa",
+    "producto": "sdk_gphone64_x86_64",
+    "hardware": "ranchu",
+    "fingerprint": "google/sdk_gphone64_x86_64/emu64xa:14/UE1A.230829.050/12077443:userdebug/dev-keys",
+    "anchoPx": 1080,
+    "altoPx": 1920,
+    "densidadDpi": 320,
+    "heapMaximoBytes": 201326592,
+    "memoriaNativaBytes": 5022272
+  },
+  "fixture": {
+    "ruta": "app/src/androidTest/assets/F-P1-10k.m3u",
+    "entradas": 10000,
+    "sha256": "45c489a557efcafa53af5bffd9a001aeb2cdc1616c40a4f823e2f39817ddd04c"
+  },
+  "metricas": {
+    "parseo": {
+      "calentamientos": 5,
+      "mediciones": 20,
+      "medicionesHeap": 20,
+      "medianaMs": 128.249,
+      "p95Ms": 204.859,
+      "maximoMs": 229.251,
+      "picoHeapMiB": 29.578
+    }
+  },
+  "limites": {
+    "parseoP95Ms": 2500.000,
+    "heapMiB": 384.000
+  },
+  "cumple": true
+}

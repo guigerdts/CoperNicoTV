@@ -1073,6 +1073,8 @@ E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La h
 | E6-T5 | Diagnóstico | Protocolo, pistas, buffer y último error; URL saneada |
 | E6-T6 | Zapeo y volumen | Volumen, siguiente/anterior y cambio sin volver al Catálogo |
 
+E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 a E6-T6 siguen pendientes.
+
 ### 8.7 E7 — Android TV, móvil y preferencias
 
 | ID | Objetivo | Criterio de aceptación |
@@ -3352,3 +3354,70 @@ de URL. E5 y S24 no se alteran: el baseline XMLTV sigue pendiente de revisión
 humana. No hay PR ni merge; los commits viven en
 `chore/e2-url-ui-validation` y `feat/e1-bootstrap` permanece en `68c9511`.
 E6 no se inicia dentro de esta entrada.
+
+### L70 — E6-T1: reproducción Media3 de un Canal (2026-11-03)
+
+**Autorización y objetivo.** Implementar el primer incremento funcional de
+E6-T1 —«Sesión Media3 y fuentes»— sin avanzar a E6-T2..T6: abrir un Canal desde
+el Catálogo, resolver su URL cifrada y reproducirla con Media3, con pruebas JVM
+e instrumentadas y validación en CI.
+
+**Alcance implementado.**
+
+- `:core` puro: `ProtocoloStream` y `ClasificadorStream` distinguen HLS, DASH,
+  SmoothStreaming, progresivo, RTSP y RTMP. RTMP se rechaza con
+  `stream_rtmp_no_soportado`: no se declara soporte ni se intenta con un motor
+  que no lo ofrece.
+- `ReproductorRepositorio` descifra `url_stream_cifrada` en memoria,
+  canonicaliza con `CampoUrl.CANAL_URL_STREAM` y clasifica el protocolo. Errores
+  tipados: `canal_no_existe`, `url_ilegible` y los códigos canónicos de URL.
+- `ReproductorViewModel` y `ReproductorScreen`: una sesión `ExoPlayer` por URL
+  resuelta, `PlayerView` con el controlador estándar, liberación al salir,
+  `keepScreenOn`, etiqueta de estado con posición (`TAG_REPRODUCTOR_ESTADO`) y
+  error con código propio (`TAG_REPRODUCTOR_ERROR`).
+- Navegación: `Pantalla.REPRODUCTOR` en `MainActivity` y acción «Reproducir» en
+  `DialogoAccionesCanal`.
+- Dependencias Media3 1.5.0: `exoplayer`, `exoplayer-hls`, `exoplayer-dash`,
+  `exoplayer-rtsp`, `exoplayer-smoothstreaming` y `ui`.
+
+**Privacidad.** La URL descifrada vive solo en memoria y en la sesión del motor.
+`ReproductorUiState.Listo.toString()` omite la URL y `codigoDeError` traduce
+`PlaybackException` a códigos estables sin propagar el mensaje de Media3, que
+puede contenerla (S57a).
+
+**Pruebas.** JVM: `ClasificadorStreamTest` 6/6 y
+`ReproductorRepositorioTest` 7/7 (HLS, progresivo con query, RTSP, RTMP
+rechazado, canal inexistente, sobre ilegible y esquema no admitido).
+Instrumentadas: `ReproductorUiTest` 3/3 en emulador (MP4 progresivo, HLS y
+recurso ausente), con servidor HTTP local que sirve los fixtures del APK de
+pruebas y soporta `Range`; el caso de error verifica además que la UI no expone
+la URL. La clase se añadió al filtro explícito de `instrumented-mobile`.
+
+**Soporte de pruebas.** `app/src/debug/res/xml/network_security_config.xml`
+permite cleartext solo a `127.0.0.1` y `localhost` en builds debug, porque el
+emulador sirve los fixtures por loopback; release no hereda esa política.
+
+**Incidencias y corrección.** El run `41627011539` ejecutó `ReproductorUiTest`
+tras `9cbac2d` y falló 2/3 con `http_error`: el servidor de pruebas mapeaba
+`/f15.mp4` al asset `f15.mp4`, pero los fixtures viven en `f15/f15.mp4`, así que
+respondía 404. `448260e` corrige las rutas y añade una verificación temprana de
+fixtures que falla nombrando la ruta exacta, en lugar de agotar 30 s de espera.
+
+**Evidencia CI.** `reportes-jvm`: `ClasificadorStreamTest` 6/6 y
+`ReproductorRepositorioTest` 7/7, 0 fallos. Run `41625727348` sobre `2cda640`:
+`apk`, `jvm-tests`, `static-analysis`, `instrumented-mobile` e
+`instrumented-tv` en `success`. Run `41629302335` sobre `448260e`: los mismos
+cinco jobs en `success`, y `reportes-instrumented-mobile` registra
+`ReproductorUiTest` con 3/3 pruebas aprobadas. En local se ejecutaron
+`./gradlew :core:test --tests "*ClasificadorStreamTest*"` y
+`./gradlew ktlintCheck detekt`, ambos verdes; `:app` no compila localmente por
+AAPT2 x86-64 sobre ARM64, así que su validación es exclusivamente de CI.
+
+**Estado y frontera.** E6-T1 queda **parcial**: HLS y HTTP progresivo están
+implementados y validados en emulador. DASH, RTSP y SmoothStreaming están
+clasificados y cableados, pero no validados por reproducción: no se declaran
+soportados. E6-T2 (controles y fullscreen), T3 (pistas), T4 (reintentos y
+backoff), T5 (diagnóstico) y T6 (zapeo y volumen) no se implementan en esta
+entrada. Reproducir no registra Historial. E5, S24 y el baseline XMLTV no se
+alteran. Sin PR ni merge; `feat/e1-bootstrap` sigue en `68c9511`.
+

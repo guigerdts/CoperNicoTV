@@ -74,7 +74,7 @@ class ReproductorUiTest {
     fun unRecursoAusenteMuestraUnCodigoPropioSinUrl() {
         sembrarCanal(catalogo, FixturesF15.url(servidor, "f15/ausente.mp4"))
 
-        composeRule.abrirReproductor()
+        composeRule.abrirPantallaReproductor()
 
         composeRule.esperarTag(TAG_REPRODUCTOR_ERROR)
         val texto = composeRule.textoDeTag(TAG_REPRODUCTOR_ERROR)

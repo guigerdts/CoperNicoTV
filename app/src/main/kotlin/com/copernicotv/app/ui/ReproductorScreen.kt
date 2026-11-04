@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -119,6 +120,9 @@ const val TAG_REPRODUCTOR_ASPECTO = "reproductor-aspecto"
 
 /** Etiqueta del indicador de búfer. */
 const val TAG_REPRODUCTOR_BUFFER = "reproductor-buffer"
+
+/** Etiqueta del aviso de reintento durante la recuperación (E6-T4). */
+const val TAG_REPRODUCTOR_REINTENTO = "reproductor-reintento"
 
 /** Etiqueta del selector de pista de audio (E6-T3). */
 const val TAG_REPRODUCTOR_AUDIO = "reproductor-audio"
@@ -284,6 +288,7 @@ private fun SuperficieReproductor(
     ) {
         SuperficieVideo(motor, modo)
         IndicadorCarga(fase)
+        AvisoReintento(estado)
         DiagnosticoEstado(datos, fase, estado.posicionMs)
         if (controlesVisibles) {
             Controles(
@@ -583,6 +588,38 @@ private fun BoxScope.IndicadorCarga(fase: EstadoReproductor) {
 }
 
 /**
+ * Aviso visible mientras S20 agota sus reintentos (E6-T4).
+ *
+ * No es un error definitivo: informa el número de reintento en curso y deja los
+ * controles disponibles para salir o seguir esperando. El error definitivo lo
+ * pinta [ErrorReproduccion] al cerrarse la sesión.
+ */
+@Composable
+private fun BoxScope.AvisoReintento(estado: EstadoSesion) {
+    if (estado.estado != EstadoReproductor.REINTENTANDO) return
+    Surface(
+        modifier = Modifier.align(Alignment.Center),
+        color = Color.Black.copy(alpha = 0.78f),
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Text(
+            text =
+                stringResource(
+                    R.string.reproductor_reintento,
+                    estado.reintento.coerceAtLeast(1),
+                    estado.reintentosMaximos.coerceAtLeast(1),
+                ),
+            modifier =
+                Modifier
+                    .testTag(TAG_REPRODUCTOR_REINTENTO)
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+/**
  * Diagnóstico estable de E6-T1: invisible, pero siempre presente para que la
  * evidencia de CI no dependa de que los controles estén visibles.
  */
@@ -657,6 +694,7 @@ private fun etiquetaFase(fase: EstadoReproductor): String =
         EstadoReproductor.REPRODUCIENDO -> stringResource(R.string.reproductor_fase_reproduciendo)
         EstadoReproductor.PAUSADO -> stringResource(R.string.reproductor_fase_pausado)
         EstadoReproductor.TERMINADO -> stringResource(R.string.reproductor_fase_terminado)
+        EstadoReproductor.REINTENTANDO -> stringResource(R.string.reproductor_fase_reintentando)
         EstadoReproductor.ERROR -> stringResource(R.string.reproductor_fase_error)
     }
 

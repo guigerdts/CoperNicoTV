@@ -9,8 +9,10 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -22,11 +24,16 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Única sesión Media3 de la pantalla de reproducción (E6-T2).
+ * Única sesión Media3 de la pantalla de reproducción (E6-T2, ampliada en E6-T4).
  *
  * Es dueña del `ExoPlayer` y publica su estado como un flujo inmutable. La
  * interfaz solo Observa y envía acciones: no crea ni recrea el motor, y la
  * liberación es idempotente para sobrevivir a dobles llamadas del ciclo de vida.
+ *
+ * La recuperación de S20 reintenta sobre la misma instancia con `prepare()`:
+ * nunca se recrea la sesión. Los reintentos internos de Media3 se desactivan
+ * con [PoliticaErroresMedia3] para que la política observable sea exactamente
+ * la de S20 y no una suma de reintentos internos más los propios.
  *
  * La URL vive únicamente dentro de `MediaItem`; el estado publicado no la
  * expone ni se registra en logs (S57a).
@@ -36,6 +43,7 @@ class SesionMedia3(
     url: String,
     private val preferenciasIniciales: PreferenciasPista = PreferenciasPista(),
     private val intervaloMs: Long = INTERVALO_SONDEO_MS,
+    private val politica: PoliticaReintentos = PoliticaReintentos(),
 ) {
     private val _estado = MutableStateFlow(EstadoSesion())
     val estado: StateFlow<EstadoSesion> = _estado.asStateFlow()
@@ -52,21 +60,32 @@ class SesionMedia3(
     val estadoPistas: StateFlow<EstadoPistas> = _estadoPistas.asStateFlow()
 
     /** Motor de reproducción; la interfaz solo lo conecta a su superficie. */
-    val reproductor: ExoPlayer = ExoPlayer.Builder(contexto).build()
+    val reproductor: ExoPlayer =
+        ExoPlayer.Builder(contexto)
+            .setMediaSourceFactory(
+                DefaultMediaSourceFactory(contexto)
+                    .setLoadErrorHandlingPolicy(PoliticaErroresMedia3()),
+            )
+            .build()
 
     private val alcance = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private val liberada = AtomicBoolean(false)
+    private val reintentos = politica.maquina()
+    private var trabajoReintento: Job? = null
     private var preferencias = preferenciasIniciales
     private var grupos: List<Tracks.Group> = emptyList()
     private var firmaGrupos = ""
     private val oyente =
         object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                _estado.value =
-                    _estado.value.copy(
-                        estado = EstadoReproductor.ERROR,
-                        codigoError = codigoDeError(error),
-                    )
+                if (liberada.get()) return
+                val estadoHttp = estadoHttpDe(error)
+                when (val decision = reintentos.alFallar(clasificarFallo(error.errorCode, estadoHttp))) {
+                    is DecisionReintento.Reintentar -> programarReintento(decision)
+                    DecisionReintento.Definitivo ->
+                        terminarConError(codigoDeError(error.errorCode, estadoHttp))
+                    DecisionReintento.Ignorar -> Unit
+                }
             }
 
             override fun onTracksChanged(tracks: Tracks) {
@@ -180,6 +199,8 @@ class SesionMedia3(
      */
     fun liberar() {
         if (!liberada.compareAndSet(false, true)) return
+        trabajoReintento?.cancel()
+        trabajoReintento = null
         alcance.cancel()
         runCatching { reproductor.removeListener(oyente) }
         reproductor.release()
@@ -188,8 +209,55 @@ class SesionMedia3(
     /** Solo para pruebas: confirma que la sesión liberó su motor. */
     fun estaLiberada(): Boolean = liberada.get()
 
+    /**
+     * Publica el reintento pendiente y lo ejecuta sobre la misma instancia.
+     *
+     * Existe una sola corrutina de reintento por sesión: la máquina ignora
+     * fallos duplicados y esta guarda evita duplicar el trabajo si el motor
+     * notificara dos veces. La cancelación de la sesión cancela la espera, de
+     * modo que un reintento pendiente nunca sobrevive a un cambio de Canal o a
+     * la salida de la pantalla.
+     */
+    private fun programarReintento(decision: DecisionReintento.Reintentar) {
+        if (trabajoReintento?.isActive == true) return
+        _estado.value =
+            _estado.value.copy(
+                estado = EstadoReproductor.REINTENTANDO,
+                codigoError = null,
+                reintento = decision.numero,
+                reintentosMaximos = reintentos.maximo,
+            )
+        trabajoReintento =
+            alcance.launch {
+                politica.esperar(decision.esperaMs)
+                if (!isActive || liberada.get()) return@launch
+                reintentos.alEjecutar()
+                _estado.value =
+                    _estado.value.copy(
+                        estado = EstadoReproductor.CARGANDO,
+                        reintento = 0,
+                        reintentosMaximos = 0,
+                    )
+                reproductor.prepare()
+            }
+    }
+
+    /** Cierra la recuperación con el error definitivo (S20). */
+    private fun terminarConError(codigo: String) {
+        trabajoReintento?.cancel()
+        trabajoReintento = null
+        _estado.value =
+            _estado.value.copy(
+                estado = EstadoReproductor.ERROR,
+                codigoError = codigo,
+                reintento = 0,
+                reintentosMaximos = 0,
+            )
+    }
+
     private fun publicarEstado() {
-        if (_estado.value.estado == EstadoReproductor.ERROR) return
+        val fase = _estado.value.estado
+        if (fase == EstadoReproductor.ERROR || fase == EstadoReproductor.REINTENTANDO) return
         val duracion = reproductor.duration.tomarSiConocida()
         _estado.value =
             EstadoSesion(
@@ -344,13 +412,27 @@ class SesionMedia3(
 /**
  * Traduce el error del motor a un código propio y estable. El mensaje de
  * Media3 puede contener la URL: no se propaga a la UI ni a un log (S57a).
+ *
+ * Los HTTP se tipan por clase: 4xx es un error de cliente que S20 no
+ * reintenta, 5xx es un fallo del servidor y el resto conserva el código
+ * genérico.
  */
-internal fun codigoDeError(error: PlaybackException): String =
-    when (error.errorCode) {
+internal fun codigoDeError(
+    codigoError: Int,
+    estadoHttp: Int?,
+): String =
+    when (codigoError) {
         PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "fuente_no_encontrada"
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
         -> "sin_conexion"
-        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "http_error"
+        PlaybackException.ERROR_CODE_TIMEOUT -> "tiempo_agotado"
+        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
+            when {
+                estadoHttp == null -> "http_error"
+                estadoHttp in 400..499 -> "http_cliente"
+                estadoHttp in 500..599 -> "http_servidor"
+                else -> "http_error"
+            }
         else -> "error_reproduccion"
     }

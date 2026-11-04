@@ -12,6 +12,7 @@ import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.app.player.PistaDisponible
+import com.copernicotv.app.player.PoliticaReintentos
 import com.copernicotv.app.player.PreferenciaPista
 import com.copernicotv.app.player.PreferenciasPista
 import com.copernicotv.app.player.SesionMedia3
@@ -62,6 +63,7 @@ class ReproductorViewModel
         private val repositorio: ReproductorRepositorio,
         @ApplicationContext private val contexto: Context,
         private val preferenciasPista: RepositorioPreferenciasPista,
+        private val politicaReintentos: PoliticaReintentos,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -88,7 +90,9 @@ class ReproductorViewModel
          * recomposición o una actividad recreada no vuelven a abrir el motor.
          */
         fun cargar(canalId: Long) {
-            if (canalCargado == canalId && sesion != null) return
+            // Una carga en curso para el mismo Canal ya es dueña de la sesión:
+            // repetirla la liberaría y reiniciaría el presupuesto de S20.
+            if (canalCargado == canalId && (sesion != null || carga?.isActive == true)) return
             canalCargado = canalId
             carga?.cancel()
             carga =
@@ -107,8 +111,10 @@ class ReproductorViewModel
                             preferenciasActuales =
                                 runCatching { preferenciasPista.leer() }
                                     .getOrDefault(PreferenciasPista())
-                            abrirSesion(datos.url, preferenciasActuales)
-                            _estado.value = datos
+                            val nueva = abrirSesion(datos.url, preferenciasActuales)
+                            // Si la sesión falló antes de publicar el Canal, el
+                            // error definitivo ya ganó: no lo pisamos con Listo.
+                            if (sesion === nueva) _estado.value = datos
                         }
                         is ResultadoStream.Error -> {
                             _estado.value = ReproductorUiState.Error(resultado.codigo)
@@ -190,13 +196,15 @@ class ReproductorViewModel
         private fun abrirSesion(
             url: String,
             preferencias: PreferenciasPista,
-        ) {
-            val nueva = SesionMedia3(contexto, url, preferencias)
+        ): SesionMedia3 {
+            val nueva = SesionMedia3(contexto, url, preferencias, politica = politicaReintentos)
             sesion = nueva
             recolector?.cancel()
             recolector =
                 viewModelScope.launch {
                     nueva.estado.collect { estadoSesion ->
+                        // Un callback de la sesión anterior no debe tocar la nueva (E6-T4).
+                        if (sesion !== nueva) return@collect
                         _sesionEstado.value = estadoSesion
                         if (estadoSesion.estado == EstadoReproductor.ERROR) {
                             _estado.value =
@@ -209,6 +217,7 @@ class ReproductorViewModel
             recolectorPistas =
                 viewModelScope.launch {
                     nueva.estadoPistas.collect { pistas ->
+                        if (sesion !== nueva) return@collect
                         _estadoPistas.value = pistas
                         preferenciasActuales =
                             PreferenciasPista(
@@ -217,6 +226,7 @@ class ReproductorViewModel
                             )
                     }
                 }
+            return nueva
         }
 
         private fun guardarPreferencias(preferencias: PreferenciasPista) {
@@ -227,12 +237,15 @@ class ReproductorViewModel
         }
 
         private fun cerrarSesion() {
+            // La sesión deja de ser la vigente antes de cancelar los recolectores:
+            // así una entrega en vuelo no puede escribir estado de la anterior.
+            val anterior = sesion
+            sesion = null
             recolector?.cancel()
             recolector = null
             recolectorPistas?.cancel()
             recolectorPistas = null
-            sesion?.liberar()
-            sesion = null
+            anterior?.liberar()
             _sesionEstado.value = EstadoSesion()
             _estadoPistas.value = EstadoPistas()
         }

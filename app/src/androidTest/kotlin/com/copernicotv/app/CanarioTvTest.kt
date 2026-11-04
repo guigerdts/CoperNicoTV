@@ -17,6 +17,7 @@ import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_ABRIR_DOCUMENTO
 import com.copernicotv.app.ui.TAG_BUSCAR
 import com.copernicotv.app.ui.TAG_IMPORTAR
+import com.copernicotv.app.ui.TAG_IMPORTAR_URL
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Before
@@ -52,11 +53,13 @@ class CanarioTvTest {
 
     @Test
     fun importaYRecorreElCatalogoSoloConDpad() {
-        // El foco inicial cae en el primer control y se baja con D-pad hasta el
-        // disparador de importación. Así el canario recorre la UI real y no una
-        // versión con un solo botón.
+        // El foco inicial cae en el primer control y se baja con D-pad por las
+        // tres acciones de importación (documento, URL y fixture). Así el
+        // canario recorre la UI real y no una versión con un solo botón.
         composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertIsFocused()
         composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag(TAG_IMPORTAR_URL).assertIsFocused()
+        composeRule.onNodeWithTag(TAG_IMPORTAR_URL).performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag(TAG_IMPORTAR).assertIsFocused()
         composeRule.onNodeWithTag(TAG_IMPORTAR).performKeyInput { pressKey(Key.DirectionCenter) }
 

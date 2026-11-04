@@ -1011,6 +1011,8 @@ Alcance: build, módulos, derivación de identidad, esquema Room v1, integridad/
 
 ### 8.2 E2 — Importación M3U/M3U8 y catálogo base
 
+E2 está **cerrada y validada**. El cierre por rendimiento y errores se registró en L48; la brecha de E2-T2 en el alta de Fuente/Lista por URL —`CatalogoRepositorio.importarDesdeUrl` existía sin camino de UI que lo invocara— se corrigió y se validó en CI el 2026-11-03 (L69, commits `664e092` y `565d76b`, run `41571547230`). El parser M3U, el baseline M3U aprobado y el comportamiento SAF no se modificaron.
+
 | ID | Objetivo | Criterio de aceptación |
 |---|---|---|
 | E2-T1 | Parser M3U/M3U8 streaming | Tablas: mínimo, atributos, `EXTGRP`, comillas, comas en atributos, BOM, CRLF/LF, basura intercalada, `EXTINF` sin URL; fixtures M3U y M3U8 separados. Límites ADR-0006:21–24: una línea física que excede el máximo configurable (default inicial de especificación: 64 KiB) invalida y descarta la entrada en curso, registra error tipado con ubicación y el parser se resincroniza en el siguiente `#EXTINF` válido; la lista continúa y una URL huérfana no se asocia a una entrada incompleta. Por encima del máximo configurable de atributos (default inicial: 64), los pares clave-valor posteriores no se incorporan, se registran como informativo no-fatal agregado por código y se conservan los primeros 64 aceptados; el conteo es por aparición de par clave-valor reconocido del `EXTINF`, incluidas claves repetidas, y la primera aparición de una clave fija el valor. No hay límite de tamaño de entrada completa ni de documento en el parser; un límite de descarga/red, si se define, pertenece a la capa de importación. Ambos límites son configurables globalmente; los defaults son valores iniciales de especificación, no validados experimentalmente. Los errores se agregan por código con conteo total y muestra acotada de ubicaciones; ninguna lista válida se rechaza por número de canales |
@@ -3300,3 +3302,53 @@ de F24a–F24c; el mapping está documentado y no agrega semántica nueva.
 aprueba el baseline, no se cierra S24, no se abre PR, no se hace merge y no se
 inicia E6 ni E7. Commit medido: `b5605f1`; la evidencia y este registro se
 publican en un commit posterior.
+
+### L69 — E2-T2: alta de Fuente y Lista por URL (2026-11-03)
+
+**Autorización y objetivo.** Cerrar la brecha verificable de E2-T2 —«Alta de
+Fuente y Lista (archivo/URL)»— sin reabrir E2, sin tocar el parser M3U, el
+baseline M3U ni el comportamiento SAF, y sin avanzar a E6 antes de validar.
+
+**Brecha detectada.** `CatalogoRepositorio.importarDesdeUrl(nombre, url)` existía
+con descarga previa a la persistencia, cifrado de la ubicación y errores tipados
+(`ubicacion_invalida`, `esquema_no_admitido`, `http_4xx`, `http_5xx`, `timeout`,
+`sin_conexion`, `sin_canales`), y estaba cubierto solo por sus caminos de error.
+Ningún control de la UI lo invocaba: el alta por URL no era alcanzable por el
+usuario.
+
+**Implementación.** `CatalogoScreen` incorpora `TAG_IMPORTAR_URL`,
+`AccionesImportacion` (documento SAF, URL y fixture, en ese orden) y
+`DialogoImportarUrl` con nombre y URL obligatorios; `DialogoCatalogo.ImportarUrl`
+lo enruta. `CatalogoViewModel.importarDesdeUrl` valida nombre y URL no vacíos y
+delega en el mismo flujo `importar` que ya administra `importando` y el estado de
+error. `MainActivity` cablea `onImportarUrl`. Se añadieron tres strings.
+
+**Regla de privacidad.** El nombre de la Fuente lo escribe el usuario y es
+obligatorio: no se deriva de la URL, para no persistir en claro host ni
+credenciales en `Fuente.nombre` (S57a, D5 base). La URL sigue cifrada y
+canonicalizada por el repositorio.
+
+**Pruebas.** `ImportacionE2Test` incorpora
+`una url http valida persiste la fuente y su lista`, con servidor HTTP local de
+un solo uso: verifica el conteo de Canales, la Fuente por nombre, la Lista con
+`esquema = http` y el Estado de Actualización `completada`. `CanarioTvTest` se
+actualizó para recorrer con D-pad las tres acciones de importación
+(`TAG_ABRIR_DOCUMENTO` → `TAG_IMPORTAR_URL` → `TAG_IMPORTAR`) antes de activar
+el fixture; el canario falló en el primer intento porque asumía el orden
+anterior, y esa fue la única regresión detectada.
+
+**Evidencia CI.** Run `41571547230` sobre `565d76b`, workflow `ci.yml`:
+`apk`, `jvm-tests`, `static-analysis`, `instrumented-mobile` e
+`instrumented-tv` en `success`; `p1-performance` y `p1-android` omitidos por
+diseño. `ImportacionE2Test`: 12/12 pruebas aprobadas, incluida la importación
+exitosa por URL. El run previo `41570509278` falló en `instrumented-tv` por la
+asunción de orden del canario; `instrumented-mobile` falló después por
+infraestructura (`sdkmanager`: `Error reading Zip content from a
+SeekableByteChannel`, emulador sin arrancar) y se recuperó con
+`gh run rerun --failed`, no con cambios de código.
+
+**Estado y frontera.** E2 queda cerrada y validada, ahora también por el camino
+de URL. E5 y S24 no se alteran: el baseline XMLTV sigue pendiente de revisión
+humana. No hay PR ni merge; los commits viven en
+`chore/e2-url-ui-validation` y `feat/e1-bootstrap` permanece en `68c9511`.
+E6 no se inicia dentro de esta entrada.

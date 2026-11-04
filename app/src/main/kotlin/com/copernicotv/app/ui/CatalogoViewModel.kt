@@ -419,6 +419,23 @@ class CatalogoViewModel
             }
         }
 
+        /**
+         * Da de alta una Fuente y su Lista desde una URL HTTP/HTTPS.
+         *
+         * El nombre lo escribe el usuario: no se deriva de la URL para no
+         * persistir en claro el host ni credenciales en la columna `Fuente.nombre`
+         * (S57a). La URL se descarga y valida en el repositorio antes de escribir.
+         */
+        fun importarDesdeUrl(
+            nombreFuente: String,
+            url: String,
+        ) {
+            val nombre = nombreFuente.trim()
+            val ubicacion = url.trim()
+            if (nombre.isEmpty() || ubicacion.isEmpty()) return
+            importar { repositorio.importarDesdeUrl(nombre, ubicacion) }
+        }
+
         private fun importar(bloque: suspend () -> ResumenImportacion) {
             if (_estado.value.importando) return
             _estado.value = _estado.value.copy(importando = true, mensaje = null)

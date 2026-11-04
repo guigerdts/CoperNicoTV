@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -21,12 +22,14 @@ import com.copernicotv.app.ui.ColeccionesUiState
 import com.copernicotv.app.ui.CoperNicoTheme
 import com.copernicotv.app.ui.FuentesScreen
 import com.copernicotv.app.ui.FuentesViewModel
+import com.copernicotv.app.ui.GuiaScreen
+import com.copernicotv.app.ui.GuiaViewModel
 import com.copernicotv.app.ui.PerfilesUiState
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
 /** Pantallas de la actividad única. */
-private enum class Pantalla { CATALOGO, FUENTES }
+private enum class Pantalla { CATALOGO, FUENTES, GUIA }
 
 /** Única actividad del canario de E1-C. */
 @AndroidEntryPoint
@@ -44,7 +47,10 @@ class MainActivity : ComponentActivity() {
                 var pantalla by rememberSaveable { mutableStateOf(Pantalla.CATALOGO) }
                 when (pantalla) {
                     Pantalla.CATALOGO ->
-                        PantallaCatalogo(onAbrirFuentes = { pantalla = Pantalla.FUENTES })
+                        PantallaCatalogo(
+                            onAbrirFuentes = { pantalla = Pantalla.FUENTES },
+                            onAbrirGuia = { pantalla = Pantalla.GUIA },
+                        )
                     Pantalla.FUENTES -> {
                         val fuentesViewModel: FuentesViewModel = hiltViewModel()
                         val fuentesEstado by fuentesViewModel.estado.collectAsStateWithLifecycle()
@@ -54,6 +60,27 @@ class MainActivity : ComponentActivity() {
                             onVolver = { pantalla = Pantalla.CATALOGO },
                         )
                     }
+                    Pantalla.GUIA -> {
+                        val guiaViewModel: GuiaViewModel = hiltViewModel()
+                        val guiaEstado by guiaViewModel.estado.collectAsStateWithLifecycle()
+                        val programasFlow by guiaViewModel.programas.collectAsStateWithLifecycle()
+                        key(programasFlow) {
+                            val programas = programasFlow.collectAsLazyPagingItems()
+                            GuiaScreen(
+                                estado = guiaEstado,
+                                programas = programas,
+                                onSeleccionarFuente = guiaViewModel::seleccionarFuente,
+                                onAbrirCanal = guiaViewModel::abrirCanal,
+                                onVolverAlListado = guiaViewModel::volverAlListado,
+                                onAbrirDetalle = guiaViewModel::abrirDetalle,
+                                onCerrarDetalle = guiaViewModel::cerrarDetalle,
+                                onConfirmarAsociacion = guiaViewModel::confirmarAsociacion,
+                                onEditarAsociacion = guiaViewModel::editarAsociacion,
+                                onRevocarAsociacion = guiaViewModel::revocarAsociacion,
+                                onVolver = { pantalla = Pantalla.CATALOGO },
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -61,7 +88,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PantallaCatalogo(onAbrirFuentes: () -> Unit) {
+private fun PantallaCatalogo(
+    onAbrirFuentes: () -> Unit,
+    onAbrirGuia: () -> Unit,
+) {
     val viewModel: CatalogoViewModel = hiltViewModel()
     val estado by viewModel.estado.collectAsStateWithLifecycle()
     val criterios by viewModel.criterios.collectAsStateWithLifecycle()
@@ -138,6 +168,7 @@ private fun PantallaCatalogo(onAbrirFuentes: () -> Unit) {
                 onAsociarListaAPerfil = viewModel::asociarListaAPerfil,
                 onDesasociarListaDePerfil = viewModel::desasociarListaDePerfil,
                 onAbrirFuentes = onAbrirFuentes,
+                onAbrirGuia = onAbrirGuia,
             ),
     )
 }

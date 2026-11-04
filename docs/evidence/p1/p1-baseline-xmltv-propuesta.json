@@ -1,0 +1,150 @@
+{
+  "esquema": "p1-baseline/v1",
+  "estado": "propuesta_pendiente_revision_humana",
+  "destino": "docs/evidence/p1/p1-baseline.json",
+  "baselineAprobadoActual": "M3U en docs/evidence/p1/p1-baseline.json; no modificado por esta propuesta",
+  "formato": "XMLTV",
+  "fecha": "2026-11-02T20:49:23.651154650Z",
+  "entorno": {
+    "runner": "ubuntu26",
+    "runnerSolicitado": "ubuntu-latest",
+    "arquitectura": "X64",
+    "jdk": "17.0.21",
+    "agp": "no aplica (medición en :core, módulo JVM)",
+    "heapMaximoBytes": 536870912,
+    "workflow": ".github/workflows/ci.yml",
+    "job": "p1-performance",
+    "disparo": "workflow_dispatch"
+  },
+  "fixture": {
+    "ruta": "core/src/test/resources/fixtures/F24a.xml",
+    "formato": "XMLTV",
+    "canales": 100,
+    "programas": 10000,
+    "bytes": 1533410,
+    "sha256": "20c0417f83b5f3534e3229b2c423ad6bdd3f54bc1c92e7776efbb655c0f74bf1"
+  },
+  "procedimiento": {
+    "comando": "./gradlew :core:p1Performance :core:p1XmltvPerformance :app:testDebugUnitTest -Pp1.busqueda=true -Pp1.commit=\"$GITHUB_SHA\" --no-parallel --stacktrace",
+    "tarea": ":core:p1XmltvPerformance",
+    "calentamientos": 10,
+    "mediciones": 30,
+    "estadistico": "p95 nearest-rank",
+    "memoria": "pico de heap con Runtime.totalMemory() - freeMemory(), muestreo cada 2 ms",
+    "notaGc": "El muestreador de heap arranca después de System.gc(); se parsea tres veces en el mismo proceso.",
+    "reinicioProcesoEntreMedicionesHeap": false,
+    "notaProceso": "No se reinicia el proceso JVM entre las tres lecturas de heap. Es la misma limitación metodológica del baseline M3U aprobado; DC-10 §3 permite no reiniciar cuando el entorno no lo permita."
+  },
+  "limites": {
+    "parseoP95Ms": 1200.0,
+    "heapMiB": 256.0,
+    "regresionTiempo": 1.2,
+    "regresionMemoria": 1.15
+  },
+  "corridas": [
+    {
+      "orden": 1,
+      "run": "41519220751",
+      "job": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41519220751/job/125530610438",
+      "artefacto": {
+        "nombre": "p1-medicion",
+        "id": 13176013585,
+        "run": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41519220751"
+      },
+      "commit": "b5605f15a59e770827bba942e1bcedd7d56799c9",
+      "fecha": "2026-11-02T20:28:30.854649982Z",
+      "medianaMs": 34.535,
+      "p95Ms": 46.427,
+      "maximoMs": 48.017,
+      "picoHeapMiB": 22.502,
+      "cumple": true,
+      "evidencia": {
+        "json": "docs/evidence/p1/medicion-xmltv-b5605f1-r2.json",
+        "csv": "docs/evidence/p1/mediciones-xmltv-b5605f1-r2.csv"
+      }
+    },
+    {
+      "orden": 2,
+      "run": "41520808801",
+      "job": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41520808801/job/125536023632",
+      "artefacto": {
+        "nombre": "p1-medicion",
+        "id": 13177343151,
+        "run": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41520808801"
+      },
+      "commit": "b5605f15a59e770827bba942e1bcedd7d56799c9",
+      "fecha": "2026-11-02T20:39:03.454557279Z",
+      "medianaMs": 44.788,
+      "p95Ms": 55.584,
+      "maximoMs": 80.099,
+      "picoHeapMiB": 22.141,
+      "cumple": true,
+      "evidencia": {
+        "json": "docs/evidence/p1/medicion-xmltv-b5605f1-r3.json",
+        "csv": "docs/evidence/p1/mediciones-xmltv-b5605f1-r3.csv"
+      }
+    },
+    {
+      "orden": 3,
+      "run": "41522305743",
+      "job": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41522305743/job/125541138512",
+      "artefacto": {
+        "nombre": "p1-medicion",
+        "id": 13177598812,
+        "run": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41522305743"
+      },
+      "commit": "b5605f15a59e770827bba942e1bcedd7d56799c9",
+      "fecha": "2026-11-02T20:49:23.651154650Z",
+      "medianaMs": 51.241,
+      "p95Ms": 71.081,
+      "maximoMs": 82.927,
+      "picoHeapMiB": 21.539,
+      "cumple": true,
+      "evidencia": {
+        "json": "docs/evidence/p1/medicion-xmltv-b5605f1-r4.json",
+        "csv": "docs/evidence/p1/mediciones-xmltv-b5605f1-r4.csv"
+      }
+    }
+  ],
+  "referencia": {
+    "criterio": "peor p95 y peor pico de heap de las tres corridas",
+    "p95Ms": 71.081,
+    "picoHeapMiB": 22.502,
+    "regresionTiempoMs": 85.297,
+    "regresionMemoriaMiB": 25.877
+  },
+  "revisionHumana": {
+    "estado": "pendiente",
+    "fecha": null,
+    "aprobadoPor": null,
+    "decisiones": [],
+    "detalle": "Pendiente de revisión humana de DC-10 §5. Esta propuesta no modifica el baseline M3U aprobado ni se usa para regresión hasta su aprobación."
+  },
+  "descartadas": [
+    {
+      "run": "41503973319",
+      "job": "https://github.com/guigerdts/CoperNicoTV/actions/runs/41503973319/job/125478364489",
+      "commit": "b5605f15a59e770827bba942e1bcedd7d56799c9",
+      "fecha": "2026-11-02T18:50:31.070508275Z",
+      "medianaMs": 54.542,
+      "p95Ms": 70.875,
+      "maximoMs": 86.628,
+      "picoHeapMiB": 21.595,
+      "motivo": "El run completo falló de entrada en instrumented-mobile por timeout de UI, ajeno a P1. El job p1-performance fue success y su artefacto es válido, pero no es una corrida completa verde de entrada. Se reejecutó solo el job móvil; la medición no se repitió. Se descarta para la terna por el mismo criterio que el baseline M3U.",
+      "evidencia": {
+        "json": "docs/evidence/p1/medicion-xmltv-b5605f1-r1-descartada.json",
+        "csv": "docs/evidence/p1/mediciones-xmltv-b5605f1-r1-descartada.csv"
+      }
+    }
+  ],
+  "diferenciasContrato": [
+    "El workflow usa ubuntu-latest, pero ImageOS reportó ubuntu26 en las tres corridas. El baseline M3U aprobado se midió en ubuntu24; los valores absolutos de XMLTV no se comparan con los de M3U.",
+    "No se reinicia el proceso JVM entre las tres lecturas de heap; se aplica System.gc() antes de muestrear. DC-10 §3 permite no reiniciar cuando el entorno no lo permita y el baseline M3U aprobado usa la misma limitación.",
+    "S24 no fija el contenido literal de F24a-F24c. La materialización conserva el orden de S24 y los casos ya existentes en ParserXmltvTest; F24a mantiene exactamente el SHA-256 del generador anterior."
+  ],
+  "alcance": {
+    "cubre": "parseo XMLTV de 10 000 programas y pico de heap del parseo en JVM",
+    "noCubre": "métricas de búsqueda (150 ms) y página 2 (80 ms), y la medición P1 en Android"
+  },
+  "noAprobado": true
+}

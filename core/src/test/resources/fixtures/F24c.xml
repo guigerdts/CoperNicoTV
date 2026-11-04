@@ -1,0 +1,6 @@
+<tv>
+  <channel id="a"><display-name>A</display-name></channel>
+  <programme start="20260101120000 +0000" channel="a"><title>Sin fin</title></programme>
+  <programme start="20260101130000 +0000" stop="20260101140000 +0000"><title>Sin canal</title></programme>
+  <programme start="20260101140000 +0000" stop="20260101150000 +0000" channel="a"><title>Completo</title></programme>
+</tv>

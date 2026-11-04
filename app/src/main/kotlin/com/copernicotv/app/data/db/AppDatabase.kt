@@ -17,6 +17,7 @@ import com.copernicotv.app.data.db.dao.EvidenciaColisionDao
 import com.copernicotv.app.data.db.dao.FavoritoDao
 import com.copernicotv.app.data.db.dao.FuenteDao
 import com.copernicotv.app.data.db.dao.FuenteGuiaDao
+import com.copernicotv.app.data.db.dao.GeneracionGuiaDao
 import com.copernicotv.app.data.db.dao.GrupoDao
 import com.copernicotv.app.data.db.dao.HistorialDao
 import com.copernicotv.app.data.db.dao.HmacPendienteDao
@@ -26,6 +27,7 @@ import com.copernicotv.app.data.db.dao.ObservacionPendienteDao
 import com.copernicotv.app.data.db.dao.OcultacionCanalDao
 import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
+import com.copernicotv.app.data.db.dao.ProgramaDao
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.db.entities.AparienciaClavePendienteEntity
 import com.copernicotv.app.data.db.entities.AparienciaEntity
@@ -111,6 +113,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun fuenteDao(): FuenteDao
 
     abstract fun fuenteGuiaDao(): FuenteGuiaDao
+
+    abstract fun generacionGuiaDao(): GeneracionGuiaDao
+
+    abstract fun programaDao(): ProgramaDao
 
     abstract fun listaDao(): ListaDao
 

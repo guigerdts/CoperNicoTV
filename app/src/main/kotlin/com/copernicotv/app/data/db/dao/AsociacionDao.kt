@@ -3,7 +3,23 @@ package com.copernicotv.app.data.db.dao
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import com.copernicotv.app.data.db.entities.AsociacionEntity
+
+/**
+ * Asociación con el Canal y la generación publicada que la respalda.
+ *
+ * La UI necesita el nombre del Canal y la generación para consultar programas;
+ * una Asociación sin generación publicada no puede mostrar guía.
+ */
+data class CanalConGuia(
+    val canalId: Long,
+    val nombre: String?,
+    val channelIdTexto: String,
+    val fuenteGuiaId: Long,
+    val generacionId: Long,
+    val estado: String,
+)
 
 /**
  * Asociaciones EPG de un Canal.
@@ -41,6 +57,46 @@ interface AsociacionDao {
 
     @Query("DELETE FROM Asociacion WHERE id = :id")
     suspend fun eliminar(id: Long): Int
+
+    @Query("SELECT * FROM Asociacion WHERE id = :id")
+    suspend fun porId(id: Long): AsociacionEntity?
+
+    @Query("SELECT * FROM Asociacion WHERE fuenteGuiaId = :fuenteGuiaId ORDER BY channelIdTexto, id")
+    suspend fun porFuente(fuenteGuiaId: Long): List<AsociacionEntity>
+
+    @Query(
+        "SELECT * FROM Asociacion WHERE fuenteGuiaId = :fuenteGuiaId AND channelIdTexto = :channelId LIMIT 1",
+    )
+    suspend fun porFuenteYCanal(
+        fuenteGuiaId: Long,
+        channelId: String,
+    ): AsociacionEntity?
+
+    @Update
+    suspend fun actualizar(fila: AsociacionEntity): Int
+
+    @Query("DELETE FROM Asociacion WHERE fuenteGuiaId = :fuenteGuiaId")
+    suspend fun eliminarPorFuente(fuenteGuiaId: Long): Int
+
+    @Query("SELECT COUNT(*) FROM Asociacion WHERE fuenteGuiaId = :fuenteGuiaId AND estado = :estado")
+    suspend fun contarPorEstado(
+        fuenteGuiaId: Long,
+        estado: String,
+    ): Int
+
+    @Query(
+        """
+        SELECT a.canalId AS canalId, c.nombre AS nombre, a.channelIdTexto AS channelIdTexto,
+            a.fuenteGuiaId AS fuenteGuiaId, f.generacionPublicadaId AS generacionId, a.estado AS estado
+        FROM Asociacion a
+        INNER JOIN Canal c ON c.id = a.canalId
+        INNER JOIN FuenteGuia f ON f.id = a.fuenteGuiaId
+        WHERE f.generacionPublicadaId IS NOT NULL
+          AND (:fuenteGuiaId IS NULL OR a.fuenteGuiaId = :fuenteGuiaId)
+        ORDER BY c.nombre, c.id, a.fuenteGuiaId
+        """,
+    )
+    suspend fun conCanalYGuia(fuenteGuiaId: Long?): List<CanalConGuia>
 
     @Query("SELECT COUNT(*) FROM Asociacion")
     suspend fun contar(): Int

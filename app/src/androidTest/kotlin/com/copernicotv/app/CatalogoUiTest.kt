@@ -142,7 +142,13 @@ class CatalogoUiTest {
             composeRule.onAllNodesWithText("Canal A").fetchSemanticsNodes().isEmpty()
         }
         composeRule.onNodeWithTag(TAG_FILTRO_OCULTOS).performClick()
-        esperarTag(PREFIJO_TAG_CANAL + 0)
+        // Paging conserva la emisión anterior mientras aplica «mostrar ocultos»:
+        // esperar el canal 0 no garantiza que ya sea el canal oculto. La insignia
+        // «Oculto» es la señal de que la nueva emisión llegó.
+        esperarHasta {
+            composeRule.onAllNodesWithText("Oculto").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertExists()
         composeRule.onNodeWithText("Oculto").assertExists()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performClick()

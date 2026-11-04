@@ -5,10 +5,15 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
+import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.ReproductorRepositorio
 import com.copernicotv.app.data.ResultadoStream
+import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
+import com.copernicotv.app.player.PistaDisponible
+import com.copernicotv.app.player.PreferenciaPista
+import com.copernicotv.app.player.PreferenciasPista
 import com.copernicotv.app.player.SesionMedia3
 import com.copernicotv.core.player.ProtocoloStream
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,12 +61,16 @@ class ReproductorViewModel
     constructor(
         private val repositorio: ReproductorRepositorio,
         @ApplicationContext private val contexto: Context,
+        private val preferenciasPista: RepositorioPreferenciasPista,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
 
         private val _sesionEstado = MutableStateFlow(EstadoSesion())
         val sesionEstado: StateFlow<EstadoSesion> = _sesionEstado.asStateFlow()
+
+        private val _estadoPistas = MutableStateFlow(EstadoPistas())
+        val estadoPistas: StateFlow<EstadoPistas> = _estadoPistas.asStateFlow()
 
         /** Motor de la sesión activa; `null` mientras no hay sesión abierta. */
         val motor: ExoPlayer?
@@ -71,6 +80,8 @@ class ReproductorViewModel
         private var canalCargado: Long? = null
         private var carga: Job? = null
         private var recolector: Job? = null
+        private var recolectorPistas: Job? = null
+        private var preferenciasActuales = PreferenciasPista()
 
         /**
          * Resuelve el Canal y abre su sesión. Es idempotente por Canal: una
@@ -93,7 +104,10 @@ class ReproductorViewModel
                                     url = resultado.stream.url,
                                     protocolo = resultado.stream.protocolo,
                                 )
-                            abrirSesion(datos.url)
+                            preferenciasActuales =
+                                runCatching { preferenciasPista.leer() }
+                                    .getOrDefault(PreferenciasPista())
+                            abrirSesion(datos.url, preferenciasActuales)
                             _estado.value = datos
                         }
                         is ResultadoStream.Error -> {
@@ -119,6 +133,40 @@ class ReproductorViewModel
             sesion?.buscarA(posicionMs)
         }
 
+        /** Selecciona una pista de audio y la guarda como preferencia (D3). */
+        fun seleccionarAudio(pista: PistaDisponible) {
+            sesion?.seleccionarAudio(pista)
+            guardarPreferencias(
+                preferenciasActuales.copy(audio = PreferenciaPista.Pista(pista.idioma, pista.etiqueta)),
+            )
+        }
+
+        /** Devuelve el audio a la selección automática y lo guarda (D3). */
+        fun usarAudioAutomatico() {
+            sesion?.usarAudioAutomatico()
+            guardarPreferencias(preferenciasActuales.copy(audio = PreferenciaPista.Automatica))
+        }
+
+        /** Selecciona una pista de subtítulos y la guarda como preferencia (D3). */
+        fun seleccionarSubtitulos(pista: PistaDisponible) {
+            sesion?.seleccionarSubtitulos(pista)
+            guardarPreferencias(
+                preferenciasActuales.copy(subtitulos = PreferenciaPista.Pista(pista.idioma, pista.etiqueta)),
+            )
+        }
+
+        /** Desactiva los subtítulos y guarda esa preferencia (S44). */
+        fun desactivarSubtitulos() {
+            sesion?.desactivarSubtitulos()
+            guardarPreferencias(preferenciasActuales.copy(subtitulos = PreferenciaPista.Desactivada))
+        }
+
+        /** Devuelve los subtítulos a la selección automática y lo guarda (D3). */
+        fun usarSubtitulosAutomaticos() {
+            sesion?.usarSubtitulosAutomaticos()
+            guardarPreferencias(preferenciasActuales.copy(subtitulos = PreferenciaPista.Automatica))
+        }
+
         /** Cierra la sesión al salir de la pantalla y permite reabrir el Canal. */
         fun cerrar() {
             carga?.cancel()
@@ -139,8 +187,11 @@ class ReproductorViewModel
             cerrarSesion()
         }
 
-        private fun abrirSesion(url: String) {
-            val nueva = SesionMedia3(contexto, url)
+        private fun abrirSesion(
+            url: String,
+            preferencias: PreferenciasPista,
+        ) {
+            val nueva = SesionMedia3(contexto, url, preferencias)
             sesion = nueva
             recolector?.cancel()
             recolector =
@@ -154,13 +205,35 @@ class ReproductorViewModel
                         }
                     }
                 }
+            recolectorPistas?.cancel()
+            recolectorPistas =
+                viewModelScope.launch {
+                    nueva.estadoPistas.collect { pistas ->
+                        _estadoPistas.value = pistas
+                        preferenciasActuales =
+                            PreferenciasPista(
+                                audio = pistas.preferenciaAudio,
+                                subtitulos = pistas.preferenciaSubtitulos,
+                            )
+                    }
+                }
+        }
+
+        private fun guardarPreferencias(preferencias: PreferenciasPista) {
+            preferenciasActuales = preferencias
+            viewModelScope.launch {
+                runCatching { preferenciasPista.guardar(preferencias) }
+            }
         }
 
         private fun cerrarSesion() {
             recolector?.cancel()
             recolector = null
+            recolectorPistas?.cancel()
+            recolectorPistas = null
             sesion?.liberar()
             sesion = null
             _sesionEstado.value = EstadoSesion()
+            _estadoPistas.value = EstadoPistas()
         }
     }

@@ -147,12 +147,18 @@ internal fun ReglaPrincipal.mostrarControlesConDpad() {
     esperarTag(TAG_REPRODUCTOR_CONTROLES)
 }
 
-/** Espera a que el foco del D-pad quede en el botón play/pausa. */
-internal fun ReglaPrincipal.esperarFocoEnAlternar() {
-    esperarHasta {
-        runCatching { onNodeWithTag(TAG_REPRODUCTOR_ALTERNAR).assertIsFocused() }.isSuccess
+/** Espera a que el foco del D-pad quede en el nodo con [tag]. */
+internal fun ReglaPrincipal.esperarFocoEn(
+    tag: String,
+    tiempoMs: Long = ESPERA_TEST_MS,
+) {
+    esperarHasta(tiempoMs) {
+        runCatching { onNodeWithTag(tag).assertIsFocused() }.isSuccess
     }
 }
+
+/** Espera a que el foco del D-pad quede en el botón play/pausa. */
+internal fun ReglaPrincipal.esperarFocoEnAlternar() = esperarFocoEn(TAG_REPRODUCTOR_ALTERNAR)
 
 /** ViewModel de la pantalla; permite inspeccionar la sesión viva en pruebas. */
 internal fun ReglaPrincipal.viewModelReproductor(): ReproductorViewModel = ViewModelProvider(activity)[ReproductorViewModel::class.java]

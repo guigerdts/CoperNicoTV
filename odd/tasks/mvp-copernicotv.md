@@ -185,7 +185,7 @@ La etapa es **provisional por implementación y validación, no por decisiones a
 | S8 | E2/E3 | JVM, Robolectric, I-M | S8a: `group-title` y `EXTGRP` asignan el Grupo declarado a la Apariencia. S8b: dos Grupos con el mismo nombre en Listas distintas son filas distintas. S8c: ocultar uno deja el otro visible. S8d: un Canal sin `group-title` ni `EXTGRP` no se asigna a un Grupo inventado y no provoca crash. | Fixture F8 con `group-title`, `EXTGRP` y un Canal sin Grupo; importar en L1 y L2; `SELECT` por Lista/Grupo; ocultar Grupo en L1; consultar visibilidad en L1 y L2; abrir el catálogo en I-M y comparar las etiquetas. |
 | S9 | E3 | Robolectric, I-M | Primera página con los IDs esperados, sin duplicados, y la misma página en dos consultas consecutivas. P1 aprobada como política híbrida; límites, regresión y procedimiento p95 en DC-10 (JVM 1200/150/80 ms, 256 MiB). La medición P1 de búsqueda se ejecutó el 2026-10-30 y el baseline quedó aprobado (L52); la cobertura funcional de IDs, estabilidad y filtros está en E3-U2. | Cargar 10 000 Canales; buscar `Canal 42`; capturar IDs de la página 0; repetir; aplicar dos filtros (Grupo y Favorito) y capturar de nuevo; comparar; medir P1 conforme a §7 y DC-10; la cobertura funcional está en E3-U2 y el baseline de búsqueda quedó aprobado en L52. |
 | S10 | E3 | Robolectric, I-M | S10a: marcar y desmarcar Favorito crea/elimina una sola fila y persiste tras reinicio. S10b: un segundo alta de Favorito no crea fila. S10c: crear, renombrar y borrar Colección, y agregar/quitar miembros, se refleja en UI y persiste. S10d: la Colección conserva un orden propio distinto del orden de Lista. | I-M: crear y borrar una Colección, agregar C,B,A y quitar B; reiniciar; comprobar UI. Robolectric: alta de Favorito dos veces y `SELECT count(*)`; comparar orden de Colección C,A con orden de Lista A,B,C. |
-| S11 | E3 | Robolectric, I-M | S11a: Historial con una fila por Canal, garantizada por `UNIQUE(canal_id)`; reproducir actualiza la fecha; al fusionar dos Canales que pasan a representar la misma identidad canónica, se conserva `max(fecha)` y no se duplican filas. S11b: la consulta de últimos N usa índice; N=10 fijo; orden determinista `fecha DESC, canal_id DESC`; índice propuesto `(fecha, canal_id)`; fechas iguales se desempatan por `canal_id DESC`; este orden no es el de la organización del Catálogo (S14i). La verificación del plan de consulta con `EXPLAIN QUERY PLAN` queda especificada y no ejecutada; no se afirma que el índice garantice por sí solo un plan óptimo. S11c: la UI de acceso rápido muestra los últimos N en ese orden y abre el Canal seleccionado. S11d: todo persiste tras reinicio. | Reproducir C1, C2 y C1 con fechas controladas; `SELECT` ordenado; fusionar dos Canales que pasan a la misma identidad y comprobar que sobrevive `max(fecha)` sin duplicado; insertar una segunda fila con el mismo `canal_id` y comprobar el rechazo de `UNIQUE(canal_id)`; `EXPLAIN QUERY PLAN` de últimos N (especificado, no ejecutado); I-M: abrir acceso rápido, comprobar los últimos 10, tocar el segundo y verificar el Canal; reiniciar y repetir. |
+| S11 | E3 | Robolectric, I-M | S11a: Historial con una fila por Canal, garantizada por `UNIQUE(canal_id)`; reproducir actualiza la fecha; al fusionar dos Canales que pasan a representar la misma identidad canónica, se conserva `max(fecha)` y no se duplican filas. S11b: la consulta de últimos N usa índice; N=10 fijo; orden determinista `fecha DESC, canal_id DESC`; índice propuesto `(fecha, canal_id)`; fechas iguales se desempatan por `canal_id DESC`; este orden no es el de la organización del Catálogo (S14i). La verificación del plan de consulta con `EXPLAIN QUERY PLAN` queda especificada y no ejecutada; no se afirma que el índice garantice por sí solo un plan óptimo. S11c: la UI de acceso rápido muestra los últimos N en ese orden y abre el Canal seleccionado. S11d: todo persiste tras reinicio. | Reproducir C1, C2 y C1 con fechas controladas; `SELECT` ordenado; fusionar dos Canales que pasan a la misma identidad y comprobar que sobrevive `max(fecha)` sin duplicado; insertar una segunda fila con el mismo `canal_id` y comprobar el rechazo de `UNIQUE(canal_id)`; `EXPLAIN QUERY PLAN` de últimos N (especificado, no ejecutado); I-M: abrir acceso rápido, comprobar los últimos 10, tocar el segundo y verificar el Canal; reiniciar y repetir. Evidencia local de S11b (2026-11-05): `EXPLAIN QUERY PLAN` de las consultas reales de `ultimos` y `observarUltimos` usa `index_Historial_fecha_canalId` y no crea `TEMP B-TREE`; detalle y salida en §10.10.6. Prueba instrumentada `S11bPlanConsultaTest` añadida al job `instrumented-mobile`; ejecución y run de CI en Android API 34 pendientes, por lo que S11b no se declara cerrada. |
 | S12 | E2 | JVM | Logo, nombre y atributos extendidos persistidos; `EXTGRP` produce Grupo; la ausencia de un atributo no lanza. | Fixtures F12a (completo) y F12b (mínimo); importar; comparar campos y Grupo. |
 | S13 | E3 | Robolectric, I-M | S13a: ocultar un Canal lo excluye del Catálogo visible pero conserva fila y relaciones; desocultarlo lo restaura. S13b: ocultar un Grupo afecta solo a las Apariencias de ese Grupo/Lista; el Grupo homónimo de otra Lista sigue visible. S13c: ambas ocultaciones y sus reversiones persisten tras reinicio. | Contar filas y FKs antes/después; ocultar/desocultar Canal; consultar; ocultar/desocultar Grupo en L1; comparar L1/L2; I-M: abrir Catálogo en ambos estados y comprobar visibilidad; reiniciar y releer. |
 | S14 | E3 | JVM, Robolectric, I-M | S14a: L1 y L2 comparten tres Canales, C1, C2 y C3, con órdenes independientes y distinguibles; estado inicial L1: C1, C2, C3 y L2: C3, C2, C1. Reordenar únicamente L1 a C2, C1, C3 y verificar inmediatamente L1: C2, C1, C3 y L2: C3, C2, C1. Cerrar la app y recrear el proceso (no basta recrear Activity, DataStore o BD); tras reabrir, verificar de nuevo L1: C2, C1, C3 y L2: C3, C2, C1. La operación no cambia la identidad de los Canales ni el orden propio de las Colecciones; coherencia con S14c y S45a–S45c. No basta comprobar solo L2: deben afirmarse ambas secuencias exactas antes y después del reinicio. S14b: el orden de una Colección es independiente del orden de Apariencia. S14c: la UI permite ejecutar el reordenamiento manual y refleja el nuevo orden tras reiniciar. S14d: `README.md:38` y `:84` exigen genéricamente ordenación y personalización del catálogo; la cobertura aprobada es la combinación de modos A/B/C y sus direcciones, orden manual de Apariencias, orden independiente de Colecciones y preferencias de ordenación por Lista persistidas entre reinicios, sin atribuir esa cobertura al README ni agregar funciones implícitas de presentación u organización sin requisito concreto aprobado. La decisión es de alcance, no de implementación ni validación. Las reglas de mayúsculas/acentos, Canales sin nombre y Canales sin grupo están aprobadas y se detallan en §2.1; su implementación y validación siguen pendientes y condicionan el cierre de S14 en §9.1.10. S14e–S14m: cubren los modos A/B/C, canales nunca reproducidos, desempates deterministas con acentos, comparación reproducible JVM/Android con tabla de orden español fija en `:core`, canales sin nombre al final, sección «Sin grupo» sin Grupo ficticio, preferencia independiente por Lista, persistencia tras reinicio, no regresión de Apariencia/Colección e identidad/esquema; aserciones, niveles y procedimientos en §2.1. La preferencia por Lista es propiedad de E3-T7; E7-T5 la consume. No bloqueada por D1(a), D2(a), D3, D4 ni D5: sus decisiones se resuelven en §6.2 (DC-01–DC-11); la implementación/validación sigue pendiente. | S14a: preparar tres Canales compartidos C1, C2 y C3; fijar el estado inicial L1: C1, C2, C3 y L2: C3, C2, C1; leer ambas; reordenar únicamente L1 a C2, C1, C3; verificar inmediatamente L1: C2, C1, C3 y L2: C3, C2, C1; cerrar la app y recrear el proceso (no basta recrear Activity, DataStore o BD); reabrir; verificar de nuevo L1: C2, C1, C3 y L2: C3, C2, C1. Confirmar que no cambia la identidad de los Canales ni el orden propio de las Colecciones; coherencia con S14c y S45a–S45c. No basta comprobar solo L2. S14b: definir orden A,B,C en Apariencia y C,B,A en Colección; cambiar uno; releer. S14c: I-M arrastrar/ordenar manualmente y comparar la secuencia visible; reiniciar. S14a y S14c se implementan en E3-T8; S14b en E3-T5. S14d: contrastar README y ADR-0002:23/:27 con §2.1; comprobar que la cobertura aprobada incluye A/B/C y direcciones, orden manual de Apariencias, orden independiente de Colecciones y preferencias por Lista persistidas; comprobar que las reglas de comparación, Canales sin nombre y Canales sin grupo están registradas en §2.1; no declarar S14 completo hasta implementarlas y validarlas. S14e–S14m: ejecutar los fixtures F14e–F14m y los procedimientos de §2.1, incluidos los casos de mayúsculas/acentos, sin nombre y sin grupo. |
@@ -1643,7 +1643,7 @@ proceso.
 |---|---|---|---|
 | E3-T1 | Cumplida | §10.10.1; búsqueda paginada y filtros en E3-U2; `BusquedaFiltrosTest` 1/1; tres corridas P1 de búsqueda sobre `418c33f` (`40987152414`, `40987957054`, `40988640006`) y baseline aprobado en L52. | Ninguno; E3-T1 está cerrada. |
 | E3-T2 | Parcial | `FavoritoEntity` con índice único `canalId`; `FavoritoDao` usa `OnConflictStrategy.IGNORE`; `EstadoUsuarioPersistenciaTest` prueba alta idempotente y restricción real; `CatalogoUiTest.favoritoYocultacionFiltranYseRevierten` prueba la UI. | «Sobrevive a Actualización» no se ejecutó; depende de E4-T6. |
-| E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente. | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` futuro. |
+| E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente. | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` futuro (actualización 2026-11-05: ejecutado localmente con SQLite 3.46.1/3.53.4; prueba instrumentada `S11bPlanConsultaTest` añadida al job `instrumented-mobile`, pendiente de ejecución y run en Android API 34; ver §10.10.6); S11d (persistencia tras reinicio) pendiente. |
 | E3-T4 | Cubierta | `OcultacionCanalEntity` y `OcultacionGrupoEntity` con FK y `UNIQUE`; `EstadoUsuarioPersistenciaTest` prueba que ocultar Canal/Grupo no altera Apariencias ni Canales y que grupos homónimos de Listas distintas se ocultan por separado; `CatalogoUiTest` prueba alternar Oculto por Canal. | Ninguno para el criterio de datos. |
 | E3-T5 | Parcial | `ColeccionRepositorioTest` 6/6: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada y errores; `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones. | Unicidad de pertenencia y las dos posiciones de ADR-0004:60(m5) tras E4; S45a exige recreación de proceso y la prueba solo cierra y reabre la base. |
 | E3-T6 | Cubierta | `CatalogoUiTest`: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo», recreación de Activity y `elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | Ninguno para el criterio instrumentado. |
@@ -1711,7 +1711,9 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
   169 (1 omitida), 0 fallos; `instrumented-mobile` 26/26; `instrumented-tv`
   1/1.
 - **Pendiente.** La fusión `max(fecha)` de E4-T4/T5 y el `EXPLAIN QUERY PLAN`
-  futuro siguen pendientes; E3 permanece abierta.
+  futuro siguen pendientes; E3 permanece abierta. Actualización 2026-11-05: el
+  `EXPLAIN QUERY PLAN` local se registró en §10.10.6; la fusión y la
+  confirmación en SQLite de Android API 34 siguen pendientes.
 
 #### 10.10.5 E3-U9: «Sin nombre» instrumentado (E3-T6)
 
@@ -1734,6 +1736,122 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
   (criterios de E4), E3-T5 (unicidad tras E4/m5 y recreación de proceso),
   E3-T7/T8 (recreación de proceso) y E3-T9 (E6/E7). No quedan unidades E3
   ejecutables sin E4.
+
+#### 10.10.6 Verificación S11b: plan de consulta de Historial
+
+**Estado: verificación local ejecutada y prueba instrumentada preparada; S11b
+no cerrada en el entorno objetivo.** Base
+`20bf1bc4f00ba772ec8e1e8bd5b82bd4f3e2b633` (2026-11-05). No se cambió el texto
+ni el comportamiento de las consultas ni el esquema: el SQL de `ultimos` y
+`observarUltimos` se extrajo a `HistorialConsultas` para que producción y la
+prueba instrumentada compartan exactamente la misma consulta. La comprobación
+local usa las consultas reales de `HistorialDao.ultimos` y
+`HistorialDao.observarUltimos`, el esquema exportado
+`app/schemas/com.copernicotv.app.data.db.AppDatabase/1.json` y los índices
+reales de `Historial`, `Favorito` y `OcultacionCanal`.
+
+- **Consultas examinadas.**
+  - `ultimos`:
+    `SELECT * FROM Historial ORDER BY fecha DESC, canalId DESC LIMIT :limite`.
+  - `observarUltimos`:
+    `SELECT c.id AS canalId, c.nombre AS nombre, EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito, EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto FROM Historial h INNER JOIN Canal c ON c.id = h.canalId ORDER BY h.fecha DESC, h.canalId DESC LIMIT :limite`.
+- **Índice examinado.** `index_Historial_fecha_canalId` es no único sobre
+  `(fecha, canalId)`; `index_Favorito_canalId` y
+  `index_OcultacionCanal_canalId` son únicos sobre `canalId`; `Canal.id` es la
+  PK. La consulta no usa hints.
+- **Preparación.** Se creó una base temporal con el `createSql` exacto del
+  esquema exportado, `PRAGMA foreign_keys = ON`, sin `ANALYZE` (`sqlite_stat1`
+  ausente) y con 10 000 filas en `Canal`/`Historial`, 500 en `Favorito` y 400
+  en `OcultacionCanal`. Se repitió con 0, 10 y 100 filas; el plan no cambió.
+- **Salida real (SQLite 3.46.1, Python `sqlite3`).** Se transcribe la salida
+  íntegra de `EXPLAIN QUERY PLAN` con `limite = 10`:
+
+  ```
+  === EXPLAIN QUERY PLAN: ultimos ===
+  6|0|0|SCAN Historial USING COVERING INDEX index_Historial_fecha_canalId
+
+  === EXPLAIN QUERY PLAN: observarUltimos ===
+  7|0|0|SCAN h USING COVERING INDEX index_Historial_fecha_canalId
+  9|0|0|SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+  15|0|0|CORRELATED SCALAR SUBQUERY 1
+  19|15|0|SEARCH f USING COVERING INDEX index_Favorito_canalId (canalId=?)
+  28|0|0|CORRELATED SCALAR SUBQUERY 2
+  32|28|0|SEARCH oc USING COVERING INDEX index_OcultacionCanal_canalId (canalId=?)
+  ```
+
+  La contraprueba con el CLI `sqlite3` 3.53.4 sobre la misma base produjo el
+  mismo árbol:
+
+  ```
+  QUERY PLAN
+  `--SCAN Historial USING COVERING INDEX index_Historial_fecha_canalId
+
+  QUERY PLAN
+  |--SCAN h USING COVERING INDEX index_Historial_fecha_canalId
+  |--SEARCH c USING INTEGER PRIMARY KEY (rowid=?)
+  |--CORRELATED SCALAR SUBQUERY 1
+  |  `--SEARCH f USING COVERING INDEX index_Favorito_canalId (canalId=?)
+  `--CORRELATED SCALAR SUBQUERY 2
+     `--SEARCH oc USING COVERING INDEX index_OcultacionCanal_canalId (canalId=?)
+  ```
+- **Interpretación.** `SCAN Historial USING COVERING INDEX` no es un escaneo
+  completo de la tabla: recorre el índice compuesto en orden inverso y obtiene
+  todas las columnas de `SELECT *` del índice y del rowid. Ese recorrido
+  satisface `ORDER BY fecha DESC, canalId DESC` sin `USE TEMP B-TREE FOR ORDER
+  BY`. En `observarUltimos`, el índice de `Historial` aporta el orden; el JOIN
+  se resuelve con `SEARCH c USING INTEGER PRIMARY KEY` y los `EXISTS`
+  correlacionados usan los índices covering de `Favorito` y `OcultacionCanal`.
+  No aparece un `SCAN` de tabla completa de `Historial` ni de `Canal`.
+- **Conclusión.** El índice `(fecha, canalId)` se usa como exige S11b y no hace
+  falta cambiar la consulta ni el esquema. El plan es estable con 0, 10, 100 y
+  10 000 filas y coincide en SQLite 3.46.1 y 3.53.4.
+- **Límite del entorno.** La verificación no se ejecutó con la versión de
+  SQLite del system image de Android API 34 que usa la CI
+  (`.github/workflows/ci.yml`): este host es aarch64/Termux, no tiene emulador
+  ni system image, y el `sqlite3` de `platform-tools` es x86-64 (3.50.6) y no
+  se puede ejecutar aquí. Por eso la evidencia es local y representativa, no
+  una medición del entorno objetivo; **S11b no se declara cerrada** y la
+  confirmación en Android API 34 sigue pendiente. S11d y E3-T3 permanecen
+  pendientes; no se implementa S11d.
+- **Prueba instrumentada añadida (2026-11-05).** Se agregó
+  `app/src/androidTest/kotlin/com/copernicotv/app/S11bPlanConsultaTest.kt`.
+  La prueba:
+  - construye una base Room in-memory con el esquema real de `AppDatabase`;
+  - obtiene `SELECT sqlite_version()` y registra API, dispositivo y modelo;
+  - verifica que `index_Historial_fecha_canalId` existe y cubre exactamente
+    `(fecha, canalId)`;
+  - siembra 10 000 filas en `Historial`/`Canal`, 500 en `Favorito` y 400 en
+    `OcultacionCanal`;
+  - ejecuta `EXPLAIN QUERY PLAN` sobre `HistorialConsultas.ULTIMOS` y
+    `HistorialConsultas.OBSERVAR_ULTIMOS`, las mismas constantes que usa
+    `HistorialDao`, y llama a los métodos reales `ultimos` y `observarUltimos`;
+  - comprueba que `Historial` se recorre con
+    `index_Historial_fecha_canalId`, que no aparece
+    `USE TEMP B-TREE FOR ORDER BY`, y que `Canal`, `Favorito` y
+    `OcultacionCanal` se resuelven por PK/índice, no por escaneo completo;
+  - falla si falta el índice, cambia el orden/contrato, aparece el ordenamiento
+    temporal o el plan deja de usar el índice compuesto;
+  - registra la versión de SQLite y todas las filas del plan en logcat y salida
+    de la prueba para diagnóstico, sin fijar el texto completo del plan.
+- **Integración en CI.** `S11bPlanConsultaTest` se añadió a la lista explícita
+  de clases del job `instrumented-mobile` en `.github/workflows/ci.yml`. Ese
+  job usa API 34, `google_apis`, `x86_64` y `pixel_2`; por tanto la prueba está
+  destinada al SQLite real de Android API 34, no a Python, JDBC de escritorio
+  ni Robolectric.
+- **Validación local de la prueba.** `:app:ktlintCheck`, `:app:detekt` y
+  `:core:test` terminaron verdes; `git diff --check` quedó limpio.
+  `:app:compileDebugAndroidTestKotlin` no se pudo completar en este host: es
+  aarch64 y el AAPT2 x86-64 de las build-tools falla en
+  `processDebugResources` antes de compilar Kotlin. No hay emulador ni system
+  image local.
+- **Ejecución en API 34 y run de CI: pendientes.** No se ejecutó la prueba
+  instrumentada, por lo que no hay versión real de SQLite de Android, plan
+  capturado, resultado de comprobaciones ni identificación de run de CI. El
+  test es el artefacto que debe producir y registrar esos datos. No se
+  declara S11b verificada hasta que `instrumented-mobile` ejecute
+  `S11bPlanConsultaTest` en API 34 y termine verde; en ese momento se
+  transcribirán en esta sección la versión, el dispositivo/API, el plan
+  completo, el resultado y el run.
 
 ## 11. Log
 

@@ -155,6 +155,33 @@ interface ColeccionCanalDao {
     @Insert
     suspend fun insertar(fila: ColeccionCanalEntity): Long
 
+    /**
+     * Inserta la pertenencia solo si esa Colección todavía no contiene ese
+     * Canal. La comprobación y el alta ocurren en una sola sentencia, de modo
+     * que el alta es idempotente incluso si el llamador no comprobó antes.
+     *
+     * No se usa un índice único global: E1-U3 exige que el esquema v1 siga
+     * representando las dos posiciones y la pertenencia duplicada idéntica de
+     * ADR-0004:59(m5) antes de la consolidación. La garantía de unicidad de
+     * las altas nuevas vive en esta sentencia y en la transacción del
+     * repositorio.
+     */
+    @Query(
+        """
+        INSERT INTO ColeccionCanal (coleccionId, canalId, posicion)
+        SELECT :coleccionId, :canalId, :posicion
+        WHERE NOT EXISTS (
+            SELECT 1 FROM ColeccionCanal
+            WHERE coleccionId = :coleccionId AND canalId = :canalId
+        )
+        """,
+    )
+    suspend fun insertarSiNoExiste(
+        coleccionId: Long,
+        canalId: Long,
+        posicion: Int,
+    )
+
     @Query("SELECT * FROM ColeccionCanal WHERE id = :id")
     suspend fun porId(id: Long): ColeccionCanalEntity?
 

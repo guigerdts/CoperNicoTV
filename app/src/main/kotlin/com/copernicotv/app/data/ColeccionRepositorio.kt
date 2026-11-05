@@ -2,7 +2,6 @@ package com.copernicotv.app.data
 
 import androidx.room.withTransaction
 import com.copernicotv.app.data.db.AppDatabase
-import com.copernicotv.app.data.db.entities.ColeccionCanalEntity
 import com.copernicotv.app.data.db.entities.ColeccionEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -16,11 +15,14 @@ import javax.inject.Singleton
  * Colecciones con orden propio, independiente de `Apariencia.orden` y de la
  * preferencia A/B/C de cada Lista.
  *
- * La pertenencia se guarda en `ColeccionCanal.posicion`. El repositorio no
- * impone unicidad de `(coleccionId, canalId)` ni de `(coleccionId, posicion)`:
- * el esquema v1 debe seguir permitiendo las dos posiciones de ADR-0004:60(m5)
- * antes de que E4 resuelva la consolidación. La operación de alta sí es
- * idempotente para no crear duplicados nuevos desde la UI.
+ * La pertenencia se guarda en `ColeccionCanal.posicion`. El esquema v1 no
+ * impone unicidad global: debe seguir representando las dos posiciones y la
+ * pertenencia duplicada idéntica de ADR-0004:59(m5) antes de la consolidación
+ * (E1-U3). El repositorio, en cambio, garantiza que un alta nueva no cree un
+ * duplicado: comprueba, inserta y calcula la posición dentro de una única
+ * transacción de Room, y la sentencia de alta repite la condición. Las filas
+ * duplicadas legacy que existan por una consolidación pendiente se conservan
+ * intactas para que m5 pueda resolverlas.
  */
 @Singleton
 class ColeccionRepositorio
@@ -79,37 +81,45 @@ class ColeccionRepositorio
         /**
          * Agrega un Canal al final de la Colección.
          *
-         * Si el Canal ya tiene una pertenencia en esa Colección no se inserta
-         * otra fila: la UI no crea duplicados nuevos. Las filas duplicadas que
-         * ya existan por una consolidación pendiente se conservan intactas.
+         * La comprobación de pertenencia, el cálculo de la posición y el alta
+         * ocurren dentro de la misma transacción de Room. Room serializa las
+         * transacciones del proceso, así que dos altas concurrentes del mismo
+         * Canal no pueden insertar dos filas: la segunda ve la fila confirmada
+         * por la primera y devuelve [ResultadoAccion.Ok] sin escribir. La
+         * sentencia de alta repite la condición (`NOT EXISTS`) como segunda
+         * barrera a nivel de sentencia.
+         *
+         * No se agrega un índice único global porque E1-U3 exige que el
+         * esquema v1 siga representando las dos posiciones y la pertenencia
+         * duplicada idéntica de ADR-0004:59(m5) antes de la consolidación. Las
+         * filas duplicadas que ya existan por una consolidación pendiente se
+         * conservan intactas; solo se impide crear duplicados nuevos.
          */
         suspend fun agregarCanal(
             coleccionId: Long,
             canalId: Long,
         ): ResultadoAccion =
             withContext(Dispatchers.IO) {
-                if (db.coleccionDao().porId(coleccionId) == null) {
-                    return@withContext ResultadoAccion.Error(ERROR_COLECCION_NO_EXISTE)
-                }
-                if (db.canalDao().porId(canalId) == null) {
-                    return@withContext ResultadoAccion.Error(ERROR_CANAL_NO_EXISTE)
-                }
-                if (db.coleccionCanalDao().porCanal(coleccionId, canalId).isNotEmpty()) {
-                    return@withContext ResultadoAccion.Ok
-                }
                 try {
                     db.withTransaction {
+                        if (db.coleccionDao().porId(coleccionId) == null) {
+                            return@withTransaction ResultadoAccion.Error(ERROR_COLECCION_NO_EXISTE)
+                        }
+                        if (db.canalDao().porId(canalId) == null) {
+                            return@withTransaction ResultadoAccion.Error(ERROR_CANAL_NO_EXISTE)
+                        }
+                        if (db.coleccionCanalDao().porCanal(coleccionId, canalId).isNotEmpty()) {
+                            return@withTransaction ResultadoAccion.Ok
+                        }
                         val ahora = Instant.now()
-                        db.coleccionCanalDao().insertar(
-                            ColeccionCanalEntity(
-                                coleccionId = coleccionId,
-                                canalId = canalId,
-                                posicion = db.coleccionCanalDao().maxPosicion(coleccionId) + 1,
-                            ),
+                        db.coleccionCanalDao().insertarSiNoExiste(
+                            coleccionId = coleccionId,
+                            canalId = canalId,
+                            posicion = db.coleccionCanalDao().maxPosicion(coleccionId) + 1,
                         )
                         db.coleccionDao().tocar(coleccionId, ahora)
+                        ResultadoAccion.Ok
                     }
-                    ResultadoAccion.Ok
                 } catch (error: Exception) {
                     ResultadoAccion.Error(ERROR_AGREGAR_CANAL)
                 }

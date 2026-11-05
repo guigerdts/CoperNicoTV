@@ -114,9 +114,10 @@ jobs:
           # El filtro es una lista explícita: toda prueba instrumentada de móvil
           # que pueda correr aislada debe añadirse aquí. `CanarioTvTest` se
           # excluye a propósito porque corre en el job de TV. Las fases de
-          # reinicio real (`E3T8Proceso*` y `S11dProceso*`) se ejecutan aparte
-          # dentro de `e3-process-restart.sh`, porque necesitan compartir datos
-          # entre invocaciones de instrumentación sin reinstalar el APK.
+          # reinicio real (`E3T8Proceso*`, `S11dProceso*` y `S45Proceso*`) se
+          # ejecutan aparte dentro de `e3-process-restart.sh`, porque necesitan
+          # compartir datos entre invocaciones de instrumentación sin reinstalar
+          # el APK.
           # `android-emulator-runner` ejecuta cada línea como un shell aparte,
           # así que la suite y el script de reinicio van en una sola línea con `&&`.
           script: |

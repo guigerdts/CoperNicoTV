@@ -14,6 +14,26 @@ import com.copernicotv.app.data.db.entities.PerfilListaEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
+/**
+ * SQL compartido por `HistorialDao` y la verificación instrumentada de S11b.
+ *
+ * Mantener la consulta en un único lugar permite ejecutar `EXPLAIN QUERY PLAN`
+ * sobre exactamente el mismo texto que usa producción, sin duplicarlo en la prueba.
+ */
+object HistorialConsultas {
+    const val ULTIMOS: String =
+        "SELECT * FROM Historial ORDER BY fecha DESC, canalId DESC LIMIT :limite"
+
+    const val OBSERVAR_ULTIMOS: String =
+        "SELECT c.id AS canalId, c.nombre AS nombre, " +
+            "EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito, " +
+            "EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto " +
+            "FROM Historial h " +
+            "INNER JOIN Canal c ON c.id = h.canalId " +
+            "ORDER BY h.fecha DESC, h.canalId DESC " +
+            "LIMIT :limite"
+}
+
 @Dao
 interface HistorialDao {
     @Insert
@@ -62,7 +82,7 @@ interface HistorialDao {
     @Query("SELECT COUNT(*) FROM Historial")
     suspend fun contar(): Int
 
-    @Query("SELECT * FROM Historial ORDER BY fecha DESC, canalId DESC LIMIT :limite")
+    @Query(HistorialConsultas.ULTIMOS)
     suspend fun ultimos(limite: Int): List<HistorialEntity>
 
     /**
@@ -73,17 +93,7 @@ interface HistorialDao {
      * FK con cascada hace que ese caso no ocurra, pero la consulta no depende
      * de ello.
      */
-    @Query(
-        """
-        SELECT c.id AS canalId, c.nombre AS nombre,
-            EXISTS(SELECT 1 FROM Favorito f WHERE f.canalId = c.id) AS esFavorito,
-            EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id) AS estaOculto
-        FROM Historial h
-        INNER JOIN Canal c ON c.id = h.canalId
-        ORDER BY h.fecha DESC, h.canalId DESC
-        LIMIT :limite
-        """,
-    )
+    @Query(HistorialConsultas.OBSERVAR_ULTIMOS)
     fun observarUltimos(limite: Int): Flow<List<HistorialResumen>>
 }
 

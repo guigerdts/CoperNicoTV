@@ -185,7 +185,7 @@ La etapa es **provisional por implementación y validación, no por decisiones a
 | S8 | E2/E3 | JVM, Robolectric, I-M | S8a: `group-title` y `EXTGRP` asignan el Grupo declarado a la Apariencia. S8b: dos Grupos con el mismo nombre en Listas distintas son filas distintas. S8c: ocultar uno deja el otro visible. S8d: un Canal sin `group-title` ni `EXTGRP` no se asigna a un Grupo inventado y no provoca crash. | Fixture F8 con `group-title`, `EXTGRP` y un Canal sin Grupo; importar en L1 y L2; `SELECT` por Lista/Grupo; ocultar Grupo en L1; consultar visibilidad en L1 y L2; abrir el catálogo en I-M y comparar las etiquetas. |
 | S9 | E3 | Robolectric, I-M | Primera página con los IDs esperados, sin duplicados, y la misma página en dos consultas consecutivas. P1 aprobada como política híbrida; límites, regresión y procedimiento p95 en DC-10 (JVM 1200/150/80 ms, 256 MiB). La medición P1 de búsqueda se ejecutó el 2026-10-30 y el baseline quedó aprobado (L52); la cobertura funcional de IDs, estabilidad y filtros está en E3-U2. | Cargar 10 000 Canales; buscar `Canal 42`; capturar IDs de la página 0; repetir; aplicar dos filtros (Grupo y Favorito) y capturar de nuevo; comparar; medir P1 conforme a §7 y DC-10; la cobertura funcional está en E3-U2 y el baseline de búsqueda quedó aprobado en L52. |
 | S10 | E3 | Robolectric, I-M | S10a: marcar y desmarcar Favorito crea/elimina una sola fila y persiste tras reinicio. S10b: un segundo alta de Favorito no crea fila. S10c: crear, renombrar y borrar Colección, y agregar/quitar miembros, se refleja en UI y persiste. S10d: la Colección conserva un orden propio distinto del orden de Lista. | I-M: crear y borrar una Colección, agregar C,B,A y quitar B; reiniciar; comprobar UI. Robolectric: alta de Favorito dos veces y `SELECT count(*)`; comparar orden de Colección C,A con orden de Lista A,B,C. |
-| S11 | E3 | Robolectric, I-M | S11a: Historial con una fila por Canal, garantizada por `UNIQUE(canal_id)`; reproducir actualiza la fecha; al fusionar dos Canales que pasan a representar la misma identidad canónica, se conserva `max(fecha)` y no se duplican filas. S11b: la consulta de últimos N usa índice; N=10 fijo; orden determinista `fecha DESC, canal_id DESC`; índice propuesto `(fecha, canal_id)`; fechas iguales se desempatan por `canal_id DESC`; este orden no es el de la organización del Catálogo (S14i). La verificación del plan de consulta con `EXPLAIN QUERY PLAN` se ejecutó en local y en Android API 34 (SQLite 3.39.2, run `42021126752`); no se afirma que el índice garantice por sí solo un plan óptimo. S11c: la UI de acceso rápido muestra los últimos N en ese orden y abre el Canal seleccionado. S11d: todo persiste tras reinicio. | Reproducir C1, C2 y C1 con fechas controladas; `SELECT` ordenado; fusionar dos Canales que pasan a la misma identidad y comprobar que sobrevive `max(fecha)` sin duplicado; insertar una segunda fila con el mismo `canal_id` y comprobar el rechazo de `UNIQUE(canal_id)`; `EXPLAIN QUERY PLAN` de últimos N ejecutado en local y Android API 34; I-M: abrir acceso rápido, comprobar los últimos 10, tocar el segundo y verificar el Canal; reiniciar y repetir. Evidencia local y en Android API 34 de S11b (2026-11-05): `EXPLAIN QUERY PLAN` de las consultas reales de `ultimos` y `observarUltimos` usa `index_Historial_fecha_canalId` y no crea `TEMP B-TREE`; detalle y salida en §10.10.6. Prueba instrumentada `S11bPlanConsultaTest` ejecutada en el job `instrumented-mobile` (run `42021126752`, job `127223871504`) sobre Android API 34 y SQLite 3.39.2, 51/51 instrumentadas verdes; S11b verificada. E3-T3 sigue parcial por S11d y la fusión `max(fecha)` de E4-T4/T5. |
+| S11 | E3 | Robolectric, I-M | S11a: Historial con una fila por Canal, garantizada por `UNIQUE(canal_id)`; reproducir actualiza la fecha; al fusionar dos Canales que pasan a representar la misma identidad canónica, se conserva `max(fecha)` y no se duplican filas. S11b: la consulta de últimos N usa índice; N=10 fijo; orden determinista `fecha DESC, canal_id DESC`; índice propuesto `(fecha, canal_id)`; fechas iguales se desempatan por `canal_id DESC`; este orden no es el de la organización del Catálogo (S14i). La verificación del plan de consulta con `EXPLAIN QUERY PLAN` se ejecutó en local y en Android API 34 (SQLite 3.39.2, run `42021126752`); no se afirma que el índice garantice por sí solo un plan óptimo. S11c: la UI de acceso rápido muestra los últimos N en ese orden y abre el Canal seleccionado. S11d: todo persiste tras reinicio. | Reproducir C1, C2 y C1 con fechas controladas; `SELECT` ordenado; fusionar dos Canales que pasan a la misma identidad y comprobar que sobrevive `max(fecha)` sin duplicado; insertar una segunda fila con el mismo `canal_id` y comprobar el rechazo de `UNIQUE(canal_id)`; `EXPLAIN QUERY PLAN` de últimos N ejecutado en local y Android API 34; I-M: abrir acceso rápido, comprobar los últimos 10, tocar el segundo y verificar el Canal; reiniciar y repetir. Evidencia local y en Android API 34 de S11b (2026-11-05): `EXPLAIN QUERY PLAN` de las consultas reales de `ultimos` y `observarUltimos` usa `index_Historial_fecha_canalId` y no crea `TEMP B-TREE`; detalle y salida en §10.10.6. Prueba instrumentada `S11bPlanConsultaTest` ejecutada en el job `instrumented-mobile` (run `42021126752`, job `127223871504`) sobre Android API 34 y SQLite 3.39.2, 51/51 instrumentadas verdes; S11b verificada. S11d verificada en Android API 34 el 2026-11-05 (PR #16, commit `bd3e8e8`, run `42037003281`): dos fases instrumentadas en invocaciones separadas, separadas por `am force-stop`, con identidades de proceso `7892:486674` y `7984:493708`, los mismos diez Canales en el orden `Canal 12`…`Canal 3` y conteo 10 en ambas fases; detalle en §10.10.7. E3-T3 sigue parcial solo por la fusión `max(fecha)` de E4-T4/T5. |
 | S12 | E2 | JVM | Logo, nombre y atributos extendidos persistidos; `EXTGRP` produce Grupo; la ausencia de un atributo no lanza. | Fixtures F12a (completo) y F12b (mínimo); importar; comparar campos y Grupo. |
 | S13 | E3 | Robolectric, I-M | S13a: ocultar un Canal lo excluye del Catálogo visible pero conserva fila y relaciones; desocultarlo lo restaura. S13b: ocultar un Grupo afecta solo a las Apariencias de ese Grupo/Lista; el Grupo homónimo de otra Lista sigue visible. S13c: ambas ocultaciones y sus reversiones persisten tras reinicio. | Contar filas y FKs antes/después; ocultar/desocultar Canal; consultar; ocultar/desocultar Grupo en L1; comparar L1/L2; I-M: abrir Catálogo en ambos estados y comprobar visibilidad; reiniciar y releer. |
 | S14 | E3 | JVM, Robolectric, I-M | S14a: L1 y L2 comparten tres Canales, C1, C2 y C3, con órdenes independientes y distinguibles; estado inicial L1: C1, C2, C3 y L2: C3, C2, C1. Reordenar únicamente L1 a C2, C1, C3 y verificar inmediatamente L1: C2, C1, C3 y L2: C3, C2, C1. Cerrar la app y recrear el proceso (no basta recrear Activity, DataStore o BD); tras reabrir, verificar de nuevo L1: C2, C1, C3 y L2: C3, C2, C1. La operación no cambia la identidad de los Canales ni el orden propio de las Colecciones; coherencia con S14c y S45a–S45c. No basta comprobar solo L2: deben afirmarse ambas secuencias exactas antes y después del reinicio. S14b: el orden de una Colección es independiente del orden de Apariencia. S14c: la UI permite ejecutar el reordenamiento manual y refleja el nuevo orden tras reiniciar. S14d: `README.md:38` y `:84` exigen genéricamente ordenación y personalización del catálogo; la cobertura aprobada es la combinación de modos A/B/C y sus direcciones, orden manual de Apariencias, orden independiente de Colecciones y preferencias de ordenación por Lista persistidas entre reinicios, sin atribuir esa cobertura al README ni agregar funciones implícitas de presentación u organización sin requisito concreto aprobado. La decisión es de alcance, no de implementación ni validación. Las reglas de mayúsculas/acentos, Canales sin nombre y Canales sin grupo están aprobadas y se detallan en §2.1; su implementación y validación siguen pendientes y condicionan el cierre de S14 en §9.1.10. S14e–S14m: cubren los modos A/B/C, canales nunca reproducidos, desempates deterministas con acentos, comparación reproducible JVM/Android con tabla de orden español fija en `:core`, canales sin nombre al final, sección «Sin grupo» sin Grupo ficticio, preferencia independiente por Lista, persistencia tras reinicio, no regresión de Apariencia/Colección e identidad/esquema; aserciones, niveles y procedimientos en §2.1. La preferencia por Lista es propiedad de E3-T7; E7-T5 la consume. No bloqueada por D1(a), D2(a), D3, D4 ni D5: sus decisiones se resuelven en §6.2 (DC-01–DC-11); la implementación/validación sigue pendiente. | S14a: preparar tres Canales compartidos C1, C2 y C3; fijar el estado inicial L1: C1, C2, C3 y L2: C3, C2, C1; leer ambas; reordenar únicamente L1 a C2, C1, C3; verificar inmediatamente L1: C2, C1, C3 y L2: C3, C2, C1; cerrar la app y recrear el proceso (no basta recrear Activity, DataStore o BD); reabrir; verificar de nuevo L1: C2, C1, C3 y L2: C3, C2, C1. Confirmar que no cambia la identidad de los Canales ni el orden propio de las Colecciones; coherencia con S14c y S45a–S45c. No basta comprobar solo L2. S14b: definir orden A,B,C en Apariencia y C,B,A en Colección; cambiar uno; releer. S14c: I-M arrastrar/ordenar manualmente y comparar la secuencia visible; reiniciar. S14a y S14c se implementan en E3-T8; S14b en E3-T5. S14d: contrastar README y ADR-0002:23/:27 con §2.1; comprobar que la cobertura aprobada incluye A/B/C y direcciones, orden manual de Apariencias, orden independiente de Colecciones y preferencias por Lista persistidas; comprobar que las reglas de comparación, Canales sin nombre y Canales sin grupo están registradas en §2.1; no declarar S14 completo hasta implementarlas y validarlas. S14e–S14m: ejecutar los fixtures F14e–F14m y los procedimientos de §2.1, incluidos los casos de mayúsculas/acentos, sin nombre y sin grupo. |
@@ -1029,7 +1029,7 @@ E2 está **cerrada y validada**. El cierre por rendimiento y errores se registr�
 |---|---|---|
 | E3-T1 | Búsqueda y filtros | Búsqueda paginada y filtros combinables con 10 000 Canales; medición P1 conforme a §7 (límite absoluto, regresión contra baseline versionado y p95); límites y procedimiento de DC-10; la búsqueda paginada y los filtros están implementados en E3-U2 (2026-10-29); la medición P1 de búsqueda/página 2 se ejecutó el 2026-10-30 sobre `418c33f` (runs `40987152414`, `40987957054` y `40988640006`; L51) y cumple los límites absolutos; el baseline JVM+Android quedó aprobado el 2026-10-30 (L52), con auditoría del contrato y corrección documental del medidor; E3-T1 se declara cerrada. |
 | E3-T2 | Favoritos | Único por Canal; sobrevive a Actualización. Estado tras E3-U7 (2026-10-31): parcial; la unicidad está implementada y probada, pero «sobrevive a Actualización» depende de E4-T6 y no se ejecutó (L56). |
-| E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación con `EXPLAIN QUERY PLAN` ejecutada en local y Android API 34; acceso rápido; base de S14g; S11. Estado tras E3-U8 (2026-10-31): parcial; unicidad, fecha, N=10, orden e índice están implementados y probados; el acceso rápido S11c está implementado con UI y pruebas (L57); faltan la fusión `max(fecha)` de E4-T4/T5 y S11d; el `EXPLAIN QUERY PLAN` quedó verificado en local y Android API 34 (S11b, §10.10.6). |
+| E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación con `EXPLAIN QUERY PLAN` ejecutada en local y Android API 34; acceso rápido; base de S14g; S11. Estado tras E3-U8 (2026-10-31): parcial; unicidad, fecha, N=10, orden e índice están implementados y probados; el acceso rápido S11c está implementado con UI y pruebas (L57); S11d quedó verificada en Android API 34 (PR #16, run `42037003281`; §10.10.7); falta la fusión `max(fecha)` de E4-T4/T5; el `EXPLAIN QUERY PLAN` quedó verificado en local y Android API 34 (S11b, §10.10.6). |
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas. Estado tras E3-U7 (2026-10-31): cubierta en datos; FKs e índices únicos y pruebas de ocultación por Canal/Grupo y grupos homónimos de Listas distintas (L56). |
 | E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. Estado tras E3-U7 (2026-10-31): parcial; además de la unicidad, S45a exige recreación de proceso y la prueba disponible solo cierra y reabre la base (L56). |
 | E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado. Estado tras E3-U9 (2026-10-31): cubierta; navegación, CRUD, «Sin grupo» y «Sin nombre» están instrumentados (L58). |
@@ -1643,7 +1643,7 @@ proceso.
 |---|---|---|---|
 | E3-T1 | Cumplida | §10.10.1; búsqueda paginada y filtros en E3-U2; `BusquedaFiltrosTest` 1/1; tres corridas P1 de búsqueda sobre `418c33f` (`40987152414`, `40987957054`, `40988640006`) y baseline aprobado en L52. | Ninguno; E3-T1 está cerrada. |
 | E3-T2 | Parcial | `FavoritoEntity` con índice único `canalId`; `FavoritoDao` usa `OnConflictStrategy.IGNORE`; `EstadoUsuarioPersistenciaTest` prueba alta idempotente y restricción real; `CatalogoUiTest.favoritoYocultacionFiltranYseRevierten` prueba la UI. | «Sobrevive a Actualización» no se ejecutó; depende de E4-T6. |
-| E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente. | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` verificado en local (SQLite 3.46.1/3.53.4) y en Android API 34 (SQLite 3.39.2, run `42021126752`, 51/51 verdes); S11d (persistencia tras reinicio) pendiente. |
+| E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente; `S11dProcesoFase1Test`/`S11dProcesoFase2Test` demuestran el Historial persistido tras `am force-stop` y una invocación nueva, con orden `Canal 12`…`Canal 3` (L75). | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` verificado en local (SQLite 3.46.1/3.53.4) y en Android API 34 (SQLite 3.39.2, run `42021126752`, 51/51 verdes); S11d verificada en Android API 34 (run `42037003281`, §10.10.7). |
 | E3-T4 | Cubierta | `OcultacionCanalEntity` y `OcultacionGrupoEntity` con FK y `UNIQUE`; `EstadoUsuarioPersistenciaTest` prueba que ocultar Canal/Grupo no altera Apariencias ni Canales y que grupos homónimos de Listas distintas se ocultan por separado; `CatalogoUiTest` prueba alternar Oculto por Canal. | Ninguno para el criterio de datos. |
 | E3-T5 | Parcial | `ColeccionRepositorioTest` 6/6: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada y errores; `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones. | Unicidad de pertenencia y las dos posiciones de ADR-0004:60(m5) tras E4; S45a exige recreación de proceso y la prueba solo cierra y reabre la base. |
 | E3-T6 | Cubierta | `CatalogoUiTest`: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo», recreación de Activity y `elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | Ninguno para el criterio instrumentado. |
@@ -1653,7 +1653,9 @@ proceso.
 
 **Cierre.** La auditoría no cierra E3: E3-T1 está cerrada; E3-T4 y E3-T6
 están cubiertas; E3-T2, E3-T3, E3-T5 y E3-T9 siguen parciales; E3-T7 y E3-T8
-quedan cubiertas por L74 (2026-11-05). Las afirmaciones previas de L54 sobre
+quedan cubiertas por L74 (2026-11-05), y S11d se verificó en L75 (2026-11-05),
+por lo que E3-T3 conserva solo la fusión `max(fecha)` de E4-T4/T5. Las
+afirmaciones previas de L54 sobre
 E3-T7 «implementada y validada» y de L54 sobre E3-T6 «cubierta» quedan
 precisadas: la persistencia observada entonces no probaba la recreación de
 proceso de S14k/S45d y no existía prueba instrumentada de «Sin nombre»; esa
@@ -1710,10 +1712,12 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
   `41211756665` verde. `jvm-tests`: `:core` 253 pruebas (1 omitida) y `:app`
   169 (1 omitida), 0 fallos; `instrumented-mobile` 26/26; `instrumented-tv`
   1/1.
-- **Pendiente.** La fusión `max(fecha)` de E4-T4/T5 y S11d siguen pendientes;
-  E3 permanece abierta. Actualización 2026-11-05: el `EXPLAIN QUERY PLAN` se
+- **Pendiente.** La fusión `max(fecha)` de E4-T4/T5 sigue pendiente; E3
+  permanece abierta. Actualización 2026-11-05: el `EXPLAIN QUERY PLAN` se
   verificó en local y en Android API 34 (SQLite 3.39.2, run `42021126752`;
-  §10.10.6); S11b queda verificada. La fusión y S11d siguen pendientes.
+  §10.10.6); S11b queda verificada. Actualización 2026-11-05 (PR #16, run
+  `42037003281`): S11d queda verificada en Android API 34 (§10.10.7). Solo la
+  fusión sigue pendiente.
 
 #### 10.10.5 E3-U9: «Sin nombre» instrumentado (E3-T6)
 
@@ -1740,7 +1744,8 @@ cambios de esquema Room v1, `main`, `docs/evidence/u0-manifest.md`,
 #### 10.10.6 Verificación S11b: plan de consulta de Historial
 
 **Estado: verificación local y en Android API 34 ejecutadas; S11b verificada.**
-E3-T3 sigue parcial por la fusión `max(fecha)` de E4-T4/T5 y por S11d. Base
+E3-T3 sigue parcial por la fusión `max(fecha)` de E4-T4/T5; S11d se verificó
+después (§10.10.7). Base
 `20bf1bc4f00ba772ec8e1e8bd5b82bd4f3e2b633` (2026-11-05). No se cambió el texto
 ni el comportamiento de las consultas ni el esquema: el SQL de `ultimos` y
 `observarUltimos` se extrajo a `HistorialConsultas` para que producción y la
@@ -1830,8 +1835,8 @@ reales de `Historial`, `Favorito` y `OcultacionCanal`.
   no tiene emulador ni system image, y el `sqlite3` de `platform-tools` es
   x86-64 (3.50.6) y no se puede ejecutar aquí; por eso la primera evidencia
   fue local (SQLite 3.46.1/3.53.4). La corrida de Android API 34 de arriba
-  sustituye esa limitación para S11b. S11d y E3-T3 permanecen pendientes; no
-  se implementa S11d.
+  sustituye esa limitación para S11b. En esa fecha S11d y E3-T3 seguían
+  pendientes; S11d se implementó y verificó después (§10.10.7).
 - **Prueba instrumentada añadida (2026-11-05).** Se agregó
   `app/src/androidTest/kotlin/com/copernicotv/app/S11bPlanConsultaTest.kt`.
   La prueba:
@@ -1867,7 +1872,69 @@ reales de `Historial`, `Favorito` y `OcultacionCanal`.
   versión real de SQLite (3.39.2), el dispositivo/API, el plan capturado, el
   resultado y el run quedan registrados arriba. S11b se declara verificada en
   el entorno objetivo. E3-T3 sigue parcial por la fusión `max(fecha)` de
-  E4-T4/T5 y por S11d.
+  E4-T4/T5; S11d se verificó después (§10.10.7).
+
+#### 10.10.7 S11d: Historial persistido tras un proceso nuevo (2026-11-05)
+
+**Estado: S11d verificada en Android API 34. E3-T3 sigue parcial solo por la
+fusión `max(fecha)` de E4-T4/T5.** La evidencia corresponde al PR #16 (rama
+`test/e3-s11d-process-restart`, commit `bd3e8e88849f55c0a391f02b69878ef156bfec63`)
+y al run `42037003281`; el run de push `42036994724` sobre el mismo commit quedó
+5/5 verde. No se cambió producción, el esquema Room v1, `HistorialDao`,
+`HistorialRepositorio`, el índice de S11b, E3-T2/T5/T9, `README.md` ni
+`GLOSSARY.md`.
+
+- **Alcance.** Dos pruebas instrumentadas nuevas:
+  `S11dProcesoFase1Test` y `S11dProcesoFase2Test`, con el soporte compartido
+  `S11dProcesoSoporte.kt`. La fase 1 siembra el Historial y deja una marca en
+  `filesDir/s11d-proceso.properties`; la fase 2 corre en otra invocación de
+  instrumentación, después de `am force-stop`, y no limpia Room ni DataStore.
+- **Datos sembrados.** Una Lista y doce Canales (`Canal 1`…`Canal 12`) con
+  fechas crecientes fijas, base `2026-02-01T00:00:00Z` más un segundo por
+  índice, registradas con `HistorialRepositorio.registrar`. El recorte de
+  `LIMITE = 10` deja fuera `Canal 1` y `Canal 2`, por lo que el orden
+  observable es `Canal 12`…`Canal 3`.
+- **Contrato verificado en ambas fases.** `HistorialDao.contar() == 10`; el
+  orden de `HistorialRepositorio.ultimos()` y de la UI coincide con
+  `Canal 12`…`Canal 3`; los nombres y las fechas son los registrados;
+  `HistorialDao.porCanal` devuelve `null` para `Canal 1` y `Canal 2`; la
+  sección «Acceso rápido» muestra exactamente diez entradas y no la undécima;
+  abrir la segunda entrada muestra «Acciones de Canal 11».
+- **Identidad de proceso.** La marca guarda
+  `Process.myPid():Process.getStartElapsedRealtime()`, la Lista, los IDs y los
+  nombres de los Canales. La fase 2 exige `assertNotEquals` contra su propia
+  identidad; el PID solo no basta porque Android puede reutilizarlo. En el run
+  citado, fase 1 fue `7892:486674` y fase 2 `7984:493708`.
+- **Estrategia de ejecución.** `.github/scripts/e3-process-restart.sh` se
+  extendió con las dos fases de S11d, reutilizando el mecanismo de E3-T8:
+  instalación única con `adb install -r -t`, fase 1 con
+  `am instrument -e clearPackageData false`, `am force-stop`, comprobación de
+  que `pidof` ya no encuentra el proceso, y fase 2 en otra invocación. Las
+  fases no usan `connectedDebugAndroidTest` porque AGP desinstala el APK y
+  borraría `filesDir`/Room. `scenario.recreate()` solo refresca la UI después
+  de sembrar; no se usa como evidencia de reinicio, igual que en E3-T8.
+  Logcat se limpia antes de cada fase y se captura con
+  `adb logcat -d -s S11dProceso:I`.
+- **Evidencia del run `42037003281` (PR #16).** `instrumented-mobile` ejecutó
+  51 pruebas de `connectedDebugAndroidTest` y las cuatro fases del script;
+  `S11dProcesoFase1Test` reportó `OK (1 test)` en 5,722 s con
+  `identidad=7892:486674`, `lista=3`, `canales=15,…,6` y
+  `orden=Canal 12|…|Canal 3`; `S11dProcesoFase2Test` reportó `OK (1 test)` en
+  5,061 s con `identidad=7984:493708`, `fase1=7892:486674`, `conteo=10`,
+  `canales=15,…,6` y el mismo orden. Logcat registra 13:44:08 y 13:44:15, con
+  una identidad distinta y los mismos diez Canales. `instrumented-tv` quedó
+  verde, lo que confirma que el arreglo de compilación de las pruebas S11d
+  (`bd3e8e8`) compila en ambos jobs. `jvm-tests`, `static-analysis` y `apk`
+  también verdes; `p1-performance` y `p1-android` omitidos por diseño. Los
+  reportes de ambas fases se publicaron en el artifact
+  `reportes-instrumented-mobile`.
+- **Límite del entorno local.** Este host es aarch64/Termux y no compila
+  `:app` (AAPT2 x86-64); la validación local cubrió `:app:ktlintCheck`,
+  `:app:detekt`, `:core:test` y `git diff --check`, y la compilación y las
+  instrumentadas se validaron en CI (ADR-0005).
+- **Cierre.** S11d queda **verificada** en el entorno objetivo. E3-T3 sigue
+  **parcial** únicamente por la fusión `max(fecha)` sin duplicar filas de
+  E4-T4/T5; no se inicia E4.
 
 ## 11. Log
 
@@ -3164,10 +3231,17 @@ La secuencia ejecutada de E3 es: U4 (E3-T7) el 2026-10-31; U5 colecciones
 E3-T7 quedan cubiertas. E3 sigue abierta por E3-T2/T3, E3-T5 y E3-T9; S14 y S45
 no se declaran cerradas en su totalidad.
 
+**S11d (persistencia de Historial tras reinicio) verificada el 2026-11-05
+(L75).** El PR #16 (`bd3e8e8`) extiende el script de dos fases con
+`S11dProcesoFase1Test` y `S11dProcesoFase2Test`; CI `42037003281` quedó 5/5
+verde, con identidades `7892:486674` y `7984:493708` y el mismo orden
+`Canal 12`…`Canal 3` en ambas fases. S11d queda cubierta; E3-T3 sigue abierta
+solo por la fusión `max(fecha)` de E4-T4/T5.
+
 No quedan unidades E3 ejecutables sin E4: lo pendiente exige E4 (E3-T2/T3),
 E4/m5 y recreación de proceso de Colecciones (E3-T5) o E6/E7 (E3-T9). E3-T7 y
-E3-T8 quedan cubiertas por L74 (2026-11-05). No se declara cerrada E3 mientras
-existan esos criterios.
+E3-T8 quedan cubiertas por L74 (2026-11-05) y S11d por L75. No se declara
+cerrada E3 mientras existan esos criterios.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y
@@ -4021,3 +4095,45 @@ E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad tras E4/m5 y
 recreación de proceso de Colecciones) y E3-T9 (E6/E7). No se inicia E4 ni se
 declara cerrado el MVP. `README.md`, `GLOSSARY.md`, los ADR, el baseline M3U y
 las entradas L1–L73 no se modifican.
+
+### L75 — S11d: Historial persistido tras un proceso nuevo (2026-11-05)
+
+**Autorización y objetivo.** Registrar la verificación de S11d con evidencia de
+Android API 34, sin cambiar producción, esquema Room, `HistorialDao`,
+`HistorialRepositorio`, el índice de S11b, E3-T2/T5/T9, `README.md`,
+`GLOSSARY.md` ni las entradas históricas. E3 no se declara cerrada.
+
+**Rama y commits.** Rama `test/e3-s11d-process-restart`, creada desde
+`origin/main` en `a6bdc44` (merge del PR #15). Commit de pruebas `5bbd508` y
+arreglo de compilación `bd3e8e88849f55c0a391f02b69878ef156bfec63`. PR #16:
+https://github.com/guigerdts/CoperNicoTV/pull/16, abierto y sin merge.
+
+**Archivos involucrados.**
+`app/src/androidTest/kotlin/com/copernicotv/app/S11dProcesoSoporte.kt`,
+`S11dProcesoFase1Test.kt` y `S11dProcesoFase2Test.kt`;
+`.github/scripts/e3-process-restart.sh` y `.github/workflows/ci.yml`. No se
+modificó código de producción.
+
+**Estrategia.** El script de dos fases de E3-T8 se extendió con S11d:
+instalación única de APK, fase 1 con `am instrument -e clearPackageData false`,
+`am force-stop`, comprobación con `pidof`, y fase 2 en otra invocación de
+instrumentación. La fase 1 siembra doce Canales con fechas fijas crecientes y
+registra el Historial; el recorte de `LIMITE = 10` deja `Canal 12`…`Canal 3`.
+Ambas fases verifican Room (`contar`, `ultimos`, `porCanal`) y la UI de acceso
+rápido, y abren la segunda entrada para comprobar «Acciones de Canal 11». La
+identidad `Process.myPid():Process.getStartElapsedRealtime()` se guarda en
+`filesDir/s11d-proceso.properties`; la fase 2 exige que sea distinta.
+
+**CI.** Run de PR `42037003281` sobre `bd3e8e8`: 5/5 verde (`jvm-tests`,
+`static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+`p1-performance` y `p1-android` omitidos por diseño). Run de push
+`42036994724` sobre el mismo commit: 5/5 verde. `instrumented-mobile` ejecutó
+51 pruebas de `connectedDebugAndroidTest` y las cuatro fases del script;
+`S11dProcesoFase1Test` y `S11dProcesoFase2Test` reportaron `OK (1 test)` con
+identidades `7892:486674` y `7984:493708`, `conteo=10` y el mismo orden
+`Canal 12`…`Canal 3` en ambas fases. `instrumented-tv` verde. Los reportes
+quedaron en el artifact `reportes-instrumented-mobile`.
+
+**Estado.** S11d queda **verificada** en el entorno objetivo y detallada en
+§10.10.7. E3-T3 sigue **parcial** únicamente por la fusión `max(fecha)` sin
+duplicar filas de E4-T4/T5. No se inicia E4 ni se declara cerrado el MVP.

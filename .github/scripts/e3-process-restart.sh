@@ -1,31 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# E3-T8: verifica persistencia tras terminar y relanzar el proceso real.
+# E3-T8 y S11d: verifican persistencia tras terminar y relanzar el proceso real.
 #
 # No se puede hacer `am force-stop` dentro de la instrumentación porque el
 # runner de Android se ejecuta en el proceso de la app: el `force-stop` mataría
-# al propio test. Por eso la evidencia se divide en dos invocaciones separadas.
+# al propio test. Por eso la evidencia se divide en dos invocaciones separadas
+# por cada escenario.
 #
 # No se usa `connectedDebugAndroidTest` para las fases: AGP desinstala el APK
 # bajo prueba al terminar cada invocación, lo que borraría `filesDir` y Room.
-# En su lugar se instalan los APK una sola vez y se lanzan las dos fases con
+# En su lugar se instalan los APK una sola vez y se lanzan las fases con
 # `am instrument`, de modo que entre fases solo cambie el proceso.
 #
-# La fase 2 comprueba, con `Process.getStartElapsedRealtime()`, que corre en un
-# proceso distinto al de la fase 1. No se usa `ActivityScenario.recreate()`.
+# Cada fase 2 comprueba, con `Process.getStartElapsedRealtime()`, que corre en
+# un proceso distinto al de su fase 1. No se usa `ActivityScenario.recreate()`.
 
 ADB="${ADB:-adb}"
 APP_ID="com.copernicotv.app"
 TEST_ID="com.copernicotv.app.test"
 RUNNER="com.copernicotv.app.HiltTestRunner"
-CLASE_FASE1="com.copernicotv.app.E3T8ProcesoFase1Test"
-CLASE_FASE2="com.copernicotv.app.E3T8ProcesoFase2Test"
+CLASE_E3T8_FASE1="com.copernicotv.app.E3T8ProcesoFase1Test"
+CLASE_E3T8_FASE2="com.copernicotv.app.E3T8ProcesoFase2Test"
+CLASE_S11D_FASE1="com.copernicotv.app.S11dProcesoFase1Test"
+CLASE_S11D_FASE2="com.copernicotv.app.S11dProcesoFase2Test"
 APK_APP="app/build/outputs/apk/debug/app-debug.apk"
 APK_TEST="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 REPORTES="app/build/reports/androidTests"
 
-mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2"
+mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2" "$REPORTES/s11d-fase1" "$REPORTES/s11d-fase2"
 
 if [[ ! -f "$APK_APP" ]]; then
     APK_APP=$(find app/build/outputs/apk -name '*-debug.apk' -not -path '*androidTest*' -print -quit)
@@ -75,12 +78,30 @@ ejecutar_fase() {
     fi
 }
 
-ejecutar_fase "$CLASE_FASE1" "$REPORTES/e3-fase1/instrumentation.txt"
+detener_proceso() {
+    "$ADB" shell am force-stop "$APP_ID"
+    if "$ADB" shell pidof "$APP_ID" >/dev/null 2>&1; then
+        echo "ERROR: el proceso de $APP_ID sigue activo después de am force-stop" >&2
+        return 1
+    fi
+}
 
-"$ADB" shell am force-stop "$APP_ID"
-if "$ADB" shell pidof "$APP_ID" >/dev/null 2>&1; then
-    echo "ERROR: el proceso de $APP_ID sigue activo después de am force-stop" >&2
-    exit 1
-fi
+capturar_logcat_s11d() {
+    local destino="$1"
+    "$ADB" logcat -d -s S11dProceso:I > "$destino"
+}
 
-ejecutar_fase "$CLASE_FASE2" "$REPORTES/e3-fase2/instrumentation.txt"
+# E3-T8: reordenamiento persistido tras un proceso nuevo.
+ejecutar_fase "$CLASE_E3T8_FASE1" "$REPORTES/e3-fase1/instrumentation.txt"
+detener_proceso
+ejecutar_fase "$CLASE_E3T8_FASE2" "$REPORTES/e3-fase2/instrumentation.txt"
+detener_proceso
+
+# S11d: Historial persistido tras un proceso nuevo.
+"$ADB" logcat -c
+ejecutar_fase "$CLASE_S11D_FASE1" "$REPORTES/s11d-fase1/instrumentation.txt"
+capturar_logcat_s11d "$REPORTES/s11d-fase1/logcat.txt"
+detener_proceso
+"$ADB" logcat -c
+ejecutar_fase "$CLASE_S11D_FASE2" "$REPORTES/s11d-fase2/instrumentation.txt"
+capturar_logcat_s11d "$REPORTES/s11d-fase2/logcat.txt"

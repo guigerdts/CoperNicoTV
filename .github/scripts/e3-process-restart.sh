@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# E3-T8 y S11d: verifican persistencia tras terminar y relanzar el proceso real.
+# E3-T8, S11d y S45a/S45b: verifican persistencia tras terminar y relanzar el
+# proceso real.
 #
 # No se puede hacer `am force-stop` dentro de la instrumentación porque el
 # runner de Android se ejecuta en el proceso de la app: el `force-stop` mataría
@@ -24,11 +25,14 @@ CLASE_E3T8_FASE1="com.copernicotv.app.E3T8ProcesoFase1Test"
 CLASE_E3T8_FASE2="com.copernicotv.app.E3T8ProcesoFase2Test"
 CLASE_S11D_FASE1="com.copernicotv.app.S11dProcesoFase1Test"
 CLASE_S11D_FASE2="com.copernicotv.app.S11dProcesoFase2Test"
+CLASE_S45_FASE1="com.copernicotv.app.S45ProcesoFase1Test"
+CLASE_S45_FASE2="com.copernicotv.app.S45ProcesoFase2Test"
 APK_APP="app/build/outputs/apk/debug/app-debug.apk"
 APK_TEST="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 REPORTES="app/build/reports/androidTests"
 
-mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2" "$REPORTES/s11d-fase1" "$REPORTES/s11d-fase2"
+mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2" "$REPORTES/s11d-fase1" "$REPORTES/s11d-fase2" \
+    "$REPORTES/s45-fase1" "$REPORTES/s45-fase2"
 
 if [[ ! -f "$APK_APP" ]]; then
     APK_APP=$(find app/build/outputs/apk -name '*-debug.apk' -not -path '*androidTest*' -print -quit)
@@ -105,3 +109,9 @@ detener_proceso
 "$ADB" logcat -c
 ejecutar_fase "$CLASE_S11D_FASE2" "$REPORTES/s11d-fase2/instrumentation.txt"
 capturar_logcat_s11d "$REPORTES/s11d-fase2/logcat.txt"
+
+# S45a/S45b: la Colección reordenada desde la UI conserva su orden tras un
+# proceso nuevo y la secuencia visible coincide con ColeccionCanalDao.
+ejecutar_fase "$CLASE_S45_FASE1" "$REPORTES/s45-fase1/instrumentation.txt"
+detener_proceso
+ejecutar_fase "$CLASE_S45_FASE2" "$REPORTES/s45-fase2/instrumentation.txt"

@@ -1031,7 +1031,7 @@ E2 está **cerrada y validada**. El cierre por rendimiento y errores se registr�
 | E3-T2 | Favoritos | Único por Canal; sobrevive a Actualización. Estado tras E3-U7 (2026-10-31): parcial; la unicidad está implementada y probada, pero «sobrevive a Actualización» depende de E4-T6 y no se ejecutó (L56). |
 | E3-T3 | Historial | Una fila por Canal garantizada por `UNIQUE(canal_id)`; PK sustituta; fecha de última reproducción; N=10 fijo; al fusionar dos Canales que pasan a la misma identidad, conservar `max(fecha)` y no duplicar filas; orden `fecha DESC, canal_id DESC`; índice `(fecha, canal_id)`; verificación con `EXPLAIN QUERY PLAN` ejecutada en local y Android API 34; acceso rápido; base de S14g; S11. Estado tras E3-U8 (2026-10-31): parcial; unicidad, fecha, N=10, orden e índice están implementados y probados; el acceso rápido S11c está implementado con UI y pruebas (L57); S11d quedó verificada en Android API 34 (PR #16, run `42037003281`; §10.10.7); falta la fusión `max(fecha)` de E4-T4/T5; el `EXPLAIN QUERY PLAN` quedó verificado en local y Android API 34 (S11b, §10.10.6). |
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas. Estado tras E3-U7 (2026-10-31): cubierta en datos; FKs e índices únicos y pruebas de ocultación por Canal/Grupo y grupos homónimos de Listas distintas (L56). |
-| E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. Estado tras E3-U7 (2026-10-31): parcial; además de la unicidad, S45a exige recreación de proceso y la prueba disponible solo cierra y reabre la base (L56). |
+| E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. Estado tras E3-U7 (2026-10-31): parcial; además de la unicidad, S45a exige recreación de proceso y la prueba disponible solo cierra y reabre la base (L56). Estado tras E3-T5 (2026-11-05): cubierta; la pertenencia única por Colección se impone dentro de la transacción de alta y el caso m5 confirma que el alta del superviviente no duplica, sin índice único global (se conservan el duplicado legacy y las dos posiciones de ADR-0004:60(m5) que exige E1-U3); la idempotencia cubre altas concurrentes y la persistencia tras cerrar y reabrir Room; S45a/S45b para Colecciones se verificaron con dos fases instrumentadas separadas por `am force-stop` (L76, §10.10.8; run `42076937380`). |
 | E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado. Estado tras E3-U9 (2026-10-31): cubierta; navegación, CRUD, «Sin grupo» y «Sin nombre» están instrumentados (L58). |
 | E3-T7 | Ordenación del catálogo y preferencias por Lista | Modos A/B/C y dirección; canales nunca reproducidos al final; desempates deterministas con acentos; comparación reproducible JVM/Android con tabla de orden español fija en `:core` (parte de esta tarea; no crea tarea ni dependencia nueva), sin `Locale.getDefault()` ni `Collator` dependiente del dispositivo; canales sin nombre al final y «Sin nombre» solo de presentación; en Modo B, sección visual «Sin grupo» al final sin Grupo ficticio; preferencia independiente por Lista en DataStore (dueña de la persistencia; E7-T5 la consume); no modifica Apariencia/Colección ni identidad; S14e–S14m. La combinación de A/B/C y direcciones, orden manual de Apariencias (E3-T8), orden independiente de Colecciones (E3-T5) y preferencia por Lista persistida (esta tarea) es la cobertura aprobada de `README.md:38`/`:84`; no se agregan funciones implícitas. Las reglas de comparación, Canales sin nombre y Canales sin grupo están aprobadas; la limpieza de la preferencia al borrar Listas se rige por DC-08; implementada el 2026-10-31 (L54) y auditada en E3-U7 (L56). Depende de E3-T3 y E3-T6; no bloquea E3-T5; E3 sigue abierta por E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad de pertenencia tras E4/m5) y E3-T9 (preferencias de pista dependientes de E6/E7). Estado tras L74 (2026-11-05): cubierta; S14k/S45d se verificaron en la prueba de dos fases de E3-T8 (PR #13; L74), que conserva MANUAL/ASC en L1 y NOMBRE/DESC en L2 tras `am force-stop` y una nueva instrumentación. |
 | E3-T8 | Reordenamiento manual de Apariencias | Reordenar Apariencias dentro de una Lista desde la UI; reutilizar la persistencia de `Apariencia.orden` definida en E2-T3, sin crear una segunda ruta; aislar por Lista con L1/L2 y tres Canales compartidos (C1, C2, C3); no modifica `ColeccionCanal.posicion` ni la preferencia de ordenación A/B/C; S14a, S14c, S45a–S45c. Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden manual de Apariencias); su cierre requiere implementación y validación, no solo la decisión de alcance. Depende de E3-T6; referencia contractual con E2-T3; no duplica E3-T5 (Colecciones) ni E3-T7 (ordenación del catálogo). Cubierta en BD, UI y recreación física del proceso (L74): dos fases instrumentadas separadas por `am force-stop` verifican L1 C2, C1, C3; L2 C3, C2, C1; la identidad de los Canales; `ColeccionCanal.posicion` C2, C1, C3; y las preferencias L1 MANUAL/ASC y L2 NOMBRE/DESC (PR #13, `acf8c43`, merge `e461009`; runs `41938436445` y `41939784755`). |
@@ -1645,14 +1645,14 @@ proceso.
 | E3-T2 | Parcial | `FavoritoEntity` con índice único `canalId`; `FavoritoDao` usa `OnConflictStrategy.IGNORE`; `EstadoUsuarioPersistenciaTest` prueba alta idempotente y restricción real; `CatalogoUiTest.favoritoYocultacionFiltranYseRevierten` prueba la UI. | «Sobrevive a Actualización» no se ejecutó; depende de E4-T6. |
 | E3-T3 | Parcial | `HistorialEntity` con `UNIQUE(canalId)`, PK sustituta e índice `(fecha, canalId)`; `HistorialRepositorio` fija `LIMITE = 10`, conserva la fecha máxima y recorta en transacción; `EstadoUsuarioPersistenciaTest` prueba una fila, orden `fecha DESC, canalId DESC`, recorte a diez y rollback; el Modo C usa la fecha de última reproducción; el acceso rápido observable (`HistorialDao.observarUltimos`) resuelve nombre y marcas en la misma consulta y está probado con límite de diez y desempate por `canalId` descendente; `S11dProcesoFase1Test`/`S11dProcesoFase2Test` demuestran el Historial persistido tras `am force-stop` y una invocación nueva, con orden `Canal 12`…`Canal 3` (L75). | Fusión `max(fecha)` sin duplicar filas: E4-T4/T5; `EXPLAIN QUERY PLAN` verificado en local (SQLite 3.46.1/3.53.4) y en Android API 34 (SQLite 3.39.2, run `42021126752`, 51/51 verdes); S11d verificada en Android API 34 (run `42037003281`, §10.10.7). |
 | E3-T4 | Cubierta | `OcultacionCanalEntity` y `OcultacionGrupoEntity` con FK y `UNIQUE`; `EstadoUsuarioPersistenciaTest` prueba que ocultar Canal/Grupo no altera Apariencias ni Canales y que grupos homónimos de Listas distintas se ocultan por separado; `CatalogoUiTest` prueba alternar Oculto por Canal. | Ninguno para el criterio de datos. |
-| E3-T5 | Parcial | `ColeccionRepositorioTest` 6/6: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada y errores; `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones. | Unicidad de pertenencia y las dos posiciones de ADR-0004:60(m5) tras E4; S45a exige recreación de proceso y la prueba solo cierra y reabre la base. |
+| E3-T5 | Cubierta | `ColeccionRepositorioTest` 9/9: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada, errores, altas concurrentes con `CyclicBarrier(4)`, persistencia tras cerrar y reabrir Room, y quitar/re-agregar con reindexado; `FusionRepositorioTest` 14/14, incluida `m5 tras consolidar la pertenencia el alta del superviviente no duplica`; `IntegridadRoomTest` 12/12 conserva el duplicado legacy y las dos posiciones de ADR-0004:60(m5) (E1-U3); `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones; `S45ProcesoFase1Test` y `S45ProcesoFase2Test` verifican S45a/S45b tras `am force-stop` (run `42076937380`; §10.10.8). | Ninguno; la consolidación m5 se ejerció por `FusionRepositorio` y E4 solo aportará la UI que la dispara. |
 | E3-T6 | Cubierta | `CatalogoUiTest`: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo», recreación de Activity y `elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | Ninguno para el criterio instrumentado. |
-| E3-T7 | Cubierta | `OrdenCatalogoTest` 9/9; `OrdenGrupoPersistenciaTest` 2/2; `CatalogoUiTest` prueba modos, dirección, «Sin grupo» y preferencia tras recrear Activity; `PreferenciasOrdenDataStoreTest` 2/2 con una instancia nueva de DataStore; `E3T8ProcesoFase2Test` verifica MANUAL/ASC en L1 y NOMBRE/DESC en L2 tras `am force-stop` y nueva instrumentación (L74). | Ninguno para S14k/S45d; S14 y S45 no se declaran cerrados globalmente: E3-T5 conserva S45a para Colecciones y la unicidad tras E4/m5. |
-| E3-T8 | Cubierta | `ReordenamientoAparienciasTest` 2/2; `CatalogoUiTest.laAccionBajarReordenaYpersisteEnRoom`; `E3T8ProcesoFase1Test` y `E3T8ProcesoFase2Test` en procesos distintos separados por `am force-stop`, con `E3T8ProcesoSoporte` verificando L1 C2,C1,C3, L2 C3,C2,C1, Colección C2,C1,C3, identidad de Canales y preferencias (L74). | Ninguno para E3-T8; S14 y S45 no se declaran cerrados globalmente: E3-T5 conserva S45a para Colecciones y la unicidad tras E4/m5. |
+| E3-T7 | Cubierta | `OrdenCatalogoTest` 9/9; `OrdenGrupoPersistenciaTest` 2/2; `CatalogoUiTest` prueba modos, dirección, «Sin grupo» y preferencia tras recrear Activity; `PreferenciasOrdenDataStoreTest` 2/2 con una instancia nueva de DataStore; `E3T8ProcesoFase2Test` verifica MANUAL/ASC en L1 y NOMBRE/DESC en L2 tras `am force-stop` y nueva instrumentación (L74). | Ninguno para S14k/S45d; S45a/S45b para Colecciones se verificaron en E3-T5 (L76, §10.10.8). |
+| E3-T8 | Cubierta | `ReordenamientoAparienciasTest` 2/2; `CatalogoUiTest.laAccionBajarReordenaYpersisteEnRoom`; `E3T8ProcesoFase1Test` y `E3T8ProcesoFase2Test` en procesos distintos separados por `am force-stop`, con `E3T8ProcesoSoporte` verificando L1 C2,C1,C3, L2 C3,C2,C1, Colección C2,C1,C3, identidad de Canales y preferencias (L74). | Ninguno para E3-T8; S45a/S45b para Colecciones se verificaron en E3-T5 (L76, §10.10.8). |
 | E3-T9 | Parcial | `PerfilRepositorioTest` 18/18: CRUD, nombre normalizado único, Perfil vacío, Lista sin Perfil, asociación n—n, cascadas y concurrencia; la UI integra Perfiles. | Preferencias de pista globales y S2c dependen de E6-T3/E7-T5; no están implementadas. |
 
-**Cierre.** La auditoría no cierra E3: E3-T1 está cerrada; E3-T4 y E3-T6
-están cubiertas; E3-T2, E3-T3, E3-T5 y E3-T9 siguen parciales; E3-T7 y E3-T8
+**Cierre.** La auditoría no cierra E3: E3-T1 está cerrada; E3-T4, E3-T5 y E3-T6
+están cubiertas; E3-T2, E3-T3 y E3-T9 siguen parciales; E3-T7 y E3-T8
 quedan cubiertas por L74 (2026-11-05), y S11d se verificó en L75 (2026-11-05),
 por lo que E3-T3 conserva solo la fusión `max(fecha)` de E4-T4/T5. Las
 afirmaciones previas de L54 sobre
@@ -1661,13 +1661,14 @@ precisadas: la persistencia observada entonces no probaba la recreación de
 proceso de S14k/S45d y no existía prueba instrumentada de «Sin nombre»; esa
 prueba se agregó en E3-U9 (L58) y E3-T6 queda cubierta; L74 agrega la prueba de
 recreación de proceso de E3-T8 y la observación de S14k/S45d, y E3-T7 queda
-cubierta. S14 y S45 no se declaran cerrados en su totalidad: E3-T5 conserva
-S45a para Colecciones y la unicidad tras E4/m5. El
+cubierta. S45 queda cubierta: S45a–S45c tienen evidencia en L74 y L76
+(§10.10.7, §10.10.8) y S45d en L74. El
 commit de cierre `53815c3` tiene el run `41206648731` 5/5 verde y `TV emulator
 trial` `41206648729` verde. No se inicia E4 ni se declara E3 cerrada. La
 siguiente unidad ejecutable sin E4 era el acceso rápido de Historial
-(E3-T3/S11c), implementado en E3-U8 (L57); tras E3-U9 no quedan unidades E3
-ejecutables sin E4.
+(E3-T3/S11c), implementado en E3-U8 (L57); tras E3-U9 no quedaban unidades E3
+ejecutables sin E4 y E3-T5 se cerró después porque la consolidación m5 ya
+existía en `FusionRepositorio` y E4 solo aportará su UI (L76).
 
 #### 10.10.4 E3-U8: acceso rápido de Historial (S11c)
 
@@ -1935,6 +1936,70 @@ y al run `42037003281`; el run de push `42036994724` sobre el mismo commit qued�
 - **Cierre.** S11d queda **verificada** en el entorno objetivo. E3-T3 sigue
   **parcial** únicamente por la fusión `max(fecha)` sin duplicar filas de
   E4-T4/T5; no se inicia E4.
+
+#### 10.10.8 E3-T5: unicidad de pertenencia y S45a/S45b de Colecciones (2026-11-05)
+
+**Estado: E3-T5 cubierta; S45 completa; E3 sigue abierta por E3-T2/T3 y
+E3-T9.** La evidencia corresponde al PR #17 (rama `test/e3-t5-colecciones`,
+commits `05dd5bd` y `5afca28`) y al run de PR `42076937380`; el run de push
+`42076933097` sobre el mismo commit quedó 5/5 verde. No se cambió el esquema
+Room v1, no se agregó migración ni índice único global, y no se tocaron
+`README.md`, `GLOSSARY.md`, los ADR, E3-T2 ni las tareas ya cubiertas.
+
+- **Problema.** Después de m5 (consolidación de identidad de Canal) dos
+  pertenencias distintas de una Colección pueden quedar apuntando al mismo
+  Canal, y un alta repetida no debía crear una segunda fila. La unicidad no
+  podía imponerse con un `UNIQUE(coleccionId, canalId)`: E1-U3 exige que el
+  esquema admita el duplicado legacy y las dos posiciones de ADR-0004:60(m5)
+  para poder probar la consolidación.
+- **Decisión.** `ColeccionRepositorio.agregarCanal` valida Colección y Canal,
+  comprueba la pertenencia, calcula la posición y ejecuta el alta dentro de
+  `db.withTransaction`; SQLite serializa las transacciones y la segunda barrera
+  es `ColeccionCanalDao.insertarSiNoExiste` (`INSERT ... SELECT ... WHERE NOT
+  EXISTS`). El chequeo previo no se presenta como garantía de concurrencia: la
+  atomicidad la dan la transacción y el `WHERE NOT EXISTS`. No se borran
+  duplicados legacy ni se debilita E1-U3; no hizo falta ADR ni DC nuevo porque
+  la solución respeta ADR-0004 y la restricción de E1-U3.
+- **Pruebas JVM.** `ColeccionRepositorioTest` 9/9: altas concurrentes del mismo
+  Canal con `CyclicBarrier(4)`, persistencia de la unicidad tras cerrar y
+  reabrir Room, quitar y volver a agregar con reindexado, y las pruebas previas
+  de orden, independencia, cascada y errores. `FusionRepositorioTest` 14/14,
+  incluida `m5 tras consolidar la pertenencia el alta del superviviente no
+  duplica`, que confirma por DAO una sola fila del superviviente con posiciones
+  0 y 1 y sin la perdedora. `IntegridadRoomTest` 12/12 conserva `coleccion
+  admite membresia duplicada y dos posiciones` (E1-U3). Las pruebas verifican el
+  estado persistido con `ColeccionCanalDao.porColeccion` y `porCanal`, no solo
+  el valor de retorno del repositorio.
+- **S45a/S45b.** `S45ProcesoFase1Test` reutiliza `sembrarE3T8` (Colección C2,
+  C1, C3), reordena la primera fila desde la UI, exige C1, C2, C3 en la UI y en
+  Room (`ColeccionCanalDao.porColeccion`), y guarda en
+  `filesDir/s45-proceso.properties` la identidad
+  `Process.myPid():Process.getStartElapsedRealtime()`, la Colección y las filas.
+  `S45ProcesoFase2Test` corre después de `am force-stop` y de una nueva
+  invocación de instrumentación, exige identidad distinta con `assertNotEquals`
+  y compara la secuencia visible con `porColeccion` y los nombres C1, C2, C3.
+  El run citado no imprime los valores de identidad; la evidencia es que la fase
+  2 pasó con la aserción de identidad distinta y sin limpiar Room.
+- **Evidencia del run `42076937380` (PR #17).** `instrumented-mobile` ejecutó 51
+  pruebas de `connectedDebugAndroidTest` y las seis fases del script (E3-T8,
+  S11d y S45). `S45ProcesoFase1Test` reportó `OK (1 test)` en 6,114 s y
+  `S45ProcesoFase2Test` `OK (1 test)` en 5,481 s; las fases de E3-T8 y S11d
+  también quedaron verdes. `instrumented-tv`, `jvm-tests`, `static-analysis` y
+  `apk` verdes; `p1-performance` y `p1-android` omitidos por diseño. Los
+  reportes de las fases se publicaron en el artifact
+  `reportes-instrumented-mobile`. El run de push `42076933097` repitió 5/5
+  verde.
+- **Límite del entorno local.** Este host es aarch64/Termux y no compila
+  `:app` (AAPT2 x86-64); la validación local cubrió `:app:ktlintCheck`,
+  `:app:detekt`, `:core:test` y `git diff --check`, y la compilación, JVM e
+  instrumentadas se validaron en CI (ADR-0005). El hook GGA no pudo ejecutarse
+  por un crash de Bun del entorno; la revisión equivalente (mismo prompt y
+  agente) devolvió `STATUS: PASSED` sobre el contenido exacto staged y el commit
+  se hizo con `--no-verify` autorizado.
+- **Cierre.** E3-T5 queda **cubierta**. S45 queda completa (S45a/S45b por esta
+  entrada, S45c por las pruebas de independencia y S45d en L74). E3 sigue
+  **abierta** por E3-T2/T3 (criterios dependientes de E4) y E3-T9 (E6/E7); no
+  se inicia E4.
 
 ## 11. Log
 
@@ -4137,3 +4202,41 @@ quedaron en el artifact `reportes-instrumented-mobile`.
 **Estado.** S11d queda **verificada** en el entorno objetivo y detallada en
 §10.10.7. E3-T3 sigue **parcial** únicamente por la fusión `max(fecha)` sin
 duplicar filas de E4-T4/T5. No se inicia E4 ni se declara cerrado el MVP.
+
+### L76 — E3-T5: unicidad de pertenencia y S45a/S45b de Colecciones (2026-11-05)
+
+**Autorización y objetivo.** Cerrar E3-T5 con la unicidad de pertenencia tras
+m5 y la verificación de S45a/S45b para Colecciones, sin índice único global,
+sin cambiar el esquema Room v1, sin reimplementar m5, sin tocar E3-T2 ni las
+entradas históricas, y sin iniciar E4.
+
+**Rama y commits.** Rama `test/e3-t5-colecciones`, creada desde `origin/main`
+en `7125319` (merge del PR #16). Commit principal `05dd5bd` y arreglo de CI
+`5afca28`. PR #17: https://github.com/guigerdts/CoperNicoTV/pull/17, abierto y
+sin merge.
+
+**Archivos involucrados.** `ColeccionRepositorio.kt`,
+`db/dao/IntegridadDaos.kt`, `ColeccionRepositorioTest.kt`,
+`FusionRepositorioTest.kt`, `S45ProcesoSoporte.kt`, `S45ProcesoFase1Test.kt`,
+`S45ProcesoFase2Test.kt`, `.github/scripts/e3-process-restart.sh` y
+`.github/workflows/ci.yml`.
+
+**Decisión de integridad.** No se agregó `UNIQUE(coleccionId, canalId)` porque
+E1-U3 exige admitir el duplicado legacy y las dos posiciones de
+ADR-0004:60(m5). El alta valida y ejecuta dentro de `db.withTransaction`, con
+`INSERT ... SELECT ... WHERE NOT EXISTS` como segunda barrera; el chequeo previo
+no se presenta como garantía de concurrencia. No se borran duplicados legacy.
+
+**CI.** Run de PR `42076937380` sobre `5afca28`: 5/5 verde (`jvm-tests`,
+`static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+`p1-performance` y `p1-android` omitidos por diseño). Run de push
+`42076933097`: 5/5 verde. `instrumented-mobile` ejecutó 51 pruebas y las seis
+fases del script; `S45ProcesoFase1Test` y `S45ProcesoFase2Test` reportaron
+`OK (1 test)` en 6,114 s y 5,481 s. El hook GGA no pudo ejecutarse por un crash
+de Bun 1.4.2 del entorno; la revisión equivalente devolvió `STATUS: PASSED`
+sobre el contenido exacto staged y el commit `5afca28` se hizo con
+`--no-verify` autorizado.
+
+**Estado.** E3-T5 queda **cubierta** y S45 completa, detallada en §10.10.8. E3
+sigue **abierta** por E3-T2/T3 y E3-T9. No se inicia E4 ni se declara cerrado
+el MVP.

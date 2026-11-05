@@ -192,6 +192,45 @@ class FusionRepositorioTest {
     }
 
     @Test
+    fun `m5 tras consolidar la pertenencia el alta del superviviente no duplica`() {
+        runBlocking {
+            val superviviente = crearCanal("Uno", "canon:v2:uno")
+            val perdedora = crearCanal("Uno bis", "canon:v2:uno")
+            val tercero = crearCanal("Tres", "canon:v2:tres")
+            val coleccionId = crearColeccion()
+            db.coleccionCanalDao().insertar(
+                ColeccionCanalEntity(coleccionId = coleccionId, canalId = superviviente, posicion = 0),
+            )
+            db.coleccionCanalDao().insertar(
+                ColeccionCanalEntity(coleccionId = coleccionId, canalId = tercero, posicion = 1),
+            )
+            db.coleccionCanalDao().insertar(
+                ColeccionCanalEntity(coleccionId = coleccionId, canalId = perdedora, posicion = 2),
+            )
+
+            val plan = planear(superviviente, perdedora)
+            val resultado =
+                fusion.confirmar(
+                    plan,
+                    DecisionesFusion(
+                        colecciones = mapOf(coleccionId to DecisionPosicionColeccion.CONSERVAR_SUPERVIVIENTE),
+                    ),
+                )
+            assertTrue(resultado is ResultadoConfirmacionFusion.Confirmada)
+
+            val repositorio = ColeccionRepositorio(db)
+            assertEquals(ResultadoAccion.Ok, repositorio.agregarCanal(coleccionId, superviviente))
+            assertEquals(ResultadoAccion.Ok, repositorio.agregarCanal(coleccionId, superviviente))
+
+            val filas = db.coleccionCanalDao().porColeccion(coleccionId)
+            assertEquals(listOf(superviviente, tercero), filas.map { it.canalId })
+            assertEquals(listOf(0, 1), filas.map { it.posicion })
+            assertEquals(1, db.coleccionCanalDao().porCanal(coleccionId, superviviente).size)
+            assertTrue(db.coleccionCanalDao().porCanal(coleccionId, perdedora).isEmpty())
+        }
+    }
+
+    @Test
     fun `historial conserva la fecha maxima y una sola fila`() {
         runBlocking {
             val superviviente = crearCanal("Uno", "canon:v2:uno")

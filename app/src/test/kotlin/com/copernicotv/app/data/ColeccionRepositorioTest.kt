@@ -12,22 +12,33 @@ import com.copernicotv.app.data.db.entities.ColeccionEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
 import com.copernicotv.core.identity.ClavePresentacion
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.TimeUnit
 
 /**
  * E3-T5 / E3-T8 / S14b / S45a–S45c: Colecciones con orden propio,
  * independiente de `Apariencia.orden`, persistente tras cerrar y reabrir la
  * base con un repositorio nuevo.
+ *
+ * La pertenencia única posterior a m5 se prueba sobre el estado persistido:
+ * altas repetidas, altas concurrentes, baja con reindexado y reapertura de
+ * Room. El esquema v1 sigue permitiendo el duplicado legacy de E1-U3.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -118,6 +129,69 @@ class ColeccionRepositorioTest {
 
             assertEquals(1, db.coleccionCanalDao().porColeccion(nuevaId).size)
             assertEquals(listOf("C1"), nombresColeccion(nuevaId))
+        }
+    }
+
+    @Test
+    fun `altas concurrentes del mismo canal dejan una sola pertenencia`() {
+        runBlocking {
+            val repositorio = ColeccionRepositorio(db)
+            val nuevaId = insertarColeccion("Concurrente")
+            val barrera = CyclicBarrier(NUMERO_ALTAS_CONCURRENTES)
+            val resultados =
+                coroutineScope {
+                    (1..NUMERO_ALTAS_CONCURRENTES)
+                        .map {
+                            async(Dispatchers.IO) {
+                                barrera.await(10, TimeUnit.SECONDS)
+                                repositorio.agregarCanal(nuevaId, canal1)
+                            }
+                        }.awaitAll()
+                }
+
+            assertTrue(resultados.all { it == ResultadoAccion.Ok })
+            val filas = db.coleccionCanalDao().porColeccion(nuevaId)
+            assertEquals(1, filas.size)
+            assertEquals(canal1, filas.single().canalId)
+            assertEquals(0, filas.single().posicion)
+            assertEquals(1, db.coleccionCanalDao().porCanal(nuevaId, canal1).size)
+        }
+    }
+
+    @Test
+    fun `la unicidad se conserva tras cerrar y reabrir la base`() {
+        runBlocking {
+            val repositorio = ColeccionRepositorio(db)
+            val nuevaId = insertarColeccion("Persistente")
+            assertEquals(ResultadoAccion.Ok, repositorio.agregarCanal(nuevaId, canal1))
+            assertEquals(ResultadoAccion.Ok, repositorio.agregarCanal(nuevaId, canal1))
+
+            db.close()
+            db = abrirBase()
+
+            val reabierto = ColeccionRepositorio(db)
+            assertEquals(ResultadoAccion.Ok, reabierto.agregarCanal(nuevaId, canal1))
+            val filas = db.coleccionCanalDao().porColeccion(nuevaId)
+            assertEquals(1, filas.size)
+            assertEquals(canal1, filas.single().canalId)
+            assertEquals(0, filas.single().posicion)
+        }
+    }
+
+    @Test
+    fun `quitar y volver a agregar el mismo canal reindexa sin duplicar`() {
+        runBlocking {
+            val repositorio = ColeccionRepositorio(db)
+            val filaC2 = db.coleccionCanalDao().porColeccion(coleccion).first { it.canalId == canal2 }
+
+            assertEquals(ResultadoAccion.Ok, repositorio.quitarFila(filaC2.id))
+            assertEquals(ResultadoAccion.Ok, repositorio.agregarCanal(coleccion, canal2))
+            assertEquals(ResultadoAccion.Ok, repositorio.agregarCanal(coleccion, canal2))
+
+            val filas = db.coleccionCanalDao().porColeccion(coleccion)
+            assertEquals(listOf(canal1, canal3, canal2), filas.map { it.canalId })
+            assertEquals(listOf(0, 1, 2), filas.map { it.posicion })
+            assertEquals(1, db.coleccionCanalDao().porCanal(coleccion, canal2).size)
         }
     }
 
@@ -274,5 +348,6 @@ class ColeccionRepositorioTest {
 
     private companion object {
         const val NOMBRE_BD = "coleccion-repositorio.db"
+        const val NUMERO_ALTAS_CONCURRENTES = 4
     }
 }

@@ -1033,8 +1033,8 @@ E2 está **cerrada y validada**. El cierre por rendimiento y errores se registr�
 | E3-T4 | Ocultaciones | Canal y Grupo con FK propia; ocultar Grupo no afecta a otras Listas. Estado tras E3-U7 (2026-10-31): cubierta en datos; FKs e índices únicos y pruebas de ocultación por Canal/Grupo y grupos homónimos de Listas distintas (L56). |
 | E3-T5 | Colecciones | Orden propio independiente de la Lista; pertenencia única por Colección tras la consolidación, permitiendo antes de resolver las dos posiciones de ADR-0004:60(m5). Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden independiente de Colecciones); su cierre requiere implementación y validación, no solo la decisión de alcance. Implementada y validada en su parte independiente de E4 el 2026-10-31 (L55): CRUD de Colecciones, orden propio en `ColeccionCanal.posicion`, alta idempotente de Canal y reindexado; no modifica `Apariencia.orden` ni la preferencia A/B/C. La unicidad de pertenencia tras la consolidación de E4/m5 sigue pendiente y no se impone antes. Estado tras E3-U7 (2026-10-31): parcial; además de la unicidad, S45a exige recreación de proceso y la prueba disponible solo cierra y reabre la base (L56). |
 | E3-T6 | UI de catálogo móvil | Navegación táctil; CRUD de Lista y Canal; muestra «Sin nombre» y la sección «Sin grupo» según S14; instrumentado. Estado tras E3-U9 (2026-10-31): cubierta; navegación, CRUD, «Sin grupo» y «Sin nombre» están instrumentados (L58). |
-| E3-T7 | Ordenación del catálogo y preferencias por Lista | Modos A/B/C y dirección; canales nunca reproducidos al final; desempates deterministas con acentos; comparación reproducible JVM/Android con tabla de orden español fija en `:core` (parte de esta tarea; no crea tarea ni dependencia nueva), sin `Locale.getDefault()` ni `Collator` dependiente del dispositivo; canales sin nombre al final y «Sin nombre» solo de presentación; en Modo B, sección visual «Sin grupo» al final sin Grupo ficticio; preferencia independiente por Lista en DataStore (dueña de la persistencia; E7-T5 la consume); no modifica Apariencia/Colección ni identidad; S14e–S14m. La combinación de A/B/C y direcciones, orden manual de Apariencias (E3-T8), orden independiente de Colecciones (E3-T5) y preferencia por Lista persistida (esta tarea) es la cobertura aprobada de `README.md:38`/`:84`; no se agregan funciones implícitas. Las reglas de comparación, Canales sin nombre y Canales sin grupo están aprobadas; la limpieza de la preferencia al borrar Listas se rige por DC-08; implementada el 2026-10-31 (L54) y auditada en E3-U7 (L56). Depende de E3-T3 y E3-T6; no bloquea E3-T5; E3 sigue abierta por E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad de pertenencia tras E4/m5), E3-T8 (recreación de proceso) y E3-T9 (preferencias de pista dependientes de E6/E7). Estado tras E3-U7: parcial; S14k/S45d exigen recreación de proceso y la prueba solo recrea la Activity. |
-| E3-T8 | Reordenamiento manual de Apariencias | Reordenar Apariencias dentro de una Lista desde la UI; reutilizar la persistencia de `Apariencia.orden` definida en E2-T3, sin crear una segunda ruta; aislar por Lista con L1/L2 y tres Canales compartidos (C1, C2, C3); no modifica `ColeccionCanal.posicion` ni la preferencia de ordenación A/B/C; S14a, S14c, S45a–S45c. Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden manual de Apariencias); su cierre requiere implementación y validación, no solo la decisión de alcance. Depende de E3-T6; referencia contractual con E2-T3; no duplica E3-T5 (Colecciones) ni E3-T7 (ordenación del catálogo). Cubierta en BD y UI (E3-U3/L53, revalidada en L55); la recreación de proceso física sigue pendiente y no se simula. |
+| E3-T7 | Ordenación del catálogo y preferencias por Lista | Modos A/B/C y dirección; canales nunca reproducidos al final; desempates deterministas con acentos; comparación reproducible JVM/Android con tabla de orden español fija en `:core` (parte de esta tarea; no crea tarea ni dependencia nueva), sin `Locale.getDefault()` ni `Collator` dependiente del dispositivo; canales sin nombre al final y «Sin nombre» solo de presentación; en Modo B, sección visual «Sin grupo» al final sin Grupo ficticio; preferencia independiente por Lista en DataStore (dueña de la persistencia; E7-T5 la consume); no modifica Apariencia/Colección ni identidad; S14e–S14m. La combinación de A/B/C y direcciones, orden manual de Apariencias (E3-T8), orden independiente de Colecciones (E3-T5) y preferencia por Lista persistida (esta tarea) es la cobertura aprobada de `README.md:38`/`:84`; no se agregan funciones implícitas. Las reglas de comparación, Canales sin nombre y Canales sin grupo están aprobadas; la limpieza de la preferencia al borrar Listas se rige por DC-08; implementada el 2026-10-31 (L54) y auditada en E3-U7 (L56). Depende de E3-T3 y E3-T6; no bloquea E3-T5; E3 sigue abierta por E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad de pertenencia tras E4/m5) y E3-T9 (preferencias de pista dependientes de E6/E7). Estado tras L74 (2026-11-05): cubierta; S14k/S45d se verificaron en la prueba de dos fases de E3-T8 (PR #13; L74), que conserva MANUAL/ASC en L1 y NOMBRE/DESC en L2 tras `am force-stop` y una nueva instrumentación. |
+| E3-T8 | Reordenamiento manual de Apariencias | Reordenar Apariencias dentro de una Lista desde la UI; reutilizar la persistencia de `Apariencia.orden` definida en E2-T3, sin crear una segunda ruta; aislar por Lista con L1/L2 y tres Canales compartidos (C1, C2, C3); no modifica `ColeccionCanal.posicion` ni la preferencia de ordenación A/B/C; S14a, S14c, S45a–S45c. Forma parte de la cobertura aprobada de `README.md:38`/`:84` (orden manual de Apariencias); su cierre requiere implementación y validación, no solo la decisión de alcance. Depende de E3-T6; referencia contractual con E2-T3; no duplica E3-T5 (Colecciones) ni E3-T7 (ordenación del catálogo). Cubierta en BD, UI y recreación física del proceso (L74): dos fases instrumentadas separadas por `am force-stop` verifican L1 C2, C1, C3; L2 C3, C2, C1; la identidad de los Canales; `ColeccionCanal.posicion` C2, C1, C3; y las preferencias L1 MANUAL/ASC y L2 NOMBRE/DESC (PR #13, `acf8c43`, merge `e461009`; runs `41938436445` y `41939784755`). |
 | E3-T9 | Perfiles de reproducción | Perfil con nombre que agrupa Listas M3U; no se reduce a renombrar la Lista activa. Las preferencias de reproducción son globales (D3, L24); el Perfil no las posee ni las duplica. No inventa pistas ni capacidades; distingue preferencias guardadas de opciones disponibles para el contenido actual. Depende de E1-U3 para `Perfil`; la integración de preferencias de pista depende de E6-T3 y E7-T5. Las preferencias de reproducción son globales y, si la pista preferida no está disponible, se usa `auto/default`, se conserva la preferencia y se avisa en la UI (D3, L24). La representación/cardinalidad se resuelve en DC-02 (`PerfilLista` n—n, nombre único, Perfil vacío, sin preferencias por Perfil); el CRUD de Perfil y la asociación n—n de Listas están implementados y validados el 2026-10-31 (L55). S2c queda parcialmente cubierta: falta la integración de preferencias de pista, dependiente de E6-T3/E7-T5, y su validación completa. |
 
 ### 8.4 E4 — Actualización, reconciliación y fusión
@@ -1647,16 +1647,20 @@ proceso.
 | E3-T4 | Cubierta | `OcultacionCanalEntity` y `OcultacionGrupoEntity` con FK y `UNIQUE`; `EstadoUsuarioPersistenciaTest` prueba que ocultar Canal/Grupo no altera Apariencias ni Canales y que grupos homónimos de Listas distintas se ocultan por separado; `CatalogoUiTest` prueba alternar Oculto por Canal. | Ninguno para el criterio de datos. |
 | E3-T5 | Parcial | `ColeccionRepositorioTest` 6/6: orden propio, independencia de Apariencias, alta idempotente, baja con reindexado, cascada y errores; `ColeccionCanalEntity` conserva un índice no único; la UI integra Colecciones. | Unicidad de pertenencia y las dos posiciones de ADR-0004:60(m5) tras E4; S45a exige recreación de proceso y la prueba solo cierra y reabre la base. |
 | E3-T6 | Cubierta | `CatalogoUiTest`: D-pad, acciones, CRUD de Lista/Canal, modos, dirección, «Sin grupo», recreación de Activity y `elCatalogoMuestraSinNombreCuandoElCanalNoTieneNombre`; `CatalogoScreen` muestra «Sin nombre» cuando `nombre` es `null`; `BusquedaFiltrosTest` 1/1. | Ninguno para el criterio instrumentado. |
-| E3-T7 | Parcial | `OrdenCatalogoTest` 9/9; `OrdenGrupoPersistenciaTest` 2/2; `CatalogoUiTest` prueba modos, dirección, «Sin grupo» y preferencia tras recrear Activity; `PreferenciasOrdenDataStoreTest` 2/2 con una instancia nueva de DataStore. | S14k/S45d exigen recrear el proceso, no solo Activity o DataStore; no se ejecutó. |
-| E3-T8 | Parcial | `ReordenamientoAparienciasTest` 2/2: L1/L2 con C1, C2 y C3, reordena solo L1, conserva L2 y la Colección y reabre la base; `CatalogoUiTest.laAccionBajarReordenaYpersisteEnRoom`. | S14a/S45a–S45c exigen recreación de proceso; la prueba solo cierra y reabre la base. |
+| E3-T7 | Cubierta | `OrdenCatalogoTest` 9/9; `OrdenGrupoPersistenciaTest` 2/2; `CatalogoUiTest` prueba modos, dirección, «Sin grupo» y preferencia tras recrear Activity; `PreferenciasOrdenDataStoreTest` 2/2 con una instancia nueva de DataStore; `E3T8ProcesoFase2Test` verifica MANUAL/ASC en L1 y NOMBRE/DESC en L2 tras `am force-stop` y nueva instrumentación (L74). | Ninguno para S14k/S45d; S14 y S45 no se declaran cerrados globalmente: E3-T5 conserva S45a para Colecciones y la unicidad tras E4/m5. |
+| E3-T8 | Cubierta | `ReordenamientoAparienciasTest` 2/2; `CatalogoUiTest.laAccionBajarReordenaYpersisteEnRoom`; `E3T8ProcesoFase1Test` y `E3T8ProcesoFase2Test` en procesos distintos separados por `am force-stop`, con `E3T8ProcesoSoporte` verificando L1 C2,C1,C3, L2 C3,C2,C1, Colección C2,C1,C3, identidad de Canales y preferencias (L74). | Ninguno para E3-T8; S14 y S45 no se declaran cerrados globalmente: E3-T5 conserva S45a para Colecciones y la unicidad tras E4/m5. |
 | E3-T9 | Parcial | `PerfilRepositorioTest` 18/18: CRUD, nombre normalizado único, Perfil vacío, Lista sin Perfil, asociación n—n, cascadas y concurrencia; la UI integra Perfiles. | Preferencias de pista globales y S2c dependen de E6-T3/E7-T5; no están implementadas. |
 
 **Cierre.** La auditoría no cierra E3: E3-T1 está cerrada; E3-T4 y E3-T6
-están cubiertas; E3-T2, E3-T3, E3-T5, E3-T7, E3-T8 y E3-T9 siguen parciales. Las
-afirmaciones previas de L54 sobre E3-T7 «implementada y validada» y de L54
-sobre E3-T6 «cubierta» quedan precisadas: la persistencia observada no prueba
-la recreación de proceso de S14k/S45d y no existía prueba instrumentada de
-«Sin nombre»; esa prueba se agregó en E3-U9 (L58) y E3-T6 queda cubierta. El
+están cubiertas; E3-T2, E3-T3, E3-T5 y E3-T9 siguen parciales; E3-T7 y E3-T8
+quedan cubiertas por L74 (2026-11-05). Las afirmaciones previas de L54 sobre
+E3-T7 «implementada y validada» y de L54 sobre E3-T6 «cubierta» quedan
+precisadas: la persistencia observada entonces no probaba la recreación de
+proceso de S14k/S45d y no existía prueba instrumentada de «Sin nombre»; esa
+prueba se agregó en E3-U9 (L58) y E3-T6 queda cubierta; L74 agrega la prueba de
+recreación de proceso de E3-T8 y la observación de S14k/S45d, y E3-T7 queda
+cubierta. S14 y S45 no se declaran cerrados en su totalidad: E3-T5 conserva
+S45a para Colecciones y la unicidad tras E4/m5. El
 commit de cierre `53815c3` tiene el run `41206648731` 5/5 verde y `TV emulator
 trial` `41206648729` verde. No se inicia E4 ni se declara E3 cerrada. La
 siguiente unidad ejecutable sin E4 era el acceso rápido de Historial
@@ -3018,10 +3022,18 @@ producción. El run `41213360494` quedó 5/5 verde (`jvm-tests`,
 La secuencia ejecutada de E3 es: U4 (E3-T7) el 2026-10-31; U5 colecciones
 (E3-T5) y U6 perfiles (E3-T9) el 2026-10-31 (L55); U7 auditoría de cierre el
 2026-10-31 (L56); U8 acceso rápido de Historial (S11c) el 2026-10-31 (L57); U9
-«Sin nombre» instrumentado el 2026-10-31 (L58). No quedan unidades E3
-ejecutables sin E4: lo pendiente exige E4 (E3-T2/T3), E4/m5 y recreación de
-proceso (E3-T5), recreación de proceso (E3-T7/T8) o E6/E7 (E3-T9). No se
-declara cerrada E3 mientras existan esos criterios.
+«Sin nombre» instrumentado el 2026-10-31 (L58).
+
+**E3-T8 (recreación de proceso) verificada el 2026-11-05 (L74).** El PR #13
+(`acf8c43`, merge `e461009`) añade dos fases instrumentadas separadas por
+`am force-stop`; CI `41938436445` y `41939784755` quedaron 5/5 verdes. E3-T8 y
+E3-T7 quedan cubiertas. E3 sigue abierta por E3-T2/T3, E3-T5 y E3-T9; S14 y S45
+no se declaran cerradas en su totalidad.
+
+No quedan unidades E3 ejecutables sin E4: lo pendiente exige E4 (E3-T2/T3),
+E4/m5 y recreación de proceso de Colecciones (E3-T5) o E6/E7 (E3-T9). E3-T7 y
+E3-T8 quedan cubiertas por L74 (2026-11-05). No se declara cerrada E3 mientras
+existan esos criterios.
 
 U0 sigue aprobada documentalmente en L32 sobre
 `18fe0fdcf5ed728768f95bf5f0568b9bb580f2b9`; §1–§9 conservan sus requisitos y
@@ -3803,3 +3815,75 @@ callbacks antiguos aislados. E6-T5 (diagnóstico ampliado) y E6-T6 (zapeo y
 volumen) siguen pendientes y no se inician; E6 en conjunto no se declara cerrada.
 `README.md`, `GLOSSARY.md`, el baseline M3U, S24 y XMLTV no se alteran. Sin PR ni
 merge; `feat/e1-bootstrap` sigue en `68c9511`.
+
+### L74 — E3-T8: recreación física del proceso en dos fases instrumentadas (2026-11-05)
+
+**Autorización y objetivo.** Registrar la finalización técnica de E3-T8 con la
+evidencia del PR #13 y su CI verde, sin modificar código, pruebas, workflows,
+criterios de aceptación ni entradas históricas. Esta entrada solo modifica este
+documento. E3 no se declara cerrada; E3-T2, E3-T3, E3-T5 y E3-T9 conservan sus
+estados. S14 y S45 no se declaran cerradas en su totalidad.
+
+**Evidencia autorizada.** PR #13, rama `feat/e3-process-restart`, commit
+`acf8c437a791bc6ba6069732887b1e5e05033fba`, merge commit
+`e4610092af74adfefdf33f8af7862ad89f1b491f`. CI del PR: run `41938436445`.
+CI de main: run `41939784755`. Ambos runs quedaron 5/5 verdes (`jvm-tests`,
+`static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`;
+`p1-performance` y `p1-android` omitidos por diseño). En `instrumented-mobile`
+corrieron 50 pruebas existentes, más `E3T8ProcesoFase1Test` y
+`E3T8ProcesoFase2Test`; ambas reportaron `OK (1 test)` y 0 fallos.
+`instrumented-tv` quedó verde.
+
+**Archivos involucrados.** `.github/scripts/e3-process-restart.sh`,
+`.github/workflows/ci.yml`,
+`app/src/androidTest/kotlin/com/copernicotv/app/E3T8ProcesoFase1Test.kt`,
+`app/src/androidTest/kotlin/com/copernicotv/app/E3T8ProcesoFase2Test.kt` y
+`app/src/androidTest/kotlin/com/copernicotv/app/E3T8ProcesoSoporte.kt`. El PR no
+modificó producción, el esquema Room v1, `README.md`, `GLOSSARY.md`, los ADR, el
+baseline M3U ni la evidencia histórica.
+
+**Estrategia de ejecución.** El job móvil ejecuta primero la suite existente de
+50 pruebas con `connectedDebugAndroidTest` y, en la misma línea, el script
+`.github/scripts/e3-process-restart.sh`. El script instala la app y el APK de
+pruebas una sola vez con `adb install -r -t`, ejecuta la fase 1 con
+`am instrument -e clearPackageData false`, termina el proceso con
+`am force-stop`, comprueba que `pidof` ya no lo encuentre y ejecuta la fase 2
+con otra invocación de `am instrument`. No se usa `connectedDebugAndroidTest`
+para las fases porque AGP desinstala el APK bajo prueba al terminar cada
+invocación, lo que borraría `filesDir` y Room. Tampoco se usa
+`ActivityScenario.recreate()` como evidencia de reinicio.
+
+**Identidad de proceso distinta.** La fase 1 escribe en
+`filesDir/e3t8-proceso.properties` la identidad
+`Process.getPid():Process.getStartElapsedRealtime()`, junto con los IDs de L1,
+L2, los Canales y la Colección. La fase 2 lee esa marca y exige
+`assertNotEquals` contra su propia identidad; el PID solo no basta porque
+Android puede reutilizarlo. La comprobación de `pidof` tras `am force-stop`
+refuerza que no quedó un proceso vivo entre fases.
+
+**Estado verificado.** La siembra fija L1 y L2 con tres Canales compartidos C1,
+C2 y C3; L1 con Apariencias C1, C2, C3 y L2 con C3, C2, C1; una Colección con
+`ColeccionCanal.posicion` C2, C1, C3; preferencia L1 `MANUAL/ASC` y L2
+`NOMBRE/DESC`. La fase 1 reordena únicamente L1 desde la UI a C2, C1, C3 y
+verifica la UI y la base. La fase 2, ya en un proceso nuevo, verifica de nuevo:
+L1 C2, C1, C3; L2 C3, C2, C1; las Apariencias de L1 y L2; la Colección C2, C1,
+C3; el conjunto de identidades de los Canales sin cambios; la preferencia L1
+`MANUAL/ASC` y la L2 `NOMBRE/DESC`. El PR declara verificados S14k y S45a–S45c;
+las aserciones cubren además S14a/S14c para el reordenamiento manual de
+Apariencias y S45d para la preferencia por Lista. Con ello E3-T8 y E3-T7 quedan
+cubiertas. S14 y S45 no se declaran cerradas en su totalidad: E3-T5 conserva la
+recreación de proceso de Colecciones (S45a) y la unicidad de pertenencia tras
+E4/m5.
+
+**Pruebas y evidencia.** El run de PR `41938436445` sobre `acf8c43` quedó 5/5
+verde; `instrumented-mobile` ejecutó 50 pruebas existentes y las dos fases
+(`OK (1 test)` cada una), con 0 fallos; `instrumented-tv` verde. El run de main
+`41939784755` sobre `e461009` quedó 5/5 verde. Los reportes de ambas fases se
+publicaron en el artifact `reportes-instrumented-mobile` del run de PR.
+
+**Estado y frontera.** E3-T8 queda **cubierta** y E3-T7 queda **cubierta** por
+la misma evidencia de recreación de proceso. E3 permanece **abierta** por
+E3-T2/T3 (criterios dependientes de E4), E3-T5 (unicidad tras E4/m5 y
+recreación de proceso de Colecciones) y E3-T9 (E6/E7). No se inicia E4 ni se
+declara cerrado el MVP. `README.md`, `GLOSSARY.md`, los ADR, el baseline M3U y
+las entradas L1–L73 no se modifican.

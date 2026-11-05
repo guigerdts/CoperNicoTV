@@ -64,11 +64,11 @@ class S11dProcesoFase1Test {
 
     @Test
     fun registraHistorialYDejaEvidenciaParaElNuevoProceso() {
-        esperarAccesoS11d(semilla)
+        composeRule.esperarAccesoS11d(semilla)
 
         val estado = runBlocking { leerEstadoS11d(db, historial, semilla) }
         afirmarEstadoS11d(estado, semilla)
-        abrirSegundoS11d(semilla)
+        composeRule.abrirSegundoS11d(semilla)
 
         escribirMarcaS11d(contexto, semilla)
         val marca = leerMarcaS11d(contexto)

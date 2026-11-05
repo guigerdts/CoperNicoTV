@@ -2,7 +2,6 @@ package com.copernicotv.app
 
 import android.content.Context
 import android.os.Process
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick

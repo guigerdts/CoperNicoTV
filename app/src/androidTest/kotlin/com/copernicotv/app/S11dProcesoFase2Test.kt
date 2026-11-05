@@ -58,11 +58,11 @@ class S11dProcesoFase2Test {
     @Test
     fun trasNuevoProcesoLaUiYLaBaseConservanElHistorial() {
         val semilla = marca.semilla()
-        esperarAccesoS11d(semilla)
+        composeRule.esperarAccesoS11d(semilla)
 
         val estado = runBlocking { leerEstadoS11d(db, historial, semilla) }
         afirmarEstadoS11d(estado, semilla)
-        abrirSegundoS11d(semilla)
+        composeRule.abrirSegundoS11d(semilla)
 
         Log.i(
             "S11dProceso",

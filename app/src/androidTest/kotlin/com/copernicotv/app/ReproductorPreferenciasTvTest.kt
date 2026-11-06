@@ -13,6 +13,8 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
+import com.copernicotv.app.data.PreferenciasReproduccion
+import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ALTERNAR
@@ -57,12 +59,21 @@ class ReproductorPreferenciasTvTest {
     @Inject
     lateinit var catalogo: CatalogoRepositorio
 
+    @Inject
+    lateinit var preferencias: RepositorioPreferenciasReproduccion
+
     private lateinit var servidor: ServidorMedios
 
     @Before
     fun preparar() {
         hiltRule.inject()
-        runBlocking { db.clearAllTables() }
+        runBlocking {
+            // Las preferencias de reproducción persisten entre pruebas dentro
+            // de la misma ejecución (mismo proceso y paquete): restablecer los
+            // valores por defecto y las claves observadas antes de cada prueba.
+            db.clearAllTables()
+            preferencias.guardar(PreferenciasReproduccion())
+        }
         val assets = InstrumentationRegistry.getInstrumentation().context.assets
         FixturesF19.verificar(assets)
         servidor = ServidorMedios(assets).also { it.iniciar() }

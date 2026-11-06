@@ -81,8 +81,8 @@ class ReproductorViewModel
         private val _modoAspecto = MutableStateFlow(ModoAspecto.AJUSTAR)
         val modoAspecto: StateFlow<ModoAspecto> = _modoAspecto.asStateFlow()
 
-        private val _controlesSecundarios = MutableStateFlow(true)
-        val controlesSecundariosVisibles: StateFlow<Boolean> = _controlesSecundarios.asStateFlow()
+        private val _controlesSecundariosVisibles = MutableStateFlow(true)
+        val controlesSecundariosVisibles: StateFlow<Boolean> = _controlesSecundariosVisibles.asStateFlow()
 
         /** Motor de la sesión activa; `null` mientras no hay sesión abierta. */
         val motor: ExoPlayer?
@@ -125,7 +125,7 @@ class ReproductorViewModel
                                 runCatching { preferenciasReproduccion.leer() }
                                     .getOrDefault(PreferenciasReproduccion())
                             _modoAspecto.value = reproduccion.modoAspecto
-                            _controlesSecundarios.value = reproduccion.controlesSecundariosVisibles
+                            _controlesSecundariosVisibles.value = reproduccion.controlesSecundariosVisibles
                             val nueva = abrirSesion(datos.url, preferenciasActuales)
                             // Si la sesión falló antes de publicar el Canal, el
                             // error definitivo ya ganó: no lo pisamos con Listo.
@@ -195,14 +195,14 @@ class ReproductorViewModel
             persistirReproduccion(
                 PreferenciasReproduccion(
                     modoAspecto = nuevo,
-                    controlesSecundariosVisibles = _controlesSecundarios.value,
+                    controlesSecundariosVisibles = _controlesSecundariosVisibles.value,
                 ),
             )
         }
 
         /** Fija la visibilidad de los controles secundarios fijos y la guarda (S17b). */
         fun fijarControlesSecundarios(visibles: Boolean) {
-            _controlesSecundarios.value = visibles
+            _controlesSecundariosVisibles.value = visibles
             persistirReproduccion(
                 PreferenciasReproduccion(
                     modoAspecto = _modoAspecto.value,

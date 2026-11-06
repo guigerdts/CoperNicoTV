@@ -76,6 +76,5 @@ object ModuloPreferenciasReproduccion {
     @Singleton
     fun repositorio(
         @ApplicationContext contexto: Context,
-    ): RepositorioPreferenciasReproduccion =
-        RepositorioPreferenciasReproduccionDataStore(contexto.dataStorePistas)
+    ): RepositorioPreferenciasReproduccion = RepositorioPreferenciasReproduccionDataStore(contexto.dataStorePistas)
 }

@@ -27,6 +27,8 @@ CLASE_S11D_FASE1="com.copernicotv.app.S11dProcesoFase1Test"
 CLASE_S11D_FASE2="com.copernicotv.app.S11dProcesoFase2Test"
 CLASE_S45_FASE1="com.copernicotv.app.S45ProcesoFase1Test"
 CLASE_S45_FASE2="com.copernicotv.app.S45ProcesoFase2Test"
+CLASE_E7T5_FASE1="com.copernicotv.app.E7T5ProcesoFase1Test"
+CLASE_E7T5_FASE2="com.copernicotv.app.E7T5ProcesoFase2Test"
 APK_APP="app/build/outputs/apk/debug/app-debug.apk"
 APK_TEST="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 REPORTES="app/build/reports/androidTests"
@@ -115,3 +117,11 @@ capturar_logcat_s11d "$REPORTES/s11d-fase2/logcat.txt"
 ejecutar_fase "$CLASE_S45_FASE1" "$REPORTES/s45-fase1/instrumentation.txt"
 detener_proceso
 ejecutar_fase "$CLASE_S45_FASE2" "$REPORTES/s45-fase2/instrumentation.txt"
+
+# E7-T5 (S44b, S17b): el modo de aspecto y la visibilidad de los controles
+# secundarios cambiados desde la UI del reproductor sobreviven a un proceso
+# nuevo. La siembra de la fase 2 re-importa el mismo tvg-id y la
+# reconciliación de ADR-0004 apunta el Canal al puerto efímero de esa fase.
+ejecutar_fase "$CLASE_E7T5_FASE1" "$REPORTES/e7t5-fase1/instrumentation.txt"
+detener_proceso
+ejecutar_fase "$CLASE_E7T5_FASE2" "$REPORTES/e7t5-fase2/instrumentation.txt"

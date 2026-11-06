@@ -31,7 +31,7 @@ interface RepositorioPreferenciasPista {
     suspend fun guardar(preferencias: PreferenciasPista)
 }
 
-private val Context.dataStorePistas: DataStore<Preferences> by preferencesDataStore(name = "preferencias_pistas")
+internal val Context.dataStorePistas: DataStore<Preferences> by preferencesDataStore(name = "preferencias_pistas")
 
 @Module
 @InstallIn(SingletonComponent::class)

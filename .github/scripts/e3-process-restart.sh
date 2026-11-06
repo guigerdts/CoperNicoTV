@@ -129,8 +129,14 @@ ejecutar_fase "$CLASE_S45_FASE2" "$REPORTES/s45-fase2/instrumentation.txt"
 # secundarios cambiados desde la UI del reproductor sobreviven a un proceso
 # nuevo. La siembra de la fase 2 re-importa el mismo tvg-id y la
 # reconciliación de ADR-0004 apunta el Canal al puerto efímero de esa fase.
-ejecutar_fase "$CLASE_E7T5_FASE1" "$REPORTES/e7t5-fase1/instrumentation.txt"
+if ! ejecutar_fase "$CLASE_E7T5_FASE1" "$REPORTES/e7t5-fase1/instrumentation.txt"; then
+    capturar_logcat_e7t5 "$REPORTES/e7t5-fase1/logcat.txt"
+    exit 1
+fi
 capturar_logcat_e7t5 "$REPORTES/e7t5-fase1/logcat.txt"
 detener_proceso
-ejecutar_fase "$CLASE_E7T5_FASE2" "$REPORTES/e7t5-fase2/instrumentation.txt"
+if ! ejecutar_fase "$CLASE_E7T5_FASE2" "$REPORTES/e7t5-fase2/instrumentation.txt"; then
+    capturar_logcat_e7t5 "$REPORTES/e7t5-fase2/logcat.txt"
+    exit 1
+fi
 capturar_logcat_e7t5 "$REPORTES/e7t5-fase2/logcat.txt"

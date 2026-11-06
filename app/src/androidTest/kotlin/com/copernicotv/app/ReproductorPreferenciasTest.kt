@@ -10,6 +10,7 @@ import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ALTERNAR
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ASPECTO
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_AUDIO

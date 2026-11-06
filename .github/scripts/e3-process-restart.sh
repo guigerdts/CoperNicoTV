@@ -34,7 +34,8 @@ APK_TEST="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 REPORTES="app/build/reports/androidTests"
 
 mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2" "$REPORTES/s11d-fase1" "$REPORTES/s11d-fase2" \
-    "$REPORTES/s45-fase1" "$REPORTES/s45-fase2"
+    "$REPORTES/s45-fase1" "$REPORTES/s45-fase2" \
+    "$REPORTES/e7t5-fase1" "$REPORTES/e7t5-fase2"
 
 if [[ ! -f "$APK_APP" ]]; then
     APK_APP=$(find app/build/outputs/apk -name '*-debug.apk' -not -path '*androidTest*' -print -quit)

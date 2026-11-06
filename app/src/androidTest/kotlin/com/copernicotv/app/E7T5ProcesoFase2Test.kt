@@ -1,6 +1,7 @@
 package com.copernicotv.app
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -73,7 +74,18 @@ class E7T5ProcesoFase2Test {
         sembrarCanal(catalogo, FixturesF19.url(servidor, FixturesF19.PISTAS))
         composeRule.abrirReproductor()
         composeRule.mostrarControlesConToque()
-        composeRule.esperarFase("Reproduciendo")
+        try {
+            composeRule.esperarFase("Reproduciendo")
+        } catch (agotado: AssertionError) {
+            // Diagnóstico E7-T5: registra la fase y el estado real del motor al
+            // agotar la espera, para distinguir restauración aplazada de fallo.
+            Log.i(
+                "E7T5Proceso",
+                "fase2 preparar: fase=${composeRule.faseActual()} " +
+                    "motor=${composeRule.estadoMotor().first}",
+            )
+            throw agotado
+        }
     }
 
     @After

@@ -14,7 +14,6 @@ import com.copernicotv.app.ui.TAG_REPRODUCTOR_ALTERNAR
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ASPECTO
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_AUDIO
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_AVANZAR
-import com.copernicotv.app.ui.TAG_REPRODUCTOR_CONTROLES
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_FASE
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_PANEL_PISTAS
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_PROGRESO

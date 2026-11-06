@@ -6,9 +6,9 @@ import android.view.ViewGroup
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.copernicotv.app.data.db.AppDatabase
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.Properties
-import kotlinx.coroutines.runBlocking
 
 /**
  * E7-T5 (S44b, S17b) para el reproductor: cambia las preferencias desde la

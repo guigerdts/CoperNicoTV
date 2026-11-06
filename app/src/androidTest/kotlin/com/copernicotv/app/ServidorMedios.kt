@@ -25,8 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal class ServidorMedios(
     private val assets: AssetManager,
-    private val decidirFallo: (ruta: String, peticion: Int) -> Int? = { _, _ -> null },
     puertoFijo: Int? = null,
+    private val decidirFallo: (ruta: String, peticion: Int) -> Int? = { _, _ -> null },
 ) : Closeable {
     /**
      * [puertoFijo] reabre el mismo puerto en dos procesos distintos (dos

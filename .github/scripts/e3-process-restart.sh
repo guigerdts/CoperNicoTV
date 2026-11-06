@@ -98,6 +98,12 @@ capturar_logcat_s11d() {
     "$ADB" logcat -d -s S11dProceso:I > "$destino"
 }
 
+# E7-T5: bitácora de las dos fases del proceso (restauración de preferencias).
+capturar_logcat_e7t5() {
+    local destino="$1"
+    "$ADB" logcat -d -s E7T5Proceso:I > "$destino"
+}
+
 # E3-T8: reordenamiento persistido tras un proceso nuevo.
 ejecutar_fase "$CLASE_E3T8_FASE1" "$REPORTES/e3-fase1/instrumentation.txt"
 detener_proceso
@@ -124,5 +130,7 @@ ejecutar_fase "$CLASE_S45_FASE2" "$REPORTES/s45-fase2/instrumentation.txt"
 # nuevo. La siembra de la fase 2 re-importa el mismo tvg-id y la
 # reconciliación de ADR-0004 apunta el Canal al puerto efímero de esa fase.
 ejecutar_fase "$CLASE_E7T5_FASE1" "$REPORTES/e7t5-fase1/instrumentation.txt"
+capturar_logcat_e7t5 "$REPORTES/e7t5-fase1/logcat.txt"
 detener_proceso
 ejecutar_fase "$CLASE_E7T5_FASE2" "$REPORTES/e7t5-fase2/instrumentation.txt"
+capturar_logcat_e7t5 "$REPORTES/e7t5-fase2/logcat.txt"

@@ -205,10 +205,15 @@ fun ReproductorScreen(
                     estado = sesionEstado,
                     pistas = estadoPistas,
                     motor = viewModel.motor,
-                    modo = modoAspecto,
-                    secundariosVisibles = controlesSecundariosVisibles,
-                    onCambiarModo = viewModel::alternarModoAspecto,
-                    onAlternarSecundarios = { viewModel.fijarControlesSecundarios(!controlesSecundariosVisibles) },
+                    modos =
+                        ModosReproductor(
+                            modo = modoAspecto,
+                            secundariosVisibles = controlesSecundariosVisibles,
+                            onCambiarModo = viewModel::alternarModoAspecto,
+                            onAlternarSecundarios = {
+                                viewModel.fijarControlesSecundarios(!controlesSecundariosVisibles)
+                            },
+                        ),
                     onAlternar = viewModel::alternar,
                     onDesplazar = viewModel::desplazar,
                     onBuscarA = viewModel::buscarA,
@@ -232,10 +237,7 @@ private fun SuperficieReproductor(
     estado: EstadoSesion,
     pistas: EstadoPistas,
     motor: ExoPlayer?,
-    modo: ModoAspecto,
-    secundariosVisibles: Boolean,
-    onCambiarModo: () -> Unit,
-    onAlternarSecundarios: () -> Unit,
+    modos: ModosReproductor,
     onAlternar: () -> Unit,
     onDesplazar: (Long) -> Unit,
     onBuscarA: (Long) -> Unit,
@@ -266,23 +268,29 @@ private fun SuperficieReproductor(
         controlesVisibles = true
     }
     val panelPistas = recordarPanelPistas(enfoques, revelar)
+    val acciones =
+        accionesReproductor(
+            revelar = revelar,
+            modos = modos,
+            onAlternar = onAlternar,
+            onDesplazar = onDesplazar,
+            onArrastre = { valor -> arrastreMs = valor },
+            leerArrastre = { arrastreMs },
+            onBuscarA = onBuscarA,
+            onSalir = onSalir,
+        )
 
     // S17b: ocultar los secundarios cierra el panel de pistas y, en TV, deja
     // el foco en play/pausa (el botón enfocado desaparecería con la fila);
     // al volver a mostrarlos el foco vuelve a play/pausa, como decidió el
     // propietario. Se compara con la visibilidad previa para no robar el foco
     // con la carga inicial.
-    var secundariosPrevios by remember { mutableStateOf(secundariosVisibles) }
-    LaunchedEffect(secundariosVisibles) {
-        if (!secundariosVisibles) {
-            secundariosPrevios = false
-            panelPistas.alCerrar()
-            if (esTelevision) runCatching { enfoqueAlternar.requestFocus() }
-        } else if (!secundariosPrevios) {
-            secundariosPrevios = true
-            if (esTelevision) runCatching { enfoqueAlternar.requestFocus() }
-        }
-    }
+    EfectoVisibilidadSecundarios(
+        secundariosVisibles = modos.secundariosVisibles,
+        esTelevision = esTelevision,
+        alCerrarPanel = { panelPistas.alCerrar() },
+        enfoqueAlternar = enfoqueAlternar,
+    )
     InmersivoPantallaCompleta(vista)
     EfectosReproductor(
         vista = vista,
@@ -316,7 +324,7 @@ private fun SuperficieReproductor(
                 )
                 .focusable(),
     ) {
-        SuperficieVideo(motor, modo)
+        SuperficieVideo(motor, modos.modo)
         IndicadorCarga(fase)
         AvisoReintento(estado)
         DiagnosticoEstado(datos, fase, estado.posicionMs)
@@ -325,48 +333,58 @@ private fun SuperficieReproductor(
                 datos = datos,
                 estado = estado,
                 fase = fase,
-                modo = modo,
-                secundariosVisibles = secundariosVisibles,
+                modos = modos,
                 arrastreMs = arrastreMs,
                 pistas = pistas,
                 panelPistas = panelPistas,
                 enfoques = enfoques,
-                acciones =
-                    AccionesReproductor(
-                        alAlternar = {
-                            revelar()
-                            onAlternar()
-                        },
-                        alDesplazar = { salto ->
-                            revelar()
-                            onDesplazar(salto)
-                        },
-                        alArrastrar = { valor -> arrastreMs = valor },
-                        alTerminarArrastre = {
-                            arrastreMs?.let { valor ->
-                                onBuscarA(valor)
-                                revelar()
-                            }
-                            arrastreMs = null
-                        },
-                        alCambiarModo = {
-                            revelar()
-                            onCambiarModo()
-                        },
-                        alAlternarSecundarios = {
-                            revelar()
-                            onAlternarSecundarios()
-                        },
-                        alSalir = {
-                            revelar()
-                            onSalir()
-                        },
-                    ),
+                acciones = acciones,
                 accionesPistas = accionesPistas,
             )
         }
     }
 }
+
+/** Arma las acciones con revelado de controles en cada interacción. */
+private fun accionesReproductor(
+    revelar: () -> Unit,
+    modos: ModosReproductor,
+    onAlternar: () -> Unit,
+    onDesplazar: (Long) -> Unit,
+    onArrastre: (Long?) -> Unit,
+    leerArrastre: () -> Long?,
+    onBuscarA: (Long) -> Unit,
+    onSalir: () -> Unit,
+) = AccionesReproductor(
+    alAlternar = {
+        revelar()
+        onAlternar()
+    },
+    alDesplazar = { salto ->
+        revelar()
+        onDesplazar(salto)
+    },
+    alArrastrar = onArrastre,
+    alTerminarArrastre = {
+        leerArrastre()?.let { valor ->
+            onBuscarA(valor)
+            revelar()
+        }
+        onArrastre(null)
+    },
+    alCambiarModo = {
+        revelar()
+        modos.onCambiarModo()
+    },
+    alAlternarSecundarios = {
+        revelar()
+        modos.onAlternarSecundarios()
+    },
+    alSalir = {
+        revelar()
+        onSalir()
+    },
+)
 
 /** Acciones que la barra de controles delega en la pantalla. */
 private data class AccionesReproductor(
@@ -379,13 +397,40 @@ private data class AccionesReproductor(
     val alSalir: () -> Unit,
 )
 
+/** Modos de reproducción controlados por preferencias globales (S44b/S17b). */
+private data class ModosReproductor(
+    val modo: ModoAspecto,
+    val secundariosVisibles: Boolean,
+    val onCambiarModo: () -> Unit,
+    val onAlternarSecundarios: () -> Unit,
+)
+
+@Composable
+private fun EfectoVisibilidadSecundarios(
+    secundariosVisibles: Boolean,
+    esTelevision: Boolean,
+    alCerrarPanel: () -> Unit,
+    enfoqueAlternar: FocusRequester,
+) {
+    var secundariosPrevios by remember { mutableStateOf(secundariosVisibles) }
+    LaunchedEffect(secundariosVisibles) {
+        if (!secundariosVisibles) {
+            secundariosPrevios = false
+            alCerrarPanel()
+            if (esTelevision) runCatching { enfoqueAlternar.requestFocus() }
+        } else if (!secundariosPrevios) {
+            secundariosPrevios = true
+            if (esTelevision) runCatching { enfoqueAlternar.requestFocus() }
+        }
+    }
+}
+
 @Composable
 private fun BoxScope.Controles(
     datos: ReproductorUiState.Listo,
     estado: EstadoSesion,
     fase: EstadoReproductor,
-    modo: ModoAspecto,
-    secundariosVisibles: Boolean,
+    modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
     panelPistas: EstadoPanelPistas,
@@ -403,8 +448,7 @@ private fun BoxScope.Controles(
         BarraInferior(
             estado = estado,
             fase = fase,
-            modo = modo,
-            secundariosVisibles = secundariosVisibles,
+            modos = modos,
             arrastreMs = arrastreMs,
             pistas = pistas,
             panelPistas = panelPistas,
@@ -469,8 +513,7 @@ private fun BoxScope.BarraSuperior(
 private fun BoxScope.BarraInferior(
     estado: EstadoSesion,
     fase: EstadoReproductor,
-    modo: ModoAspecto,
-    secundariosVisibles: Boolean,
+    modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
     panelPistas: EstadoPanelPistas,
@@ -499,11 +542,11 @@ private fun BoxScope.BarraInferior(
         }
         AvisoPistas(pistas)
         FilaProgreso(duracion, posicion, estado.puedeBuscar, acciones)
-        FilaBotones(fase, modo, secundariosVisibles, estado.puedeBuscar, enfoques.alternar, acciones)
+        FilaBotones(fase, modos.modo, modos.secundariosVisibles, estado.puedeBuscar, enfoques.alternar, acciones)
         // S17b: los selectores de pista (audio y subtítulos) también son
         // controles secundarios fijos; el aviso de preferencia no disponible
         // no lo es y permanece visible.
-        if (secundariosVisibles) {
+        if (modos.secundariosVisibles) {
             FilaPistas(pistas, enfoques, panelPistas.alAbrir)
         }
     }

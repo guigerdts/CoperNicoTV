@@ -53,7 +53,7 @@ class E7T5ProcesoFase1Test {
         borrarMarcaE7T5(contexto)
         val assets = InstrumentationRegistry.getInstrumentation().context.assets
         FixturesF19.verificar(assets)
-        servidor = ServidorMedios(assets).also { it.iniciar() }
+        servidor = ServidorMedios(assets, puertoFijo = PUERTO_E7T5).also { it.iniciar() }
     }
 
     @After

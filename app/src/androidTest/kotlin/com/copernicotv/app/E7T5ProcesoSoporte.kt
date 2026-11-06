@@ -11,6 +11,13 @@ import java.io.File
 import java.util.Properties
 
 /**
+ * Puerto fijo compartido por las dos fases de E7-T5: el servidor de medios
+ * de la fase 2 reabre el puerto de la fase 1, de modo que la URL del Canal
+ * persistida en Room sigue siendo válida tras el `force-stop`.
+ */
+internal const val PUERTO_E7T5 = 43117
+
+/**
  * E7-T5 (S44b, S17b) para el reproductor: cambia las preferencias desde la
  * UI, termina el proceso real y comprueba, en un proceso nuevo, que el modo
  * de aspecto restaurado se aplica a la `PlayerView` y que la visibilidad de
@@ -19,9 +26,9 @@ import java.util.Properties
  * Reutiliza el arnés de dos fases de E3-T8/S11d/S45: instalación única de
  * APK, `am instrument -e clearPackageData false`, `am force-stop` y otra
  * invocación de instrumentación. La marca de la fase 1 se guarda en
- * `filesDir`, y la siembra re-importa el mismo `tvg-id="e6"` en la fase 2
- * para que la reconciliación de ADR-0004 apunte el Canal al puerto efímero
- * del servidor de esa fase.
+ * `filesDir`; ambas fases abren el servidor de medios en el mismo puerto
+ * fijo, así que la URL del Canal persistida en Room sigue siendo válida en
+ * la fase 2 (la re-importación no toca un catálogo ya existente).
  */
 internal const val ARCHIVO_MARCA_E7T5 = "e7t5-proceso.properties"
 

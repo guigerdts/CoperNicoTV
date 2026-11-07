@@ -25,9 +25,20 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal class ServidorMedios(
     private val assets: AssetManager,
+    puertoFijo: Int? = null,
     private val decidirFallo: (ruta: String, peticion: Int) -> Int? = { _, _ -> null },
 ) : Closeable {
-    private val socket = ServerSocket(0, 0, InetAddress.getByName("127.0.0.1"))
+    /**
+     * [puertoFijo] reabre el mismo puerto en dos procesos distintos (dos
+     * fases de un arnés de reinicio): la URL persistida en Room del proceso
+     * anterior sigue resolviendo contra el servidor del proceso nuevo.
+     */
+    private val socket =
+        if (puertoFijo != null) {
+            ServerSocket(puertoFijo, 0, InetAddress.getByName("127.0.0.1"))
+        } else {
+            ServerSocket(0, 0, InetAddress.getByName("127.0.0.1"))
+        }
     private val alcance = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val contadores = ConcurrentHashMap<String, AtomicInteger>()
     val puerto: Int = socket.localPort

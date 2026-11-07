@@ -219,7 +219,7 @@ class ReproductorReintentosTest {
     }
 
     private fun servidorConFallos(decidir: (ruta: String, peticion: Int) -> Int?): ServidorMedios =
-        ServidorMedios(InstrumentationRegistry.getInstrumentation().context.assets, decidir).also { it.iniciar() }
+        ServidorMedios(InstrumentationRegistry.getInstrumentation().context.assets, decidirFallo = decidir).also { it.iniciar() }
 
     private fun esperarSesion(
         descripcion: String,

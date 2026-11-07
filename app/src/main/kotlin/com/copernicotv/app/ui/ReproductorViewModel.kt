@@ -5,12 +5,15 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
+import com.copernicotv.app.data.PreferenciasReproduccion
 import com.copernicotv.app.data.RepositorioPreferenciasPista
+import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
 import com.copernicotv.app.data.ReproductorRepositorio
 import com.copernicotv.app.data.ResultadoStream
 import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
+import com.copernicotv.app.player.ModoAspecto
 import com.copernicotv.app.player.PistaDisponible
 import com.copernicotv.app.player.PoliticaReintentos
 import com.copernicotv.app.player.PreferenciaPista
@@ -63,6 +66,7 @@ class ReproductorViewModel
         private val repositorio: ReproductorRepositorio,
         @ApplicationContext private val contexto: Context,
         private val preferenciasPista: RepositorioPreferenciasPista,
+        private val preferenciasReproduccion: RepositorioPreferenciasReproduccion,
         private val politicaReintentos: PoliticaReintentos,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
@@ -73,6 +77,12 @@ class ReproductorViewModel
 
         private val _estadoPistas = MutableStateFlow(EstadoPistas())
         val estadoPistas: StateFlow<EstadoPistas> = _estadoPistas.asStateFlow()
+
+        private val _modoAspecto = MutableStateFlow(ModoAspecto.AJUSTAR)
+        val modoAspecto: StateFlow<ModoAspecto> = _modoAspecto.asStateFlow()
+
+        private val _controlesSecundariosVisibles = MutableStateFlow(true)
+        val controlesSecundariosVisibles: StateFlow<Boolean> = _controlesSecundariosVisibles.asStateFlow()
 
         /** Motor de la sesión activa; `null` mientras no hay sesión abierta. */
         val motor: ExoPlayer?
@@ -111,6 +121,11 @@ class ReproductorViewModel
                             preferenciasActuales =
                                 runCatching { preferenciasPista.leer() }
                                     .getOrDefault(PreferenciasPista())
+                            val reproduccion =
+                                runCatching { preferenciasReproduccion.leer() }
+                                    .getOrDefault(PreferenciasReproduccion())
+                            _modoAspecto.value = reproduccion.modoAspecto
+                            _controlesSecundariosVisibles.value = reproduccion.controlesSecundariosVisibles
                             val nueva = abrirSesion(datos.url, preferenciasActuales)
                             // Si la sesión falló antes de publicar el Canal, el
                             // error definitivo ya ganó: no lo pisamos con Listo.
@@ -173,6 +188,29 @@ class ReproductorViewModel
             guardarPreferencias(preferenciasActuales.copy(subtitulos = PreferenciaPista.Automatica))
         }
 
+        /** Avanza al siguiente modo de aspecto y lo guarda como preferencia global (S44b). */
+        fun alternarModoAspecto() {
+            val nuevo = _modoAspecto.value.siguiente()
+            _modoAspecto.value = nuevo
+            persistirReproduccion(
+                PreferenciasReproduccion(
+                    modoAspecto = nuevo,
+                    controlesSecundariosVisibles = _controlesSecundariosVisibles.value,
+                ),
+            )
+        }
+
+        /** Fija la visibilidad de los controles secundarios fijos y la guarda (S17b). */
+        fun fijarControlesSecundarios(visibles: Boolean) {
+            _controlesSecundariosVisibles.value = visibles
+            persistirReproduccion(
+                PreferenciasReproduccion(
+                    modoAspecto = _modoAspecto.value,
+                    controlesSecundariosVisibles = visibles,
+                ),
+            )
+        }
+
         /** Cierra la sesión al salir de la pantalla y permite reabrir el Canal. */
         fun cerrar() {
             carga?.cancel()
@@ -233,6 +271,12 @@ class ReproductorViewModel
             preferenciasActuales = preferencias
             viewModelScope.launch {
                 runCatching { preferenciasPista.guardar(preferencias) }
+            }
+        }
+
+        private fun persistirReproduccion(preferencias: PreferenciasReproduccion) {
+            viewModelScope.launch {
+                runCatching { preferenciasReproduccion.guardar(preferencias) }
             }
         }
 

@@ -1,0 +1,119 @@
+package com.copernicotv.app
+
+import android.content.Context
+import android.util.Log
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.test.platform.app.InstrumentationRegistry
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_ALTERNAR
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_ASPECTO
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_AUDIO
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_AVANZAR
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_FASE
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_PROGRESO
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_RETROCEDER
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_SECUNDARIOS
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_SUBTITULOS
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_VOLVER
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+
+/**
+ * E7-T5 (S44b, S17b), fase 2: se ejecuta después de `am force-stop` y de una
+ * nueva invocación de instrumentación. Comprueba que el modo de aspecto
+ * guardado se restauró y se aplica a la `PlayerView`, y que los controles
+ * secundarios siguen ocultos; Volver, play/pausa, progreso y fase siguen
+ * presentes. Al volver a mostrar los secundarios, reaparecen los cinco.
+ *
+ * No hay limpieza de Room ni del DataStore en `@Before`: los datos son los
+ * que quedaron en disco al terminar el proceso anterior. El servidor de esta
+ * fase vuelve a abrir el mismo puerto fijo de la fase 1, así que la URL del
+ * Canal persistida en Room sigue siendo válida y la fase se concentra en la
+ * restauración de preferencias.
+ */
+@OptIn(ExperimentalTestApi::class)
+@HiltAndroidTest
+class E7T5ProcesoFase2Test {
+    @get:Rule(order = 0)
+    val hiltRule = HiltAndroidRule(this)
+
+    @get:Rule(order = 1)
+    val composeRule = createAndroidComposeRule<MainActivity>()
+
+    private val contexto: Context
+        get() = InstrumentationRegistry.getInstrumentation().targetContext
+
+    private lateinit var marca: MarcaE7T5
+    private lateinit var servidor: ServidorMedios
+
+    @Before
+    fun preparar() {
+        hiltRule.inject()
+        marca = leerMarcaE7T5(contexto)
+        assertNotEquals(
+            "La fase 2 se ejecutó en el mismo proceso que la fase 1",
+            marca.identidad,
+            identidadProceso(),
+        )
+        val assets = InstrumentationRegistry.getInstrumentation().context.assets
+        FixturesF19.verificar(assets)
+        servidor = ServidorMedios(assets, puertoFijo = PUERTO_E7T5).also { it.iniciar() }
+
+        composeRule.abrirReproductor()
+        composeRule.mostrarControlesConToque()
+        try {
+            composeRule.esperarFase("Reproduciendo")
+        } catch (agotado: AssertionError) {
+            // Diagnóstico E7-T5: registra la fase y el estado real del motor al
+            // agotar la espera, para distinguir restauración aplazada de fallo.
+            Log.i(
+                "E7T5Proceso",
+                "fase2 preparar: fase=${composeRule.faseActual()} " +
+                    "motor=${composeRule.estadoMotor().first}",
+            )
+            throw agotado
+        }
+    }
+
+    @After
+    fun cerrar() {
+        servidor.close()
+    }
+
+    @Test
+    fun trasNuevoProcesoElModoSeRestauraYLosSecundariosSiguenOcultos() {
+        assertEquals("RELLENAR", marca.modoAspecto)
+        composeRule.esperarResizeModeFillE7T5()
+
+        // S17b: ocultos exactamente los cinco secundarios; el control de la
+        // preferencia y los controles primarios permanecen.
+        composeRule.esperarTag(TAG_REPRODUCTOR_SECUNDARIOS)
+        composeRule.esperarTag(TAG_REPRODUCTOR_ALTERNAR)
+        composeRule.esperarTag(TAG_REPRODUCTOR_VOLVER)
+        composeRule.esperarTag(TAG_REPRODUCTOR_PROGRESO)
+        composeRule.esperarTag(TAG_REPRODUCTOR_FASE)
+        composeRule.esperarTagAusente(TAG_REPRODUCTOR_RETROCEDER)
+        composeRule.esperarTagAusente(TAG_REPRODUCTOR_AVANZAR)
+        composeRule.esperarTagAusente(TAG_REPRODUCTOR_ASPECTO)
+        composeRule.esperarTagAusente(TAG_REPRODUCTOR_AUDIO)
+        composeRule.esperarTagAusente(TAG_REPRODUCTOR_SUBTITULOS)
+
+        // Volver a mostrar los secundarios funciona tras el reinicio real.
+        composeRule.onNodeWithTag(TAG_REPRODUCTOR_SECUNDARIOS).performClick()
+        composeRule.esperarTag(TAG_REPRODUCTOR_RETROCEDER)
+        composeRule.esperarTag(TAG_REPRODUCTOR_AVANZAR)
+        composeRule.esperarTag(TAG_REPRODUCTOR_ASPECTO)
+        // El modo restaurado se ve también en el control al reaparecer (S44b).
+        composeRule.esperarTexto(TAG_REPRODUCTOR_ASPECTO, "Rellenar")
+        composeRule.esperarTag(TAG_REPRODUCTOR_AUDIO)
+        composeRule.esperarTag(TAG_REPRODUCTOR_SUBTITULOS)
+    }
+}

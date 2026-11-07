@@ -118,6 +118,12 @@ const val TAG_REPRODUCTOR_AVANZAR = "reproductor-avanzar"
 /** Etiqueta del selector de ajuste de pantalla. */
 const val TAG_REPRODUCTOR_ASPECTO = "reproductor-aspecto"
 
+/**
+ * Etiqueta del control de la preferencia global de controles secundarios
+ * fijos (S17b). No forma parte del conjunto que oculta o muestra.
+ */
+const val TAG_REPRODUCTOR_SECUNDARIOS = "reproductor-secundarios"
+
 /** Etiqueta del indicador de búfer. */
 const val TAG_REPRODUCTOR_BUFFER = "reproductor-buffer"
 
@@ -171,6 +177,8 @@ fun ReproductorScreen(
     val estado by viewModel.estado.collectAsStateWithLifecycle()
     val sesionEstado by viewModel.sesionEstado.collectAsStateWithLifecycle()
     val estadoPistas by viewModel.estadoPistas.collectAsStateWithLifecycle()
+    val modoAspecto by viewModel.modoAspecto.collectAsStateWithLifecycle()
+    val controlesSecundariosVisibles by viewModel.controlesSecundariosVisibles.collectAsStateWithLifecycle()
     LaunchedEffect(canalId) { viewModel.cargar(canalId) }
     val salir = {
         viewModel.cerrar()
@@ -197,6 +205,15 @@ fun ReproductorScreen(
                     estado = sesionEstado,
                     pistas = estadoPistas,
                     motor = viewModel.motor,
+                    modos =
+                        ModosReproductor(
+                            modo = modoAspecto,
+                            secundariosVisibles = controlesSecundariosVisibles,
+                            onCambiarModo = viewModel::alternarModoAspecto,
+                            onAlternarSecundarios = {
+                                viewModel.fijarControlesSecundarios(!controlesSecundariosVisibles)
+                            },
+                        ),
                     onAlternar = viewModel::alternar,
                     onDesplazar = viewModel::desplazar,
                     onBuscarA = viewModel::buscarA,
@@ -220,6 +237,7 @@ private fun SuperficieReproductor(
     estado: EstadoSesion,
     pistas: EstadoPistas,
     motor: ExoPlayer?,
+    modos: ModosReproductor,
     onAlternar: () -> Unit,
     onDesplazar: (Long) -> Unit,
     onBuscarA: (Long) -> Unit,
@@ -233,9 +251,7 @@ private fun SuperficieReproductor(
             Configuration.UI_MODE_TYPE_TELEVISION
     var controlesVisibles by rememberSaveable { mutableStateOf(true) }
     var interacciones by remember { mutableLongStateOf(0L) }
-    var modoGuardado by rememberSaveable { mutableStateOf(ModoAspecto.AJUSTAR.name) }
     var arrastreMs by remember { mutableStateOf<Long?>(null) }
-    val modo = ModoAspecto.valueOf(modoGuardado)
     val enfoqueRaiz = remember { FocusRequester() }
     val enfoqueAlternar = remember { FocusRequester() }
     val enfoques =
@@ -252,7 +268,29 @@ private fun SuperficieReproductor(
         controlesVisibles = true
     }
     val panelPistas = recordarPanelPistas(enfoques, revelar)
+    val acciones =
+        accionesReproductor(
+            revelar = revelar,
+            modos = modos,
+            onAlternar = onAlternar,
+            onDesplazar = onDesplazar,
+            onArrastre = { valor -> arrastreMs = valor },
+            leerArrastre = { arrastreMs },
+            onBuscarA = onBuscarA,
+            onSalir = onSalir,
+        )
 
+    // S17b: ocultar los secundarios cierra el panel de pistas y, en TV, deja
+    // el foco en play/pausa (el botón enfocado desaparecería con la fila);
+    // al volver a mostrarlos el foco vuelve a play/pausa, como decidió el
+    // propietario. Se compara con la visibilidad previa para no robar el foco
+    // con la carga inicial.
+    EfectoVisibilidadSecundarios(
+        secundariosVisibles = modos.secundariosVisibles,
+        esTelevision = esTelevision,
+        alCerrarPanel = { panelPistas.alCerrar() },
+        enfoqueAlternar = enfoqueAlternar,
+    )
     InmersivoPantallaCompleta(vista)
     EfectosReproductor(
         vista = vista,
@@ -286,7 +324,7 @@ private fun SuperficieReproductor(
                 )
                 .focusable(),
     ) {
-        SuperficieVideo(motor, modo)
+        SuperficieVideo(motor, modos.modo)
         IndicadorCarga(fase)
         AvisoReintento(estado)
         DiagnosticoEstado(datos, fase, estado.posicionMs)
@@ -295,43 +333,58 @@ private fun SuperficieReproductor(
                 datos = datos,
                 estado = estado,
                 fase = fase,
-                modo = modo,
+                modos = modos,
                 arrastreMs = arrastreMs,
                 pistas = pistas,
                 panelPistas = panelPistas,
                 enfoques = enfoques,
-                acciones =
-                    AccionesReproductor(
-                        alAlternar = {
-                            revelar()
-                            onAlternar()
-                        },
-                        alDesplazar = { salto ->
-                            revelar()
-                            onDesplazar(salto)
-                        },
-                        alArrastrar = { valor -> arrastreMs = valor },
-                        alTerminarArrastre = {
-                            arrastreMs?.let { valor ->
-                                onBuscarA(valor)
-                                revelar()
-                            }
-                            arrastreMs = null
-                        },
-                        alCambiarModo = {
-                            revelar()
-                            modoGuardado = modo.siguiente().name
-                        },
-                        alSalir = {
-                            revelar()
-                            onSalir()
-                        },
-                    ),
+                acciones = acciones,
                 accionesPistas = accionesPistas,
             )
         }
     }
 }
+
+/** Arma las acciones con revelado de controles en cada interacción. */
+private fun accionesReproductor(
+    revelar: () -> Unit,
+    modos: ModosReproductor,
+    onAlternar: () -> Unit,
+    onDesplazar: (Long) -> Unit,
+    onArrastre: (Long?) -> Unit,
+    leerArrastre: () -> Long?,
+    onBuscarA: (Long) -> Unit,
+    onSalir: () -> Unit,
+) = AccionesReproductor(
+    alAlternar = {
+        revelar()
+        onAlternar()
+    },
+    alDesplazar = { salto ->
+        revelar()
+        onDesplazar(salto)
+    },
+    alArrastrar = onArrastre,
+    alTerminarArrastre = {
+        leerArrastre()?.let { valor ->
+            onBuscarA(valor)
+            revelar()
+        }
+        onArrastre(null)
+    },
+    alCambiarModo = {
+        revelar()
+        modos.onCambiarModo()
+    },
+    alAlternarSecundarios = {
+        revelar()
+        modos.onAlternarSecundarios()
+    },
+    alSalir = {
+        revelar()
+        onSalir()
+    },
+)
 
 /** Acciones que la barra de controles delega en la pantalla. */
 private data class AccionesReproductor(
@@ -340,15 +393,44 @@ private data class AccionesReproductor(
     val alArrastrar: (Long) -> Unit,
     val alTerminarArrastre: () -> Unit,
     val alCambiarModo: () -> Unit,
+    val alAlternarSecundarios: () -> Unit,
     val alSalir: () -> Unit,
 )
+
+/** Modos de reproducción controlados por preferencias globales (S44b/S17b). */
+private data class ModosReproductor(
+    val modo: ModoAspecto,
+    val secundariosVisibles: Boolean,
+    val onCambiarModo: () -> Unit,
+    val onAlternarSecundarios: () -> Unit,
+)
+
+@Composable
+private fun EfectoVisibilidadSecundarios(
+    secundariosVisibles: Boolean,
+    esTelevision: Boolean,
+    alCerrarPanel: () -> Unit,
+    enfoqueAlternar: FocusRequester,
+) {
+    var secundariosPrevios by remember { mutableStateOf(secundariosVisibles) }
+    LaunchedEffect(secundariosVisibles) {
+        if (!secundariosVisibles) {
+            secundariosPrevios = false
+            alCerrarPanel()
+            if (esTelevision) runCatching { enfoqueAlternar.requestFocus() }
+        } else if (!secundariosPrevios) {
+            secundariosPrevios = true
+            if (esTelevision) runCatching { enfoqueAlternar.requestFocus() }
+        }
+    }
+}
 
 @Composable
 private fun BoxScope.Controles(
     datos: ReproductorUiState.Listo,
     estado: EstadoSesion,
     fase: EstadoReproductor,
-    modo: ModoAspecto,
+    modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
     panelPistas: EstadoPanelPistas,
@@ -366,7 +448,7 @@ private fun BoxScope.Controles(
         BarraInferior(
             estado = estado,
             fase = fase,
-            modo = modo,
+            modos = modos,
             arrastreMs = arrastreMs,
             pistas = pistas,
             panelPistas = panelPistas,
@@ -431,7 +513,7 @@ private fun BoxScope.BarraSuperior(
 private fun BoxScope.BarraInferior(
     estado: EstadoSesion,
     fase: EstadoReproductor,
-    modo: ModoAspecto,
+    modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
     panelPistas: EstadoPanelPistas,
@@ -460,8 +542,13 @@ private fun BoxScope.BarraInferior(
         }
         AvisoPistas(pistas)
         FilaProgreso(duracion, posicion, estado.puedeBuscar, acciones)
-        FilaBotones(fase, modo, estado.puedeBuscar, enfoques.alternar, acciones)
-        FilaPistas(pistas, enfoques, panelPistas.alAbrir)
+        FilaBotones(fase, modos.modo, modos.secundariosVisibles, estado.puedeBuscar, enfoques.alternar, acciones)
+        // S17b: los selectores de pista (audio y subtítulos) también son
+        // controles secundarios fijos; el aviso de preferencia no disponible
+        // no lo es y permanece visible.
+        if (modos.secundariosVisibles) {
+            FilaPistas(pistas, enfoques, panelPistas.alAbrir)
+        }
     }
 }
 
@@ -506,6 +593,7 @@ private fun FilaProgreso(
 private fun FilaBotones(
     fase: EstadoReproductor,
     modo: ModoAspecto,
+    secundariosVisibles: Boolean,
     puedeBuscar: Boolean,
     enfoqueAlternar: FocusRequester,
     acciones: AccionesReproductor,
@@ -531,24 +619,52 @@ private fun FilaBotones(
                 ),
             )
         }
-        BotonControl(
-            etiqueta = stringResource(R.string.reproductor_retroceder),
-            tag = TAG_REPRODUCTOR_RETROCEDER,
-            onClick = { acciones.alDesplazar(-SALTO_BUSQUEDA_MS) },
-            habilitado = puedeBuscar,
-        ) { Text("−10 s") }
-        BotonControl(
-            etiqueta = stringResource(R.string.reproductor_avanzar),
-            tag = TAG_REPRODUCTOR_AVANZAR,
-            onClick = { acciones.alDesplazar(SALTO_BUSQUEDA_MS) },
-            habilitado = puedeBuscar,
-        ) { Text("+10 s") }
+        // S17b: retroceso, avance y aspecto son controles secundarios fijos;
+        // play/pausa es el control primario y permanece siempre.
+        if (secundariosVisibles) {
+            BotonControl(
+                etiqueta = stringResource(R.string.reproductor_retroceder),
+                tag = TAG_REPRODUCTOR_RETROCEDER,
+                onClick = { acciones.alDesplazar(-SALTO_BUSQUEDA_MS) },
+                habilitado = puedeBuscar,
+            ) { Text("−10 s") }
+            BotonControl(
+                etiqueta = stringResource(R.string.reproductor_avanzar),
+                tag = TAG_REPRODUCTOR_AVANZAR,
+                onClick = { acciones.alDesplazar(SALTO_BUSQUEDA_MS) },
+                habilitado = puedeBuscar,
+            ) { Text("+10 s") }
+        }
         Spacer(modifier = Modifier.weight(1f))
+        if (secundariosVisibles) {
+            BotonControl(
+                etiqueta = stringResource(R.string.reproductor_aspecto),
+                tag = TAG_REPRODUCTOR_ASPECTO,
+                onClick = acciones.alCambiarModo,
+            ) { Text(stringResource(modo.recursoEtiqueta())) }
+        }
         BotonControl(
-            etiqueta = stringResource(R.string.reproductor_aspecto),
-            tag = TAG_REPRODUCTOR_ASPECTO,
-            onClick = acciones.alCambiarModo,
-        ) { Text(stringResource(modo.recursoEtiqueta())) }
+            etiqueta =
+                stringResource(
+                    if (secundariosVisibles) {
+                        R.string.reproductor_secundarios_desc_ocultar
+                    } else {
+                        R.string.reproductor_secundarios_desc_mostrar
+                    },
+                ),
+            tag = TAG_REPRODUCTOR_SECUNDARIOS,
+            onClick = acciones.alAlternarSecundarios,
+        ) {
+            Text(
+                stringResource(
+                    if (secundariosVisibles) {
+                        R.string.reproductor_secundarios_ocultar
+                    } else {
+                        R.string.reproductor_secundarios_mostrar
+                    },
+                ),
+            )
+        }
     }
 }
 

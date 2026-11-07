@@ -27,12 +27,15 @@ CLASE_S11D_FASE1="com.copernicotv.app.S11dProcesoFase1Test"
 CLASE_S11D_FASE2="com.copernicotv.app.S11dProcesoFase2Test"
 CLASE_S45_FASE1="com.copernicotv.app.S45ProcesoFase1Test"
 CLASE_S45_FASE2="com.copernicotv.app.S45ProcesoFase2Test"
+CLASE_E7T5_FASE1="com.copernicotv.app.E7T5ProcesoFase1Test"
+CLASE_E7T5_FASE2="com.copernicotv.app.E7T5ProcesoFase2Test"
 APK_APP="app/build/outputs/apk/debug/app-debug.apk"
 APK_TEST="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 REPORTES="app/build/reports/androidTests"
 
 mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2" "$REPORTES/s11d-fase1" "$REPORTES/s11d-fase2" \
-    "$REPORTES/s45-fase1" "$REPORTES/s45-fase2"
+    "$REPORTES/s45-fase1" "$REPORTES/s45-fase2" \
+    "$REPORTES/e7t5-fase1" "$REPORTES/e7t5-fase2"
 
 if [[ ! -f "$APK_APP" ]]; then
     APK_APP=$(find app/build/outputs/apk -name '*-debug.apk' -not -path '*androidTest*' -print -quit)
@@ -95,6 +98,12 @@ capturar_logcat_s11d() {
     "$ADB" logcat -d -s S11dProceso:I > "$destino"
 }
 
+# E7-T5: bitácora de las dos fases del proceso (restauración de preferencias).
+capturar_logcat_e7t5() {
+    local destino="$1"
+    "$ADB" logcat -d -s E7T5Proceso:I > "$destino"
+}
+
 # E3-T8: reordenamiento persistido tras un proceso nuevo.
 ejecutar_fase "$CLASE_E3T8_FASE1" "$REPORTES/e3-fase1/instrumentation.txt"
 detener_proceso
@@ -115,3 +124,20 @@ capturar_logcat_s11d "$REPORTES/s11d-fase2/logcat.txt"
 ejecutar_fase "$CLASE_S45_FASE1" "$REPORTES/s45-fase1/instrumentation.txt"
 detener_proceso
 ejecutar_fase "$CLASE_S45_FASE2" "$REPORTES/s45-fase2/instrumentation.txt"
+
+# E7-T5 (S44b, S17b): el modo de aspecto y la visibilidad de los controles
+# secundarios cambiados desde la UI del reproductor sobreviven a un proceso
+# nuevo. Las dos fases abren el servidor de medios en el mismo puerto fijo,
+# de modo que la URL del Canal persistida en Room sigue siendo válida en la
+# fase 2.
+if ! ejecutar_fase "$CLASE_E7T5_FASE1" "$REPORTES/e7t5-fase1/instrumentation.txt"; then
+    capturar_logcat_e7t5 "$REPORTES/e7t5-fase1/logcat.txt"
+    exit 1
+fi
+capturar_logcat_e7t5 "$REPORTES/e7t5-fase1/logcat.txt"
+detener_proceso
+if ! ejecutar_fase "$CLASE_E7T5_FASE2" "$REPORTES/e7t5-fase2/instrumentation.txt"; then
+    capturar_logcat_e7t5 "$REPORTES/e7t5-fase2/logcat.txt"
+    exit 1
+fi
+capturar_logcat_e7t5 "$REPORTES/e7t5-fase2/logcat.txt"

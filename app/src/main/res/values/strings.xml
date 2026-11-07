@@ -129,6 +129,10 @@
     <string name="reproductor_modo_ajustar">Ajustar</string>
     <string name="reproductor_modo_rellenar">Rellenar</string>
     <string name="reproductor_modo_zoom">Zoom</string>
+    <string name="reproductor_secundarios_ocultar">Ocultar secundarios</string>
+    <string name="reproductor_secundarios_mostrar">Mostrar secundarios</string>
+    <string name="reproductor_secundarios_desc_ocultar">Ocultar los controles secundarios fijos</string>
+    <string name="reproductor_secundarios_desc_mostrar">Mostrar los controles secundarios fijos</string>
     <string name="reproductor_fase_cargando">Cargando</string>
     <string name="reproductor_fase_buffering">Cargando en búfer</string>
     <string name="reproductor_fase_reproduciendo">Reproduciendo</string>

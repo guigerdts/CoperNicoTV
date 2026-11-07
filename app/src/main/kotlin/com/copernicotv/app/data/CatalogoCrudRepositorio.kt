@@ -20,7 +20,6 @@ import com.copernicotv.core.identity.ClaveCanal
 import com.copernicotv.core.identity.ClavePresentacion
 import com.copernicotv.core.identity.EstadoCanal
 import com.copernicotv.core.identity.ResultadoCanonizacion
-import com.copernicotv.core.m3u.ImportadorM3U
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

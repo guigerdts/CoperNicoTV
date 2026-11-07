@@ -15,7 +15,6 @@ import com.copernicotv.core.hmac.RechazoIndiceHmac
 import com.copernicotv.core.hmac.ResultadoTransicion
 import com.copernicotv.core.hmac.VersionOrigenHmac
 import java.time.Instant
-import javax.crypto.SecretKey
 import javax.inject.Inject
 import javax.inject.Singleton
 

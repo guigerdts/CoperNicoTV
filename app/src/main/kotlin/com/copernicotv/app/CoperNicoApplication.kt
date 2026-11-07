@@ -5,11 +5,11 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.copernicotv.app.data.GuardiaArranqueIndiceHmac
 import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Aplicación raíz. El grafo Hilt se crea aquí y vive todo el proceso.

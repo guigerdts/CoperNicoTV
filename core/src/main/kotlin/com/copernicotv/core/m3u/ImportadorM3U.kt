@@ -56,27 +56,36 @@ object ImportadorM3U {
     /** Generación HMAC inicial: `v1`. */
     const val GENERACION_HMAC: Int = 1
 
-    /** Importa un flujo sin cerrarlo; el llamador conserva su propiedad. */
+    /**
+     * Importa un flujo sin cerrarlo; el llamador conserva su propiedad.
+     *
+     * [generacionHmac] es la generación de la clave con la que se sellan los
+     * sobres: por defecto la inicial `v1`; durante la reconstrucción del
+     * índice (DC-04 §7) el llamador pasa la generación objetivo.
+     */
     fun importar(
         entrada: InputStream,
         claveHmac: SecretKey,
         limites: LimitesParserM3U = LimitesParserM3U(),
-    ): ResultadoImportacionM3U = convertir(ParserM3U.parsear(entrada, limites), claveHmac)
+        generacionHmac: Int = GENERACION_HMAC,
+    ): ResultadoImportacionM3U = convertir(ParserM3U.parsear(entrada, limites), claveHmac, generacionHmac)
 
     /** Importa un texto ya decodificado como UTF-8. */
     fun importar(
         texto: String,
         claveHmac: SecretKey,
         limites: LimitesParserM3U = LimitesParserM3U(),
-    ): ResultadoImportacionM3U = convertir(ParserM3U.parsear(texto, limites), claveHmac)
+        generacionHmac: Int = GENERACION_HMAC,
+    ): ResultadoImportacionM3U = convertir(ParserM3U.parsear(texto, limites), claveHmac, generacionHmac)
 
     private fun convertir(
         parseo: ResultadoParserM3U,
         claveHmac: SecretKey,
+        generacionHmac: Int,
     ): ResultadoImportacionM3U {
         val declaraciones = parseo.entradas.map(::declaracion)
         val agrupado = AgrupadorImportacion.agrupar(declaraciones, CampoUrl.CANAL_URL_STREAM)
-        val canales = agrupado.canales.map { canal -> convertirCanal(canal, claveHmac) }
+        val canales = agrupado.canales.map { canal -> convertirCanal(canal, claveHmac, generacionHmac) }
         return ResultadoImportacionM3U(
             canales = canales,
             rechazadas = agrupado.rechazadas,
@@ -100,11 +109,12 @@ object ImportadorM3U {
     private fun convertirCanal(
         canal: CanalDeclarado,
         claveHmac: SecretKey,
+        generacionHmac: Int,
     ): CanalImportadoM3U {
         val sobreStream =
             HmacUrl.calcularSobre(
                 clave = claveHmac,
-                generacion = GENERACION_HMAC,
+                generacion = generacionHmac,
                 campo = CampoUrl.CANAL_URL_STREAM,
                 clase = canal.clase,
                 urlCanonica = canal.urlCanonica,
@@ -114,7 +124,7 @@ object ImportadorM3U {
             canal.logoCanonica?.let { logo ->
                 HmacUrl.calcularSobre(
                     clave = claveHmac,
-                    generacion = GENERACION_HMAC,
+                    generacion = generacionHmac,
                     campo = CampoUrl.CANAL_LOGO_URL,
                     clase = ClaseUrl.HTTP_HTTPS,
                     urlCanonica = logo,

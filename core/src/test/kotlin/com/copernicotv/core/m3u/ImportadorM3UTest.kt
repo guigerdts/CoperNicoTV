@@ -99,4 +99,16 @@ class ImportadorM3UTest {
         assertEquals(0, resultado.rechazadas.size)
         assertTrue(resultado.errores.isEmpty())
     }
+
+    @Test
+    fun `puede sellar con una generacion hmac distinta de la inicial`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1 tvg-logo=\"https://example.com/l.png\",Canal\n" +
+                "https://example.com/x\n"
+        val canal = ImportadorM3U.importar(texto, clave, generacionHmac = 7).canales.single()
+        assertTrue(canal.urlStreamHmac.startsWith("hmac:v7:cv1:"))
+        assertNotNull(canal.logoHmac)
+        assertTrue(canal.logoHmac.startsWith("hmac:v7:cv1:"))
+    }
 }

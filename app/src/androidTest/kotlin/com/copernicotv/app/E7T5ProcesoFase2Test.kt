@@ -91,7 +91,6 @@ class E7T5ProcesoFase2Test {
     @Test
     fun trasNuevoProcesoElModoSeRestauraYLosSecundariosSiguenOcultos() {
         assertEquals("RELLENAR", marca.modoAspecto)
-        composeRule.esperarTexto(TAG_REPRODUCTOR_ASPECTO, "Rellenar")
         composeRule.esperarResizeModeFillE7T5()
 
         // S17b: ocultos exactamente los cinco secundarios; el control de la
@@ -112,6 +111,8 @@ class E7T5ProcesoFase2Test {
         composeRule.esperarTag(TAG_REPRODUCTOR_RETROCEDER)
         composeRule.esperarTag(TAG_REPRODUCTOR_AVANZAR)
         composeRule.esperarTag(TAG_REPRODUCTOR_ASPECTO)
+        // El modo restaurado se ve también en el control al reaparecer (S44b).
+        composeRule.esperarTexto(TAG_REPRODUCTOR_ASPECTO, "Rellenar")
         composeRule.esperarTag(TAG_REPRODUCTOR_AUDIO)
         composeRule.esperarTag(TAG_REPRODUCTOR_SUBTITULOS)
     }

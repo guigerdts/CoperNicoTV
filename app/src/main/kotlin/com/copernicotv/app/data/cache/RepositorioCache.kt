@@ -2,6 +2,7 @@ package com.copernicotv.app.data.cache
 
 import android.util.Log
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CacheM3UEntity
 import com.copernicotv.app.data.db.entities.CacheXmltvEntity

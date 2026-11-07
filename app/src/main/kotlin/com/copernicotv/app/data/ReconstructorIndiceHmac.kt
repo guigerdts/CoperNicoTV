@@ -84,7 +84,7 @@ enum class MotivoReingreso(val codigo: String) {
  * generaciones ni entre `cvM` distintos.
  */
 @Singleton
-class ReconstructorIndiceHmac
+internal class ReconstructorIndiceHmac
     @Inject
     constructor(
         private val db: AppDatabase,

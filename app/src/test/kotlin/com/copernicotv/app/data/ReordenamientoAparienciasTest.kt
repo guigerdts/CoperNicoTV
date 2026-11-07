@@ -57,7 +57,7 @@ class ReordenamientoAparienciasTest {
     @Test
     fun `reordena solo L1 y persiste tras reabrir sin tocar la coleccion`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
+            val repositorio = CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias)
             assertEquals(
                 listOf("C1", "C2", "C3"),
                 nombres(lista1),
@@ -89,7 +89,7 @@ class ReordenamientoAparienciasTest {
     @Test
     fun `los extremos no se mueven fuera de la lista`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves, preferencias)
+            val repositorio = CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias)
             assertEquals(ResultadoAccion.Ok, repositorio.moverCanal(canal1, -1))
             assertEquals(ResultadoAccion.Ok, repositorio.moverCanal(canal3, 1))
             assertEquals(listOf("C1", "C2", "C3"), nombres(lista1))

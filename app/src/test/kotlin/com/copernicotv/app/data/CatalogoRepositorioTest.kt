@@ -43,7 +43,7 @@ class CatalogoRepositorioTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = CatalogoRepositorio(db, claves, contexto)
+        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
     }
 
     @After

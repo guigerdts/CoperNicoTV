@@ -54,7 +54,7 @@ class ObservacionRepositorioTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        actualizacion = ActualizacionRepositorio(db, claves, contexto)
+        actualizacion = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
         resolucion = ObservacionRepositorio(db, claves)
         runBlocking { sembrarFuenteYLista() }
     }
@@ -85,7 +85,7 @@ class ObservacionRepositorioTest {
                     #EXTINF:-1 tvg-id="nuevo" group-title="G" tvg-logo="https://example.com/logo.png",Uno
                     https://example.com/uno
                     """.trimIndent(),
-                    claves.claveHmac,
+                    claves.crearClaveHmac(1),
                 )
             val resumen = actualizacion.actualizarConImportado(listaId, nueva)
 
@@ -141,7 +141,7 @@ class ObservacionRepositorioTest {
                     #EXTINF:-1 group-title="G",Uno
                     https://example.com/uno?x=1
                     """.trimIndent(),
-                    claves.claveHmac,
+                    claves.crearClaveHmac(1),
                 )
             val resumen = actualizacion.actualizarConImportado(listaId, reaparecida)
 
@@ -238,7 +238,7 @@ class ObservacionRepositorioTest {
     }
 
     private suspend fun actualizar(texto: String): ResumenActualizacion {
-        val importado = ImportadorM3U.importar(texto, claves.claveHmac)
+        val importado = ImportadorM3U.importar(texto, claves.crearClaveHmac(1))
         return actualizacion.actualizarConImportado(listaId, importado)
     }
 

@@ -57,7 +57,7 @@ class CatalogoPersistenciaTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         contexto.deleteDatabase(NOMBRE_BD)
         db = abrirBase()
-        repositorio = CatalogoRepositorio(db, claves, contexto)
+        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
     }
 
     @After
@@ -101,13 +101,13 @@ class CatalogoPersistenciaTest {
 
             db.close()
             db = abrirBase()
-            val repositorioNuevo = CatalogoRepositorio(db, claves, contexto)
+            val repositorioNuevo = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
             val preferencias = PreferenciasOrdenEnMemoria()
             val viewModel =
                 CatalogoViewModel(
                     repositorioNuevo,
                     BusquedaCatalogoRepositorio(db),
-                    CatalogoCrudRepositorio(db, claves, preferencias),
+                    CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias),
                     preferencias,
                     ColeccionRepositorio(db),
                     PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),
@@ -180,7 +180,7 @@ class CatalogoPersistenciaTest {
 
             val fallo =
                 runCatching {
-                    CatalogoRepositorio(db, ClavesQueFallanAlCifrar(), contexto)
+                    CatalogoRepositorio(db, ClavesQueFallanAlCifrar(), IndiceHmacRepositorio(db, ClavesQueFallanAlCifrar()), contexto)
                         .importar(texto, OTRA_FUENTE, OTRA_UBICACION)
                 }.exceptionOrNull()
 
@@ -237,7 +237,11 @@ class CatalogoPersistenciaTest {
         override val claveAes: SecretKey
             get() = throw GeneralSecurityException("clave AES no disponible")
 
-        override val claveHmac: SecretKey = base.claveHmac
+        override fun contieneClaveHmac(generacion: Int): Boolean = base.contieneClaveHmac(generacion)
+
+        override fun claveHmac(generacion: Int): SecretKey? = base.claveHmac(generacion)
+
+        override fun crearClaveHmac(generacion: Int): SecretKey = base.crearClaveHmac(generacion)
     }
 
     private companion object {

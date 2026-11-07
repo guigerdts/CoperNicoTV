@@ -52,7 +52,7 @@ class IndicadoresFuenteTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        actualizacion = ActualizacionRepositorio(db, claves, contexto)
+        actualizacion = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
         indicadores = IndicadoresFuenteRepositorioRoom(db)
         runBlocking { sembrarFuenteYLista() }
     }
@@ -66,7 +66,7 @@ class IndicadoresFuenteTest {
     @Test
     fun `S7b un intento exitoso registra exito y conserva la disponibilidad`() {
         runBlocking {
-            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.claveHmac))
+            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.crearClaveHmac(1)))
 
             val indicador = indicadores.observar().first().single()
 
@@ -80,7 +80,7 @@ class IndicadoresFuenteTest {
     @Test
     fun `S7c el fallo de actualizacion no cambia la disponibilidad`() {
         runBlocking {
-            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.claveHmac))
+            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.crearClaveHmac(1)))
             assertEquals(DisponibilidadFuente.DISPONIBLE, indicadores.observar().first().single().disponibilidad)
 
             // La ubicación cifrada de la Lista está corrupta: `leer` falla antes

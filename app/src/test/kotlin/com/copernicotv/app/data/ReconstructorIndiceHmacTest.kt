@@ -5,11 +5,16 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.entities.CacheM3UEntity
+import com.copernicotv.app.data.db.entities.CacheXmltvEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
+import com.copernicotv.app.data.db.entities.FuenteGuiaEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
+import com.copernicotv.app.data.db.entities.ObservacionPendienteImportacionEntity
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
+import com.copernicotv.core.crypto.ResultadoDescifrado
 import com.copernicotv.core.hmac.FaseIndiceHmac
 import com.copernicotv.core.hmac.MotivoHmacPendiente
 import com.copernicotv.core.hmac.MotivoTransicion
@@ -56,8 +61,9 @@ class ReconstructorIndiceHmacTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        indice = IndiceHmacRepositorio(db)
-        reconstructor = ReconstructorIndiceHmac(db, indice, claves)
+        indice = IndiceHmacRepositorio(db, claves)
+        reconstructor =
+            ReconstructorIndiceHmac(db, indice, claves, ReconstruccionValorHmac(indice, claves))
     }
 
     @After
@@ -304,6 +310,7 @@ class ReconstructorIndiceHmacTest {
         url: String,
         sobre: ByteArray = sobreDe(1, CampoUrl.CANAL_URL_STREAM, url),
         cifrado: ByteArray = cifrar("Canal", "url_stream_cifrada", url),
+        logo: Boolean = false,
     ): Long =
         db.canalDao().insertar(
             CanalEntity(
@@ -311,6 +318,8 @@ class ReconstructorIndiceHmacTest {
                 nombre = "Canal de prueba",
                 urlStreamCifrada = cifrado,
                 urlStreamHmac = sobre,
+                logoUrlCifrada = if (logo) cifrar("Canal", "logo_url_cifrada", URL_LOGO) else null,
+                logoUrlHmac = if (logo) sobreDe(1, CampoUrl.CANAL_LOGO_URL, URL_LOGO) else null,
                 claveDerivable = true,
                 creadoEn = ahora,
                 actualizadoEn = ahora,
@@ -352,7 +361,7 @@ class ReconstructorIndiceHmacTest {
         val canonica = CanonicalizadorUrl.canonizar(url, campo) as ResultadoCanonizacion.Ok
         return HmacUrl
             .calcularSobre(
-                clave = claves.claveHmac,
+                clave = claves.crearClaveHmac(1),
                 generacion = generacion,
                 campo = campo,
                 clase = canonica.clase,
@@ -379,6 +388,237 @@ class ReconstructorIndiceHmacTest {
 
     private suspend fun hmacLista(id: Long): ByteArray =
         db.reconstruccionHmacDao().loteListas(0, Long.MAX_VALUE, 10).first { it.id == id }.ubicacionHmac
+
+    @Test
+    fun `los ocho valores contractuales se reconstruyen a la generacion objetivo`() =
+        runBlocking {
+            val fuenteId = insertarFuente()
+            val listaId = insertarLista(fuenteId, URL_LISTA)
+            insertarCanal(fuenteId, URL_CANAL, logo = true)
+            insertarObservacion(fuenteId, "$URL_CANAL?obs=1", logo = "$URL_LOGO")
+            insertarCacheM3u(fuenteId, listaId, "$URL_LISTA?m3u=1")
+            val fuenteGuiaId = insertarFuenteGuia("$URL_LISTA?guia=1")
+            insertarCacheXmltv(fuenteGuiaId, "$URL_LISTA?xmltv=1")
+            enReconstruccion(2)
+
+            val resultado = reconstructor.reconstruir(ahora)
+
+            val estado = (resultado as ResultadoReconstruccion.Ok).estado
+            // Canal url+logo, Lista, Observacion url+logo, CacheM3U, CacheXmltv, FuenteGuia.
+            assertEquals(8L, estado.filasTotales)
+            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
+            assertEquals(0, indice.pendientes().size)
+            val dao = db.reconstruccionHmacDao()
+            assertArrayEquals(sobreDe(2, CampoUrl.LISTA_UBICACION, URL_LISTA), hmacLista(listaId))
+            val canalSobres = dao.loteCanales(0, Long.MAX_VALUE, 10).single()
+            assertArrayEquals(sobreDe(2, CampoUrl.CANAL_URL_STREAM, URL_CANAL), canalSobres.urlStreamHmac)
+            assertArrayEquals(sobreDe(2, CampoUrl.CANAL_LOGO_URL, URL_LOGO), canalSobres.logoUrlHmac)
+            val observaciones = dao.loteObservaciones(0, Long.MAX_VALUE, 10)
+            assertArrayEquals(
+                sobreDe(2, CampoUrl.CANAL_URL_STREAM, "$URL_CANAL?obs=1"),
+                observaciones.single().urlHmac,
+            )
+            assertArrayEquals(
+                sobreDe(2, CampoUrl.CANAL_LOGO_URL, "$URL_LOGO"),
+                observaciones.single().logoUrlHmac,
+            )
+            assertArrayEquals(
+                sobreDe(2, CampoUrl.CACHE_M3U_URL, "$URL_LISTA?m3u=1"),
+                dao.loteCacheM3u(0, Long.MAX_VALUE, 10).single().urlHmac,
+            )
+            assertArrayEquals(
+                sobreDe(2, CampoUrl.CACHE_XMLTV_URL, "$URL_LISTA?xmltv=1"),
+                dao.loteCacheXmltv(0, Long.MAX_VALUE, 10).single().urlHmac,
+            )
+            assertArrayEquals(
+                sobreDe(2, CampoUrl.FUENTE_GUIA_URL, "$URL_LISTA?guia=1"),
+                dao.loteFuentesGuia(0, Long.MAX_VALUE, 10).single().urlHmac,
+            )
+        }
+
+    @Test
+    fun `el reingreso restaura cifrado y sobre y cierra la reconstruccion`() =
+        runBlocking {
+            val fuenteId = insertarFuente()
+            val otro = insertarCanal(fuenteId, "$URL_CANAL?otro=1")
+            val roto = insertarCanal(fuenteId, URL_CANAL, cifrado = ByteArray(40) { 0x01 })
+            enReconstruccion(2)
+            assertEquals(FaseIndiceHmac.BLOQUEADO_PARCIAL, (reconstructor.reconstruir(ahora) as ResultadoReconstruccion.Ok).estado.fase)
+            val sobrePrevio = hmacCanal(otro)
+
+            val resultado = reconstructor.reingresar("Canal", roto, "urlStreamHmac", "$URL_CANAL?reingreso=1", ahora)
+
+            val estado = (resultado as ResultadoReingreso.Ok).estado
+            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
+            assertEquals(0, indice.pendientes().size)
+            assertArrayEquals(sobreDe(2, CampoUrl.CANAL_URL_STREAM, "$URL_CANAL?reingreso=1"), hmacCanal(roto))
+            val restaurado = requireNotNull(db.canalDao().porId(roto)?.urlStreamCifrada)
+            assertEquals(
+                "$URL_CANAL?reingreso=1",
+                (CifradoAes.descifrar(claves.claveAes, CifradoAes.aad("Canal", "url_stream_cifrada"), restaurado) as ResultadoDescifrado.Ok)
+                    .bytes.toString(Charsets.UTF_8),
+            )
+            // La fila ya reconstruida no se toca.
+            assertArrayEquals(sobrePrevio, hmacCanal(otro))
+        }
+
+    @Test
+    fun `el reingreso alcanza el logo de una observacion`() =
+        runBlocking {
+            val fuenteId = insertarFuente()
+            val roto = insertarObservacion(fuenteId, URL_CANAL, logo = URL_LOGO)
+            enReconstruccion(2)
+
+            val resultado =
+                reconstructor.reingresar("ObservacionPendienteImportacion", roto, "logoUrlHmac", "$URL_LOGO?reingreso=1", ahora)
+
+            val estado = (resultado as ResultadoReingreso.Ok).estado
+            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
+            val obs = db.reconstruccionHmacDao().loteObservaciones(0, Long.MAX_VALUE, 10).single()
+            assertArrayEquals(sobreDe(2, CampoUrl.CANAL_LOGO_URL, "$URL_LOGO?reingreso=1"), obs.logoUrlHmac)
+            assertEquals(
+                "$URL_LOGO?reingreso=1",
+                (
+                    CifradoAes.descifrar(
+                        claves.claveAes,
+                        CifradoAes.aad("ObservacionPendienteImportacion", "logo_url_cifrada"),
+                        requireNotNull(obs.logoUrlCifrada),
+                    ) as ResultadoDescifrado.Ok
+                )
+                    .bytes.toString(Charsets.UTF_8),
+            )
+        }
+
+    @Test
+    fun `el reingreso rechaza un valor no canonicalizable y la fila sigue pendiente`() =
+        runBlocking {
+            val fuenteId = insertarFuente()
+            val roto = insertarCanal(fuenteId, URL_CANAL, cifrado = ByteArray(40) { 0x01 })
+            enReconstruccion(2)
+            reconstructor.reconstruir(ahora)
+
+            val resultado = reconstructor.reingresar("Canal", roto, "urlStreamHmac", "no es una url", ahora)
+
+            assertEquals("canonica_invalida", (resultado as ResultadoReingreso.Rechazada).motivo)
+            assertEquals(1, indice.pendientes().size)
+        }
+
+    @Test
+    fun `el reingreso rechaza columnas y entidades desconocidas`() =
+        runBlocking {
+            enReconstruccion(2)
+            assertEquals(
+                "columna_desconocida",
+                (reconstructor.reingresar("Canal", 1L, "columna_inexistente", URL_CANAL, ahora) as ResultadoReingreso.Rechazada).motivo,
+            )
+            assertEquals(
+                "canonica_invalida",
+                // Columna valida pero entidad distinta: urlHmac la comparten
+                // cuatro entidades y la fila no existe para esa pareja.
+                (reconstructor.reingresar("EntidadInventada", 1L, "urlHmac", URL_CANAL, ahora) as ResultadoReingreso.Rechazada).motivo,
+            )
+        }
+
+    @Test
+    fun `el reingreso rechaza fase invalida fuera de la reconstruccion`() =
+        runBlocking {
+            // Idx operativo v1, sin reconstrucción abierta.
+            indice.estado(ahora)
+
+            val resultado = reconstructor.reingresar("Canal", 1L, "urlStreamHmac", URL_CANAL, ahora)
+
+            assertEquals("fase_invalida", (resultado as ResultadoReingreso.Rechazada).motivo)
+        }
+
+    @Test
+    fun `la reconstruccion es idempotente en una segunda pasada`() =
+        runBlocking {
+            val fuenteId = insertarFuente()
+            insertarCanal(fuenteId, URL_CANAL, logo = true)
+            enReconstruccion(2)
+            val primera = reconstructor.reconstruir(ahora)
+            val hmacPrimera = hmacCanal(db.reconstruccionHmacDao().loteCanales(0, Long.MAX_VALUE, 10).single().id)
+
+            val segunda = reconstructor.reconstruir(ahora)
+
+            val estado = (segunda as ResultadoReconstruccion.Ok).estado
+            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
+            assertEquals((primera as ResultadoReconstruccion.Ok).reconstruidas, estado.reconstruidas)
+            assertEquals(0L, estado.pendientes)
+            assertArrayEquals(hmacPrimera, hmacCanal(db.reconstruccionHmacDao().loteCanales(0, Long.MAX_VALUE, 10).single().id))
+        }
+
+    private suspend fun insertarObservacion(
+        fuenteId: Long,
+        url: String,
+        logo: String? = null,
+    ): Long =
+        db.observacionPendienteDao().insertar(
+            ObservacionPendienteImportacionEntity(
+                fuenteId = fuenteId,
+                importOrigen = "lista:1",
+                nombre = "Observacion de prueba",
+                urlCifrada = cifrar("ObservacionPendienteImportacion", "url_cifrada", url),
+                urlHmac = sobreDe(1, CampoUrl.CANAL_URL_STREAM, url),
+                logoUrlCifrada = logo?.let { cifrar("ObservacionPendienteImportacion", "logo_url_cifrada", it) },
+                logoUrlHmac = logo?.let { sobreDe(1, CampoUrl.CANAL_LOGO_URL, it) },
+                claveCanonica = null,
+                huellaDeclaracion = "huella",
+                claveDeduplicacion = "dedup-$url",
+                primeraObservacion = ahora,
+                ultimaObservacion = ahora,
+            ),
+        )
+
+    private suspend fun insertarCacheM3u(
+        fuenteId: Long,
+        listaId: Long,
+        url: String,
+    ): Long =
+        db.cacheM3UDao().insertar(
+            CacheM3UEntity(
+                fuenteId = fuenteId,
+                listaId = listaId,
+                urlCifrada = cifrar("CacheM3U", "url_cifrada", url),
+                urlHmac = sobreDe(1, CampoUrl.CACHE_M3U_URL, url),
+                tipo = "m3u",
+                fetchedAt = ahora,
+                expiresAt = ahora.plusSeconds(3600),
+                tamanoBytes = 128,
+                estadoFrescura = "fresca",
+                archivoRef = "archivo.cache",
+            ),
+        )
+
+    private suspend fun insertarFuenteGuia(url: String): Long =
+        db.fuenteGuiaDao().insertar(
+            FuenteGuiaEntity(
+                nombre = "Guia de prueba",
+                urlCifrada = cifrar("FuenteGuia", "url_cifrada", url),
+                urlHmac = sobreDe(1, CampoUrl.FUENTE_GUIA_URL, url),
+                usarRetencionGlobal = true,
+                creadoEn = ahora,
+                actualizadoEn = ahora,
+            ),
+        )
+
+    private suspend fun insertarCacheXmltv(
+        fuenteGuiaId: Long,
+        url: String,
+    ): Long =
+        db.cacheXmltvDao().insertar(
+            CacheXmltvEntity(
+                fuenteGuiaId = fuenteGuiaId,
+                urlCifrada = cifrar("CacheXmltv", "url_cifrada", url),
+                urlHmac = sobreDe(1, CampoUrl.CACHE_XMLTV_URL, url),
+                tipo = "xmltv",
+                fetchedAt = ahora,
+                expiresAt = ahora.plusSeconds(3600),
+                tamanoBytes = 256,
+                estadoFrescura = "fresca",
+                archivoRef = "guia.cache",
+            ),
+        )
 
     private companion object {
         const val URL_CANAL = "https://example.com/canal.m3u8"

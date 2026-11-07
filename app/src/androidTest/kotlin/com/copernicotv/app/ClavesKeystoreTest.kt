@@ -7,6 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.CatalogoRepositorio
+import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
@@ -135,7 +136,7 @@ class ClavesKeystoreTest {
         assertNull("La importación reportó el código ${resumen.error}", resumen.error)
 
         val clavesNuevas = ClavesKeystore()
-        val repositorioNuevo = CatalogoRepositorio(db, clavesNuevas, contexto())
+        val repositorioNuevo = CatalogoRepositorio(db, clavesNuevas, IndiceHmacRepositorio(db, clavesNuevas), contexto())
 
         val nombres = runBlocking { repositorioNuevo.canalesDeListaActiva().first() }
         assertEquals(listOf("Canario Uno", "Canario Dos", "Canario Tres"), nombres)

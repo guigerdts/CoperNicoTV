@@ -1,5 +1,6 @@
 package com.copernicotv.app.data
 
+import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.EstadoIndiceHmacEntity
 import com.copernicotv.app.data.db.entities.HmacPendienteEntity
@@ -14,6 +15,7 @@ import com.copernicotv.core.hmac.RechazoIndiceHmac
 import com.copernicotv.core.hmac.ResultadoTransicion
 import com.copernicotv.core.hmac.VersionOrigenHmac
 import java.time.Instant
+import javax.crypto.SecretKey
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,9 +37,69 @@ class IndiceHmacRepositorio
     @Inject
     constructor(
         private val db: AppDatabase,
+        private val claves: ClavesApp,
     ) {
         /** Estado persistido, creando la fila singleton con `hmac:v1` si falta. */
         suspend fun estado(ahora: Instant = Instant.now()): EstadoIndiceHmac = aModelo(asegurar(ahora))
+
+        /**
+         * Estado persistido sin inicializar la fila: `null` si nunca existió.
+         *
+         * Permite al guardia de sello y a la guardia de arranque distinguir la
+         * primera inicialización legítima de la pérdida de una clave usada.
+         */
+        suspend fun estadoSinInicializar(): EstadoIndiceHmac? = db.estadoIndiceHmacDao().actual()?.let(::aModelo)
+
+        /** ¿Está en la bóveda la clave de la generación [generacion]? */
+        suspend fun clavePresente(generacion: Int): Boolean = claves.contieneClaveHmac(generacion)
+
+        /**
+         * Primera inicialización legítima (instalación virgen: sin fila de
+         * estado ni sobres). Incorpora la clave de la generación inicial de
+         * forma explícita e idempotente, sin regenerar nada si ya existe, y
+         * persiste la fila de estado operativo.
+         */
+        suspend fun inicializarLegitimamente(ahora: Instant = Instant.now()): EstadoIndiceHmac {
+            claves.crearClaveHmac(GENERACION_INICIAL)
+            return estado(ahora)
+        }
+
+        /**
+         * Guardia de sello (DC-04 §7, Q2): entrega la clave de la generación
+         * activa para producir un sobre, o bloquea con `indice_hmac_no_operativo`.
+         *
+         * Nunca genera una clave sustituta. Dos caminos para no quedar
+         * operativo: el índice ya está en recuperación o bloqueado, o la clave
+         * de la generación activa desapareció en una escritura real, en cuyo
+         * caso se transiciona a `recuperacion_pendiente` y se bloquea. La
+         * primera inicialización legítima —ni fila de estado ni sobres
+         * persistidos— sí incorpora su clave `v1` de forma explícita.
+         */
+        suspend fun selloHmac(ahora: Instant = Instant.now()): SelloIndiceHmac {
+            val filaExistia = estadoSinInicializar() != null
+            val estado = estado(ahora)
+            if (!estado.esOperativo) {
+                return SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
+            }
+            val claveActiva = claves.claveHmac(estado.generacionActiva)
+            if (claveActiva != null) {
+                return SelloIndiceHmac.Disponible(claveActiva, estado.generacionActiva)
+            }
+            val inicializacionLegitima = !filaExistia && !haySobres()
+            if (inicializacionLegitima) {
+                return SelloIndiceHmac.Disponible(claves.crearClaveHmac(estado.generacionActiva), estado.generacionActiva)
+            }
+            detectarPerdidaClave(ahora)
+            return SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
+        }
+
+        /** ¿Hay algún sobre `hmac:vN:...` persistido en las tablas con HMAC? */
+        suspend fun haySobres(): Boolean =
+            with(db.reconstruccionHmacDao()) {
+                contarSobresCanal() + contarSobresLogo() + contarSobresLista() +
+                    contarSobresObservacion() + contarSobresObservacionLogo() +
+                    contarSobresCacheM3u() + contarSobresCacheXmltv() + contarSobresFuenteGuia() > 0L
+            }
 
         /** `operativo → recuperacion_pendiente` al detectar la pérdida de la clave HMAC. */
         suspend fun detectarPerdidaClave(ahora: Instant = Instant.now()): ResultadoTransicion =
@@ -230,5 +292,8 @@ class IndiceHmacRepositorio
 
         private companion object {
             const val ID_SINGLETON = 1L
+
+            /** Generación inicial del contrato: `hmac:v1`. */
+            const val GENERACION_INICIAL = 1
         }
     }

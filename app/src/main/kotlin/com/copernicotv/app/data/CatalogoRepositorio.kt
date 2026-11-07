@@ -68,6 +68,7 @@ class CatalogoRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
     ) {
@@ -116,8 +117,16 @@ class CatalogoRepositorio
                 if (canonica == null) {
                     return@withContext ResumenImportacion(null, 0, 0, ERROR_UBICACION_INVALIDA)
                 }
-                val importado = ImportadorM3U.importar(texto, claves.claveHmac)
-                persistir(nombreFuente, ubicacion, canonica, importado)
+                val sello =
+                    indice.selloHmac() as? SelloIndiceHmac.Disponible
+                        ?: return@withContext ResumenImportacion(null, 0, 0, ERROR_INDICE_HMAC_NO_OPERATIVO)
+                val importado =
+                    ImportadorM3U.importar(
+                        texto = texto,
+                        claveHmac = sello.clave,
+                        generacionHmac = sello.generacion,
+                    )
+                persistir(nombreFuente, ubicacion, canonica, importado, sello)
             }
 
         /**
@@ -139,8 +148,11 @@ class CatalogoRepositorio
                 if (canonica.clase != ClaseUrl.HTTP_HTTPS) {
                     return@withContext ResumenImportacion(null, 0, 0, ERROR_ESQUEMA_NO_ADMITIDO)
                 }
-                when (val descarga = descargar(canonica.urlCanonica)) {
-                    is Descarga.Ok -> persistir(nombreFuente, url, canonica, descarga.importado)
+                val sello =
+                    indice.selloHmac() as? SelloIndiceHmac.Disponible
+                        ?: return@withContext ResumenImportacion(null, 0, 0, ERROR_INDICE_HMAC_NO_OPERATIVO)
+                when (val descarga = descargar(canonica.urlCanonica, sello)) {
+                    is Descarga.Ok -> persistir(nombreFuente, url, canonica, descarga.importado, sello)
                     is Descarga.Fallo -> {
                         registrarFallo(nombreFuente, descarga.codigo)
                         ResumenImportacion(null, 0, 0, descarga.codigo)
@@ -187,10 +199,17 @@ class CatalogoRepositorio
                     registrarFallo(nombreFuente, ERROR_PERMISO_SAF)
                     return@withContext ResumenImportacion(null, 0, 0, ERROR_PERMISO_SAF)
                 }
+                val sello =
+                    indice.selloHmac() as? SelloIndiceHmac.Disponible
+                        ?: return@withContext ResumenImportacion(null, 0, 0, ERROR_INDICE_HMAC_NO_OPERATIVO)
                 val importado =
                     try {
                         contexto.contentResolver.openInputStream(uri)?.use { entrada ->
-                            ImportadorM3U.importar(entrada, claves.claveHmac)
+                            ImportadorM3U.importar(
+                                entrada = entrada,
+                                claveHmac = sello.clave,
+                                generacionHmac = sello.generacion,
+                            )
                         }
                     } catch (error: SecurityException) {
                         null
@@ -201,7 +220,7 @@ class CatalogoRepositorio
                     registrarFallo(nombreFuente, ERROR_ARCHIVO_INACCESIBLE)
                     return@withContext ResumenImportacion(null, 0, 0, ERROR_ARCHIVO_INACCESIBLE)
                 }
-                persistir(nombreFuente, uriTexto, canonica, importado)
+                persistir(nombreFuente, uriTexto, canonica, importado, sello)
             }
 
         /**
@@ -232,6 +251,7 @@ class CatalogoRepositorio
             ubicacion: String,
             canonica: ResultadoCanonizacion.Ok,
             importado: ResultadoImportacionM3U,
+            sello: SelloIndiceHmac.Disponible,
         ): ResumenImportacion {
             val diagnosticos = importado.diagnosticos.map { it.codigo.codigo }
             if (importado.canales.isEmpty()) {
@@ -253,7 +273,7 @@ class CatalogoRepositorio
                             registrarIntento(existente.id, RESULTADO_SIN_CAMBIOS)
                             existente
                         } else {
-                            escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales)
+                            escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales, sello)
                         }
                     }
                 } catch (rechazo: ImportacionRechazada) {
@@ -278,7 +298,10 @@ class CatalogoRepositorio
         private fun canonicalizar(ubicacion: String): ResultadoCanonizacion.Ok? =
             CanonicalizadorUrl.canonizar(ubicacion, CampoUrl.LISTA_UBICACION) as? ResultadoCanonizacion.Ok
 
-        private fun descargar(url: String): Descarga {
+        private fun descargar(
+            url: String,
+            sello: SelloIndiceHmac.Disponible,
+        ): Descarga {
             val conexion = URL(url).openConnection() as? HttpURLConnection ?: return Descarga.Fallo(ERROR_SIN_CONEXION)
             conexion.connectTimeout = tiempos.conexionMs
             conexion.readTimeout = tiempos.lecturaMs
@@ -288,7 +311,11 @@ class CatalogoRepositorio
                     in 200..299 -> {
                         val importado =
                             conexion.inputStream.use { entrada ->
-                                ImportadorM3U.importar(entrada, claves.claveHmac)
+                                ImportadorM3U.importar(
+                                    entrada = entrada,
+                                    claveHmac = sello.clave,
+                                    generacionHmac = sello.generacion,
+                                )
                             }
                         Descarga.Ok(importado)
                     }
@@ -354,6 +381,7 @@ class CatalogoRepositorio
             ubicacion: String,
             canonica: ResultadoCanonizacion.Ok,
             canales: List<CanalImportadoM3U>,
+            sello: SelloIndiceHmac.Disponible,
         ): ListaPersistida {
             val ahora = Instant.now()
             val fuenteId =
@@ -381,8 +409,8 @@ class CatalogoRepositorio
                         ubicacionHmac =
                             HmacUrl
                                 .calcularSobre(
-                                    clave = claves.claveHmac,
-                                    generacion = ImportadorM3U.GENERACION_HMAC,
+                                    clave = sello.clave,
+                                    generacion = sello.generacion,
                                     campo = CampoUrl.LISTA_UBICACION,
                                     clase = canonica.clase,
                                     urlCanonica = canonica.urlCanonica,
@@ -500,6 +528,7 @@ class CatalogoRepositorio
             const val ERROR_UBICACION_INVALIDA = "ubicacion_invalida"
             const val ERROR_ESQUEMA_NO_ADMITIDO = "esquema_no_admitido"
             const val ERROR_PERMISO_SAF = "permiso_saf_no_persistido"
+            const val ERROR_INDICE_HMAC_NO_OPERATIVO = "indice_hmac_no_operativo"
             const val ERROR_ARCHIVO_INACCESIBLE = "archivo_inaccesible"
             const val ERROR_SIN_CONEXION = "sin_conexion"
             const val ERROR_TIMEOUT = "timeout"

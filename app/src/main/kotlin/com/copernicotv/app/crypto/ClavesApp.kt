@@ -21,15 +21,40 @@ import javax.inject.Singleton
  */
 interface ClavesApp {
     val claveAes: SecretKey
-    val claveHmac: SecretKey
+
+    /**
+     * ¿Existe la clave HMAC de la generación indicada? Es una lectura sola:
+     * nunca crea, borra ni sustituye claves (DC-04 §5).
+     */
+    fun contieneClaveHmac(generacion: Int): Boolean
+
+    /**
+     * Clave HMAC de la generación solicitada sin regenerar: `null` si falta.
+     *
+     * La ausencia nunca genera una clave sustituta: eso dejaría valores nuevos
+     * indistinguibles de los viejos y violaría la prohibición de DC-04 §5.
+     * Quien detecta la ausencia transiciona el índice a `recuperacion_pendiente`
+     * (Q2 del propietario) y bloquea las escrituras e igualdades dependientes.
+     */
+    fun claveHmac(generacion: Int): SecretKey?
+
+    /**
+     * Crea la clave HMAC de una generación, o devuelve la existente
+     * (idempotente). Solo es la incorporación explícita de una generación
+     * nueva: la primera inicialización legítima del índice o la reconstrucción
+     * acordada. Nunca se invoca en respuesta a una ausencia detectada en una
+     * escritura normal (DC-04 §5, Q2).
+     */
+    fun crearClaveHmac(generacion: Int): SecretKey
 }
 
 /**
  * Implementación con Android Keystore.
  *
- * Alias versionados: `copernicotv.aes.v1` y `copernicotv.hmac.v1`. La rotación
- * futura crea `v2` y el sobre HMAC registra `vN`, de modo que las filas viejas
- * siguen siendo verificables con la generación que las produjo.
+ * Alias versionados: `copernicotv.aes.v1` y `copernicotv.hmac.vN`. Cada
+ * generación de la clave HMAC vive en su alias `copernicotv.hmac.<generacion>`,
+ * de modo que los sobres antiguos (`hmac:vN:...`) siguen siendo verificables
+ * con la clave que los produjo y una reconstrucción nunca mezcla material.
  *
  * El IV de AES-GCM lo genera `CifradoAes` (12 bytes de `SecureRandom` por
  * valor) porque el sobre `0x01 + IV + ciphertext + tag` es contrato de `:core`
@@ -37,7 +62,9 @@ interface ClavesApp {
  * Keystore se crea con `setRandomizedEncryptionRequired(false)`: sin eso,
  * Keystore rechaza el IV del llamador con `InvalidAlgorithmParameterException`
  * y la importación falla. La unicidad del IV la garantiza el generador
- * aleatorio, no Keystore.
+ * aleatorio, no Keystore. Desviación ratificada por el propietario (Q1,
+ * decisión vinculante): se conserva la generación del IV por [CifradoAes], la
+ * clave no exportable y el formato contractual del sobre.
  *
  * La anotación del constructor primario sigue la convención oficial de Kotlin
  * (`class Foo @Inject constructor()`). ktlint 1.0.1 exige la anotación en una
@@ -48,7 +75,25 @@ interface ClavesApp {
 class ClavesKeystore @Inject constructor() : ClavesApp {
     override val claveAes: SecretKey by lazy { cargarAes() }
 
-    override val claveHmac: SecretKey by lazy { clave(ALIAS_HMAC) { generadorHmac(it) } }
+    override fun contieneClaveHmac(generacion: Int): Boolean {
+        val alias = aliasHmac(generacion)
+        val almacen = almacen()
+        return almacen.containsAlias(alias) &&
+            almacen.getEntry(alias, null) is KeyStore.SecretKeyEntry
+    }
+
+    override fun claveHmac(generacion: Int): SecretKey? {
+        val existente =
+            almacen().getEntry(aliasHmac(generacion), null) as? KeyStore.SecretKeyEntry
+        return existente?.secretKey
+    }
+
+    override fun crearClaveHmac(generacion: Int): SecretKey {
+        val alias = aliasHmac(generacion)
+        val almacen = almacen()
+        val existente = almacen.getEntry(alias, null) as? KeyStore.SecretKeyEntry
+        return existente?.secretKey ?: generadorHmac(alias)
+    }
 
     /**
      * Devuelve la clave AES vigente y la regenera si la existente no puede
@@ -92,13 +137,9 @@ class ClavesKeystore @Inject constructor() : ClavesApp {
 
     private fun almacen(): KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
-    private fun clave(
-        alias: String,
-        generar: (String) -> SecretKey,
-    ): SecretKey {
-        val almacen = almacen()
-        val existente = almacen.getEntry(alias, null) as? KeyStore.SecretKeyEntry
-        return existente?.secretKey ?: generar(alias)
+    private fun aliasHmac(generacion: Int): String {
+        require(generacion >= 1) { "generación HMAC inválida" }
+        return ALIAS_PREFIJO_HMAC + generacion
     }
 
     private fun generadorAes(alias: String): SecretKey {
@@ -132,7 +173,7 @@ class ClavesKeystore @Inject constructor() : ClavesApp {
     private companion object {
         const val ANDROID_KEYSTORE = "AndroidKeyStore"
         const val ALIAS_AES = "copernicotv.aes.v1"
-        const val ALIAS_HMAC = "copernicotv.hmac.v1"
+        const val ALIAS_PREFIJO_HMAC = "copernicotv.hmac.v"
         const val TAG = "ClavesKeystore"
         const val AAD_SONDA = "ClavesKeystore.sonda"
         val SONDA = byteArrayOf(0)

@@ -4431,3 +4431,72 @@ recuerdos). CI de `main` vigente: run `42099842992` (`completed/success`, 5/5, s
 Restricciones cumplidas: solo se modificó `odd/tasks/mvp-copernicotv.md`; no se alteraron
 criterios de aceptación; no se cambió ningún contrato ni decisión; no se implementó código; no se
 iniciaron E4/E6/E7; S44 no se declara completa.
+
+### L80 — E7-U1: E7-T5 implementación de las partes definidas S44b/S17b (2026-11-06, borrador en curso)
+
+Estado: implementación completa y CI verde en el PR #21; la ronda se cierra con el
+merge y con el estado de S44a vigente (NO implementar, documentar el gap).
+
+- **Decisiones del propietario (esta ronda, registradas tal como se comunicaron):**
+  - S17b «controles secundarios fijos»: «opción 1 — Todo menos play/pausa». La
+    preferencia oculta/muestra exactamente: Retroceder 10 segundos, Avanzar 10
+    segundos, Selección de aspecto, Selección de pista de audio y Selección de
+    subtítulos. Permanecen siempre visibles y operativos: Volver, Play/pausa,
+    Barra de progreso e Indicador de fase. Modelo: preferencia global booleana,
+    DataStore de reproducción, valor predeterminado «mostrar», restauración tras
+    reinicio real del proceso y foco a play/pausa al volver a mostrar. No se
+    reordenan controles ni se duplica la persistencia de audio/subtítulos de
+    E6-T3.
+  - S44a «techo»: opción 3, sin techo y con el gap documentado. No se implementa
+    ninguna interpretación provisional de S44a; queda pendiente de definición
+    funcional del propietario y, por lo tanto, **E7-T5 NO se declara completada**.
+- **Almacén:** se reutiliza el DataStore `preferencias_pistas` (mandato L72/KDoc)
+  con claves nuevas `modo_aspecto` (string) y `controles_secundarios` (boolean,
+  predeterminado `true`); repositorio nuevo `RepositorioPreferenciasReproduccion`
+  con modelo `PreferenciasReproduccion` (predeterminados `AJUSTAR` y visibles);
+  un valor ajeno al enum `ModoAspecto` cae en `AJUSTAR` sin crash (S44c parte de
+  aspecto). La extensión `Context.dataStorePistas` pasa de `private` a `internal`;
+  no se crea ningún DataStore nuevo ni requiere migración de esquema.
+- **ViewModel/UI:** `ReproductorViewModel` expone `modoAspecto` y
+  `controlesSecundariosVisibles`, carga ambas en `cargar()` con `runCatching` y
+  persiste cada cambio (`alternarModoAspecto`, `fijarControlesSecundarios`) sin
+  bloquear el hilo principal; la pantalla elimina el `rememberSaveable` del modo
+  (S44b llega por estado reactivo), oculta −10 s/+10 s y aspecto en
+  `FilaBotones`, oculta audio/subtítulos en `FilaPistas` cerrando el panel
+  abierto, y añade el control operador de la preferencia (tag
+  `reproductor-secundarios`), siempre visible y no miembro del conjunto oculto.
+  En TV, al ocultar y al volver a mostrar, el foco va a play/pausa.
+- **Pruebas nuevas:** JVM `RepositorioPreferenciasReproduccionTest` (4);
+  instrumentadas móviles `ReproductorPreferenciasTest` (3) y TV
+  `ReproductorPreferenciasTvTest` (2); arnés de dos fases
+  `E7T5ProcesoFase1Test`/`Fase2Test` con `E7T5ProcesoSoporte` (marca en
+  `filesDir`, identidad de proceso E3-T8, servidor de medios de ambas fases en
+  el puerto fijo `PUERTO_E7T5 = 43117` para que la URL del Canal persistida en
+  Room siga resolviendo tras el `force-stop`, `PlayerView.resizeMode`),
+  agregadas a `e3-process-restart.sh` y a los filtros móviles/TV de `ci.yml`.
+- **Evidencia de CI (2026-11-06/07, cierra la ronda):** los 5 jobs verdes en
+  ambas rondas de validación del PR `#21` (runs `42320178299` y
+  `42320184353`): `jvm-tests` (~2 min), `static-analysis` (~1 min), `apk`
+  (~2 min), `instrumented-mobile` (~8 min, 54 pruebas E7-T5 incluidas) e
+  `instrumented-tv` (~5 min). Cabeza de ronda verde: `0d2a783`.
+- **Depuración registrada (11 iteraciones de CI de la ronda, todas con código
+  revisado y commiteado):** (1) `instrumentation.txt` faltante: el arnés
+  agregó las fases E7-T5 sin crear su directorio de reportes (`1670b78`).
+  (2) `@Before` de las clases de preferencias re-seed para romper la
+  contaminación de defaults entre clases (`c6c2538`); en el arnés las
+  instancias de Robolectric son contiguas pero aquí es ejecución única. (3)
+  Fase 2 en `Reintentando`/`IDLE` (logcat capturado `4ae6bf3`/`2d88d23`,
+  captura antes del `exit 1` en `13212b2`): causa raíz, `persistir()` de
+  `CatalogoRepositorio` con Fuente existente vuelve `SIN_CAMBIOS` y la
+  re-importación no actualiza URLs; la fase 2 abría la URL del puerto
+  efímero muerto de la fase 1. El comentario propio que invocaba la
+  reconciliación de ADR-0004 era una suposición falsa; se corrigió a puerto
+  fijo (`f080eff`, `835c73a`), con reorden del parámetro para no romper el
+  trailing-lambda previo (`5547711`) y argumento nombrado (`3989a82`). (4)
+  Fase 2 asertaba el texto del botón de aspecto que S17b deja oculto; el modo
+  restaurado se verifica en `PlayerView` y el texto del botón al re-mostrar
+  los secundarios (`0d2a783`).
+- **Cierre formal y estado de §9:** S44b, S44c (parte de aspecto) y S17b se
+  declaran verificadas con esta evidencia; E7-T5 queda NO completado
+  exclusivamente porque S44a «techo» sigue pendiente de definición funcional
+  del propietario. El merge de `#21` y CI de `main` se registran al ejecutarse.

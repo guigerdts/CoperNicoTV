@@ -22,6 +22,7 @@ import com.copernicotv.app.data.db.entities.ObservacionPendienteImportacionEntit
  * pasada y no alteran sus conteos.
  */
 @Dao
+@Suppress("TooManyFunctions")
 interface ReconstruccionHmacDao {
     @Query("SELECT COALESCE(MAX(id), 0) FROM Canal")
     suspend fun maximoIdCanal(): Long

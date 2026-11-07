@@ -11,16 +11,10 @@ import com.copernicotv.app.data.db.entities.ListaEntity
 import com.copernicotv.app.data.db.entities.ObservacionPendienteImportacionEntity
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
-import com.copernicotv.core.crypto.ResultadoDescifrado
-import com.copernicotv.core.hmac.DecisionReconstruccion
 import com.copernicotv.core.hmac.EstadoIndiceHmac
 import com.copernicotv.core.hmac.FaseIndiceHmac
-import com.copernicotv.core.hmac.HmacPendiente
-import com.copernicotv.core.hmac.MotivoHmacPendiente
 import com.copernicotv.core.hmac.MotivoTransicion
-import com.copernicotv.core.hmac.PlanReconstruccionHmac
 import com.copernicotv.core.hmac.ResultadoTransicion
-import com.copernicotv.core.hmac.VersionOrigenHmac
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.CanonicalizadorUrl
 import com.copernicotv.core.identity.ResultadoCanonizacion
@@ -67,7 +61,7 @@ enum class MotivoReingreso(val codigo: String) {
  * Recorre los valores HMAC persistidos de las ocho columnas contractuales del
  * esquema v1 (DC-04): `Canal` (URL y logo), `Lista` (ubicación),
  * `ObservacionPendienteImportacion` (URL y logo), `CacheM3U`, `CacheXmltv` y
- * `FuenteGuia`; decide con [PlanReconstruccionHmac] y, cuando corresponde,
+ * `FuenteGuia`; decide con ReconstruccionValorHmac y, cuando corresponde,
  * descifra la URL original, la canonicaliza y recalcula el sobre con la
  * generación objetivo conservando el `cvM` del sobre de origen. Las filas no
  * reconstruibles se registran en `HmacPendiente` con su motivo tipado.
@@ -82,7 +76,7 @@ enum class MotivoReingreso(val codigo: String) {
  * una vez todas las filas no reconstruibles. El estado solo se persiste al
  * final: `bloqueado_parcial` si hay pendientes, `operativo` si todas las filas
  * quedaron en la generación objetivo. Es idempotente —un valor ya reconstruido
- * se detecta como [DecisionReconstruccion.YaActualizada] y no se reescribe— y
+ * se detecta como ya actualizada y no se reescribe— y
  * reanudable: una nueva ejecución recalcula desde el principio sin volver a
  * descifrar lo ya actualizado.
  *
@@ -96,6 +90,7 @@ class ReconstructorIndiceHmac
         private val db: AppDatabase,
         private val indice: IndiceHmacRepositorio,
         private val claves: ClavesApp,
+        private val valores: ReconstruccionValorHmac,
     ) {
         /**
          * Ejecuta una pasada completa.
@@ -246,9 +241,10 @@ class ReconstructorIndiceHmac
 
         /**
          * Columnas contractuales que admiten reingreso, agrupadas por el
-         * nombre de columna persistido en `HmacPendiente`. La columna `urlHmac`
-         * es compartida por cuatro entidades, por lo que el llamador filtra
-         * también por `entidad`.
+         * nombre de columna persistido en `HmacPendiente`. Las columnas
+         * `urlHmac` (cuatro entidades) y `logoUrlHmac` (Canal y observación)
+         * son compartidas, por lo que el llamador filtra también por
+         * `entidad`.
          */
         private fun definiciones(columna: String): List<DefinicionColumna> =
             when (columna) {
@@ -269,6 +265,14 @@ class ReconstructorIndiceHmac
                             campo = CampoUrl.CANAL_LOGO_URL,
                             aad = AAD_LOGO,
                             escritura = { dao, id, cifrado, hmac -> dao.reingresarLogoCanal(id, cifrado, hmac) },
+                        ),
+                        DefinicionColumna(
+                            entidad = ENTIDAD_OBSERVACION,
+                            campo = CampoUrl.CANAL_LOGO_URL,
+                            aad = AAD_OBSERVACION_LOGO,
+                            escritura = { dao, id, cifrado, hmac ->
+                                dao.reingresarLogoObservacion(id, cifrado, hmac)
+                            },
                         ),
                     )
 
@@ -318,18 +322,6 @@ class ReconstructorIndiceHmac
                         ),
                     )
 
-                COLUMNA_OBSERVACION_LOGO ->
-                    listOf(
-                        DefinicionColumna(
-                            entidad = ENTIDAD_OBSERVACION,
-                            campo = CampoUrl.CANAL_LOGO_URL,
-                            aad = AAD_OBSERVACION_LOGO,
-                            escritura = { dao, id, cifrado, hmac ->
-                                dao.reingresarLogoObservacion(id, cifrado, hmac)
-                            },
-                        ),
-                    )
-
                 else -> emptyList()
             }
 
@@ -363,7 +355,7 @@ class ReconstructorIndiceHmac
             contadores: Contadores,
         ) {
             val url =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = canal.urlStreamHmac,
                         cifrado = canal.urlStreamCifrada,
@@ -397,7 +389,7 @@ class ReconstructorIndiceHmac
         ) {
             val logoHmac = canal.logoUrlHmac ?: return
             val logo =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = logoHmac,
                         cifrado = canal.logoUrlCifrada,
@@ -450,7 +442,7 @@ class ReconstructorIndiceHmac
             contadores: Contadores,
         ) {
             val ubicacion =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = lista.ubicacionHmac,
                         cifrado = lista.ubicacionCifrada,
@@ -512,7 +504,7 @@ class ReconstructorIndiceHmac
         ) {
             val urlHmac = observacion.urlHmac ?: return
             val resultado =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = urlHmac,
                         cifrado = observacion.urlCifrada,
@@ -545,7 +537,7 @@ class ReconstructorIndiceHmac
         ) {
             val logoHmac = observacion.logoUrlHmac ?: return
             val resultado =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = logoHmac,
                         cifrado = observacion.logoUrlCifrada,
@@ -553,7 +545,7 @@ class ReconstructorIndiceHmac
                             IdentidadHmac(
                                 entidad = ENTIDAD_OBSERVACION,
                                 entidadId = observacion.id,
-                                columna = COLUMNA_OBSERVACION_LOGO,
+                                columna = COLUMNA_LOGO,
                                 campo = CampoUrl.CANAL_LOGO_URL,
                                 aad = AAD_OBSERVACION_LOGO,
                             ),
@@ -598,7 +590,7 @@ class ReconstructorIndiceHmac
             contadores: Contadores,
         ) {
             val resultado =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = fila.urlHmac,
                         cifrado = fila.urlCifrada,
@@ -651,7 +643,7 @@ class ReconstructorIndiceHmac
             contadores: Contadores,
         ) {
             val resultado =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = fila.urlHmac,
                         cifrado = fila.urlCifrada,
@@ -705,7 +697,7 @@ class ReconstructorIndiceHmac
         ) {
             val urlHmac = fila.urlHmac ?: return
             val resultado =
-                procesar(
+                valores.procesar(
                     ValorHmac(
                         sobre = urlHmac,
                         cifrado = fila.urlCifrada,
@@ -751,142 +743,6 @@ class ReconstructorIndiceHmac
             }
         }
 
-        /**
-         * Decide y, si procede, reconstruye un valor HMAC.
-         *
-         * Devuelve el sobre nuevo cuando hay que escribirlo; no toca la base.
-         */
-        private suspend fun procesar(
-            valor: ValorHmac,
-            claveObjetivo: SecretKey,
-            generacionObjetivo: Int,
-            ahora: Instant,
-        ): ResultadoValor {
-            val texto = valor.sobre.toString(Charsets.UTF_8)
-            return when (val decision = PlanReconstruccionHmac.decidir(texto, generacionObjetivo)) {
-                DecisionReconstruccion.SinValor -> ResultadoValor.SinValor
-                DecisionReconstruccion.YaActualizada -> {
-                    indice.eliminarPendiente(
-                        valor.identidad.entidad,
-                        valor.identidad.entidadId,
-                        valor.identidad.columna,
-                    )
-                    ResultadoValor.YaActualizada
-                }
-
-                is DecisionReconstruccion.Pendiente -> {
-                    registrarPendiente(valor.identidad, decision.versionOrigen, decision.motivo, ahora)
-                    ResultadoValor.Pendiente
-                }
-
-                is DecisionReconstruccion.Reconstruir ->
-                    reconstruir(valor, decision.versionCanonica, claveObjetivo, generacionObjetivo, ahora)
-            }
-        }
-
-        private suspend fun reconstruir(
-            valor: ValorHmac,
-            versionCanonica: Int,
-            claveObjetivo: SecretKey,
-            generacionObjetivo: Int,
-            ahora: Instant,
-        ): ResultadoValor {
-            val cifrado = valor.cifrado
-            if (cifrado == null) {
-                registrarPendiente(
-                    valor.identidad,
-                    VersionOrigenHmac.Cv(versionCanonica),
-                    MotivoHmacPendiente.VALOR_ORIGINAL_AUSENTE,
-                    ahora,
-                )
-                return ResultadoValor.Pendiente
-            }
-            val descifrado = CifradoAes.descifrar(claves.claveAes, valor.identidad.aad, cifrado)
-            if (descifrado is ResultadoDescifrado.Fallo) {
-                val motivo =
-                    PlanReconstruccionHmac.motivoPorDescifrado(descifrado)
-                        ?: MotivoHmacPendiente.CIPHERTEXT_CORRUPTO
-                registrarPendiente(valor.identidad, VersionOrigenHmac.Cv(versionCanonica), motivo, ahora)
-                return ResultadoValor.Pendiente
-            }
-            val original = String((descifrado as ResultadoDescifrado.Ok).bytes, Charsets.UTF_8)
-            val canonica = CanonicalizadorUrl.canonizar(original, valor.identidad.campo)
-            if (canonica !is ResultadoCanonizacion.Ok) {
-                registrarPendiente(
-                    valor.identidad,
-                    VersionOrigenHmac.Cv(versionCanonica),
-                    MotivoHmacPendiente.CANONICALIZACION_FALLIDA,
-                    ahora,
-                )
-                return ResultadoValor.Pendiente
-            }
-            val sobre =
-                HmacUrl
-                    .calcularSobre(
-                        clave = claveObjetivo,
-                        generacion = generacionObjetivo,
-                        campo = valor.identidad.campo,
-                        clase = canonica.clase,
-                        urlCanonica = canonica.urlCanonica,
-                        versionCanonica = versionCanonica,
-                    ).toByteArray(Charsets.UTF_8)
-            indice.eliminarPendiente(
-                valor.identidad.entidad,
-                valor.identidad.entidadId,
-                valor.identidad.columna,
-            )
-            return ResultadoValor.Reconstruida(sobre)
-        }
-
-        private suspend fun registrarPendiente(
-            identidad: IdentidadHmac,
-            versionOrigen: VersionOrigenHmac,
-            motivo: MotivoHmacPendiente,
-            ahora: Instant,
-        ) {
-            indice.registrarPendiente(
-                HmacPendiente(
-                    entidad = identidad.entidad,
-                    entidadId = identidad.entidadId,
-                    columna = identidad.columna,
-                    versionOrigen = versionOrigen,
-                    motivo = motivo,
-                ),
-                ahora,
-            )
-        }
-
-        /** Identidad de una columna HMAC persistida. */
-        private data class IdentidadHmac(
-            val entidad: String,
-            val entidadId: Long,
-            val columna: String,
-            val campo: CampoUrl,
-            val aad: String,
-        )
-
-        /** Valor persistido que se está evaluando. */
-        private data class ValorHmac(
-            val sobre: ByteArray,
-            val cifrado: ByteArray?,
-            val identidad: IdentidadHmac,
-        )
-
-        /** Resultado por valor evaluado. */
-        private sealed interface ResultadoValor {
-            /** Hay que escribir el sobre nuevo. */
-            data class Reconstruida(val sobre: ByteArray) : ResultadoValor
-
-            /** Ya estaba en la generación objetivo. */
-            data object YaActualizada : ResultadoValor
-
-            /** Quedó registrado en `HmacPendiente`. */
-            data object Pendiente : ResultadoValor
-
-            /** No había valor persistido. */
-            data object SinValor : ResultadoValor
-        }
-
         /** Contadores acumulados de la pasada. */
         private class Contadores(
             val total: Long,
@@ -915,7 +771,6 @@ class ReconstructorIndiceHmac
             const val COLUMNA_LOGO = "logoUrlHmac"
             const val COLUMNA_UBICACION = "ubicacionHmac"
             const val COLUMNA_OBSERVACION_URL = "urlHmac"
-            const val COLUMNA_OBSERVACION_LOGO = "logoUrlHmac"
             const val COLUMNA_URL = "urlHmac"
             const val AAD_URL_STREAM = "Canal.url_stream_cifrada"
             const val AAD_LOGO = "Canal.logo_url_cifrada"

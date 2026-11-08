@@ -541,10 +541,10 @@ class ReconstructorIndiceHmacTest {
 
             val segunda = reconstructor.reconstruir(ahora)
 
-            val estado = (segunda as ResultadoReconstruccion.Ok).estado
-            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
-            assertEquals((primera as ResultadoReconstruccion.Ok).reconstruidas, estado.reconstruidas)
-            assertEquals(0L, estado.pendientes)
+            val segundaOk = segunda as ResultadoReconstruccion.Ok
+            assertEquals(FaseIndiceHmac.OPERATIVO, segundaOk.estado.fase)
+            assertEquals((primera as ResultadoReconstruccion.Ok).reconstruidas, segundaOk.reconstruidas)
+            assertEquals(0L, segundaOk.pendientes)
             assertArrayEquals(hmacPrimera, hmacCanal(db.reconstruccionHmacDao().loteCanales(0, Long.MAX_VALUE, 10).single().id))
         }
 

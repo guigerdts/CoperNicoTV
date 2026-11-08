@@ -180,7 +180,8 @@ class CatalogoPersistenciaTest {
 
             val fallo =
                 runCatching {
-                    CatalogoRepositorio(db, ClavesQueFallanAlCifrar(), IndiceHmacRepositorio(db, ClavesQueFallanAlCifrar()), contexto)
+                    val sinAes = ClavesQueFallanAlCifrar(claves)
+                    CatalogoRepositorio(db, sinAes, IndiceHmacRepositorio(db, sinAes), contexto)
                         .importar(texto, OTRA_FUENTE, OTRA_UBICACION)
                 }.exceptionOrNull()
 
@@ -231,9 +232,9 @@ class CatalogoPersistenciaTest {
     }
 
     /** Claves cuya AES falla al usarse: fuerza un fallo dentro de la transacción. */
-    private class ClavesQueFallanAlCifrar : ClavesApp {
-        private val base = ClavesEnMemoria()
-
+    private class ClavesQueFallanAlCifrar(
+        private val base: ClavesApp,
+    ) : ClavesApp {
         override val claveAes: SecretKey
             get() = throw GeneralSecurityException("clave AES no disponible")
 

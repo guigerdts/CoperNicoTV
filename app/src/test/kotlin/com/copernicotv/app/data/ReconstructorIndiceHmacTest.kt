@@ -361,7 +361,7 @@ class ReconstructorIndiceHmacTest {
         val canonica = CanonicalizadorUrl.canonizar(url, campo) as ResultadoCanonizacion.Ok
         return HmacUrl
             .calcularSobre(
-                clave = claves.crearClaveHmac(1),
+                clave = claves.crearClaveHmac(generacion),
                 generacion = generacion,
                 campo = campo,
                 clase = canonica.clase,
@@ -473,7 +473,9 @@ class ReconstructorIndiceHmacTest {
                 reconstructor.reingresar("ObservacionPendienteImportacion", roto, "logoUrlHmac", "$URL_LOGO?reingreso=1", ahora)
 
             val estado = (resultado as ResultadoReingreso.Ok).estado
-            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
+            // La pasada de reconstrucción nunca corrió: el reingreso de una
+            // sola columna no cierra un índice todavía en curso.
+            assertEquals(FaseIndiceHmac.RECUPERACION_EN_CURSO, estado.fase)
             val obs = db.reconstruccionHmacDao().loteObservaciones(0, Long.MAX_VALUE, 10).single()
             assertArrayEquals(sobreDe(2, CampoUrl.CANAL_LOGO_URL, "$URL_LOGO?reingreso=1"), obs.logoUrlHmac)
             assertEquals(
@@ -512,9 +514,8 @@ class ReconstructorIndiceHmacTest {
                 (reconstructor.reingresar("Canal", 1L, "columna_inexistente", URL_CANAL, ahora) as ResultadoReingreso.Rechazada).motivo,
             )
             assertEquals(
-                "canonica_invalida",
-                // Columna valida pero entidad distinta: urlHmac la comparten
-                // cuatro entidades y la fila no existe para esa pareja.
+                "columna_desconocida",
+                // Columna y entidad se resuelven juntas: la pareja no existe.
                 (reconstructor.reingresar("EntidadInventada", 1L, "urlHmac", URL_CANAL, ahora) as ResultadoReingreso.Rechazada).motivo,
             )
         }
@@ -531,21 +532,26 @@ class ReconstructorIndiceHmacTest {
         }
 
     @Test
-    fun `la reconstruccion es idempotente en una segunda pasada`() =
+    fun `una pasada sobre filas ya reconstruidas no las reescribe`() =
         runBlocking {
             val fuenteId = insertarFuente()
-            insertarCanal(fuenteId, URL_CANAL, logo = true)
+            val canalId =
+                insertarCanal(
+                    fuenteId,
+                    URL_CANAL,
+                    sobre = sobreDe(2, CampoUrl.CANAL_URL_STREAM, URL_CANAL),
+                )
+            val antes = hmacCanal(canalId)
             enReconstruccion(2)
-            val primera = reconstructor.reconstruir(ahora)
-            val hmacPrimera = hmacCanal(db.reconstruccionHmacDao().loteCanales(0, Long.MAX_VALUE, 10).single().id)
 
-            val segunda = reconstructor.reconstruir(ahora)
+            val resultado = reconstructor.reconstruir(ahora)
 
-            val segundaOk = segunda as ResultadoReconstruccion.Ok
-            assertEquals(FaseIndiceHmac.OPERATIVO, segundaOk.estado.fase)
-            assertEquals((primera as ResultadoReconstruccion.Ok).reconstruidas, segundaOk.reconstruidas)
-            assertEquals(0L, segundaOk.pendientes)
-            assertArrayEquals(hmacPrimera, hmacCanal(db.reconstruccionHmacDao().loteCanales(0, Long.MAX_VALUE, 10).single().id))
+            val estado = (resultado as ResultadoReconstruccion.Ok).estado
+            assertEquals(FaseIndiceHmac.OPERATIVO, estado.fase)
+            // YaActualizada cuenta como reconstruida y no toca el sobre.
+            assertEquals(1L, estado.filasReconstruidas)
+            assertEquals(0L, estado.filasPendientes)
+            assertArrayEquals(antes, hmacCanal(canalId))
         }
 
     private suspend fun insertarObservacion(

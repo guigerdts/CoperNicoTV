@@ -10,6 +10,7 @@ import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
 import com.copernicotv.app.data.ReproductorRepositorio
 import com.copernicotv.app.data.ResultadoStream
+import com.copernicotv.app.player.DiagnosticoReproductor
 import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
@@ -19,6 +20,8 @@ import com.copernicotv.app.player.PoliticaReintentos
 import com.copernicotv.app.player.PreferenciaPista
 import com.copernicotv.app.player.PreferenciasPista
 import com.copernicotv.app.player.SesionMedia3
+import com.copernicotv.app.player.construirDiagnostico
+import com.copernicotv.app.player.sanearUrl
 import com.copernicotv.core.player.ProtocoloStream
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,13 +39,14 @@ sealed interface ReproductorUiState {
     /**
      * Canal resuelto y con su sesión Media3 abierta.
      *
-     * `toString` omite la URL para que un log accidental del estado no exponga
-     * la credencial del flujo (S57a).
+     * La URL original no vive en este estado: solo se conserva su versión
+     * saneada (esquema, host y puerto). Un log accidental del estado no puede
+     * exponer la credencial del flujo (S57a).
      */
     data class Listo(
         val canalId: Long,
         val nombre: String?,
-        val url: String,
+        val urlSaneada: String,
         val protocolo: ProtocoloStream,
     ) : ReproductorUiState {
         override fun toString(): String = "Listo(canalId=$canalId, protocolo=$protocolo)"
@@ -78,6 +82,9 @@ class ReproductorViewModel
         private val _estadoPistas = MutableStateFlow(EstadoPistas())
         val estadoPistas: StateFlow<EstadoPistas> = _estadoPistas.asStateFlow()
 
+        private val _diagnostico = MutableStateFlow(DiagnosticoReproductor())
+        val diagnostico: StateFlow<DiagnosticoReproductor> = _diagnostico.asStateFlow()
+
         private val _modoAspecto = MutableStateFlow(ModoAspecto.AJUSTAR)
         val modoAspecto: StateFlow<ModoAspecto> = _modoAspecto.asStateFlow()
 
@@ -94,6 +101,9 @@ class ReproductorViewModel
         private var recolector: Job? = null
         private var recolectorPistas: Job? = null
         private var preferenciasActuales = PreferenciasPista()
+        private var protocoloActual: ProtocoloStream? = null
+        private var urlSaneadaActual: String? = null
+        private var ultimoError: String? = null
 
         /**
          * Resuelve el Canal y abre su sesión. Es idempotente por Canal: una
@@ -111,13 +121,18 @@ class ReproductorViewModel
                     _estado.value = ReproductorUiState.Cargando
                     when (val resultado = repositorio.resolver(canalId)) {
                         is ResultadoStream.Ok -> {
+                            val urlSaneada = sanearUrl(resultado.stream.url)
+                            protocoloActual = resultado.stream.protocolo
+                            urlSaneadaActual = urlSaneada
+                            ultimoError = null
                             val datos =
                                 ReproductorUiState.Listo(
                                     canalId = resultado.stream.canalId,
                                     nombre = resultado.stream.nombre,
-                                    url = resultado.stream.url,
+                                    urlSaneada = urlSaneada,
                                     protocolo = resultado.stream.protocolo,
                                 )
+                            actualizarDiagnostico(_sesionEstado.value, _estadoPistas.value)
                             preferenciasActuales =
                                 runCatching { preferenciasPista.leer() }
                                     .getOrDefault(PreferenciasPista())
@@ -126,12 +141,17 @@ class ReproductorViewModel
                                     .getOrDefault(PreferenciasReproduccion())
                             _modoAspecto.value = reproduccion.modoAspecto
                             _controlesSecundariosVisibles.value = reproduccion.controlesSecundariosVisibles
-                            val nueva = abrirSesion(datos.url, preferenciasActuales)
+                            val nueva = abrirSesion(resultado.stream.url, preferenciasActuales)
                             // Si la sesión falló antes de publicar el Canal, el
                             // error definitivo ya ganó: no lo pisamos con Listo.
                             if (sesion === nueva) _estado.value = datos
                         }
                         is ResultadoStream.Error -> {
+                            _diagnostico.value =
+                                DiagnosticoReproductor(
+                                    fase = EstadoReproductor.ERROR,
+                                    ultimoError = resultado.codigo,
+                                )
                             _estado.value = ReproductorUiState.Error(resultado.codigo)
                             canalCargado = null
                         }
@@ -244,10 +264,14 @@ class ReproductorViewModel
                         // Un callback de la sesión anterior no debe tocar la nueva (E6-T4).
                         if (sesion !== nueva) return@collect
                         _sesionEstado.value = estadoSesion
+                        estadoSesion.codigoError?.let { ultimoError = it }
+                        actualizarDiagnostico(estadoSesion, _estadoPistas.value)
                         if (estadoSesion.estado == EstadoReproductor.ERROR) {
                             _estado.value =
                                 ReproductorUiState.Error(estadoSesion.codigoError ?: "error_reproduccion")
-                            cerrarSesion()
+                            // La sesión se cierra, pero el diagnóstico queda
+                            // congelado para la pantalla de error (E6-T5).
+                            cerrarSesion(conservarDiagnostico = true)
                         }
                     }
                 }
@@ -257,6 +281,7 @@ class ReproductorViewModel
                     nueva.estadoPistas.collect { pistas ->
                         if (sesion !== nueva) return@collect
                         _estadoPistas.value = pistas
+                        actualizarDiagnostico(_sesionEstado.value, pistas)
                         preferenciasActuales =
                             PreferenciasPista(
                                 audio = pistas.preferenciaAudio,
@@ -280,7 +305,21 @@ class ReproductorViewModel
             }
         }
 
-        private fun cerrarSesion() {
+        private fun actualizarDiagnostico(
+            estadoSesion: EstadoSesion,
+            pistas: EstadoPistas,
+        ) {
+            _diagnostico.value =
+                construirDiagnostico(
+                    protocolo = protocoloActual,
+                    url = urlSaneadaActual,
+                    estado = estadoSesion,
+                    pistas = pistas,
+                    ultimoError = ultimoError,
+                )
+        }
+
+        private fun cerrarSesion(conservarDiagnostico: Boolean = false) {
             // La sesión deja de ser la vigente antes de cancelar los recolectores:
             // así una entrega en vuelo no puede escribir estado de la anterior.
             val anterior = sesion
@@ -292,5 +331,11 @@ class ReproductorViewModel
             anterior?.liberar()
             _sesionEstado.value = EstadoSesion()
             _estadoPistas.value = EstadoPistas()
+            if (!conservarDiagnostico) {
+                _diagnostico.value = DiagnosticoReproductor()
+            }
+            protocoloActual = null
+            urlSaneadaActual = null
+            ultimoError = null
         }
     }

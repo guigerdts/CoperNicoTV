@@ -3,6 +3,7 @@ package com.copernicotv.app
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
@@ -95,6 +96,11 @@ class ReproductorDiagnosticoTest {
         assertFalse("Se filtró la query: $texto", texto.contains("?"))
 
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_COPIAR_DIAGNOSTICO).performClick()
+        // El texto "Copiado" solo aparece cuando la escritura devolvió éxito:
+        // su ausencia apunta al onClick, no a la lectura del portapapeles.
+        composeRule.esperarHasta {
+            composeRule.onAllNodesWithText("Copiado").fetchSemanticsNodes().isNotEmpty()
+        }
         val copiado = esperarPortapapeles()
         assertTrue("El portapapeles no copió el diagnóstico: [$copiado]", copiado.contains("Protocolo: HTTP/HTTPS progresivo"))
         assertTrue(
@@ -158,12 +164,36 @@ class ReproductorDiagnosticoTest {
             if (texto.contains("Protocolo:")) return texto
             Thread.sleep(200)
         }
-        return texto
+        val observacion =
+            textoDePortapapeles(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+                "via targetContext",
+            ) + " / " + textoDePortapapeles(composeRule.activity, "via activity")
+        return "$texto $observacion"
     }
 
+    /** Lee el portapapeles intentando dos contextos del mismo paquete. */
     private fun leerPortapapeles(): String {
-        val contexto = InstrumentationRegistry.getInstrumentation().targetContext
-        val gestor = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        return gestor.primaryClip?.getItemAt(0)?.coerceToText(contexto)?.toString().orEmpty()
+        val viaTarget =
+            textoDePortapapeles(
+                InstrumentationRegistry.getInstrumentation().targetContext,
+                "via targetContext",
+            )
+        if (viaTarget.isNotBlank()) return viaTarget
+        return textoDePortapapeles(composeRule.activity, "via activity")
+    }
+
+    /** Lee el clip primario sin fallar si el sistema lo restringe. */
+    private fun textoDePortapapeles(
+        contexto: Context,
+        via: String,
+    ): String {
+        val gestor = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val clip = gestor?.primaryClip
+        if (clip != null && clip.itemCount > 0) {
+            val texto = clip.getItemAt(0).coerceToText(contexto)?.toString().orEmpty()
+            if (texto.isNotBlank()) return texto
+        }
+        return "[$via sin texto accesible]"
     }
 }

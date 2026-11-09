@@ -69,17 +69,14 @@ internal fun PanelDiagnostico(
             Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.72f))
+                // Consume los toques fuera del panel para que los controles de
+                // debajo no reciban una interacción mientras está abierto. Va en
+                // el padre: los hijos (botones) tienen prioridad de golpe y el
+                // resto del área cae aquí.
+                .pointerInput(Unit) { detectTapGestures { } }
                 .testTag(TAG_REPRODUCTOR_PANEL_DIAGNOSTICO),
         contentAlignment = Alignment.Center,
     ) {
-        // Consume los toques fuera del panel para que los controles de debajo
-        // no reciban una interacción mientras el diagnóstico está abierto.
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) { detectTapGestures { } },
-        )
         Column(
             modifier =
                 Modifier
@@ -114,8 +111,9 @@ internal fun PanelDiagnostico(
                     etiqueta = stringResource(R.string.reproductor_diagnostico_copiar),
                     tag = TAG_REPRODUCTOR_COPIAR_DIAGNOSTICO,
                     onClick = {
-                        copiarAlPortapapeles(contexto, texto)
-                        copiado = true
+                        // Refleja el resultado real de la escritura: si el
+                        // sistema rechaza la copia no avisamos como exitosa.
+                        copiado = copiarAlPortapapeles(contexto, texto)
                     },
                     modifier = Modifier.focusRequester(enfoqueCopiar),
                 ) {
@@ -142,10 +140,20 @@ internal fun PanelDiagnostico(
     }
 }
 
+/**
+ * Escribe el diagnóstico en el portapapeles del sistema. Devuelve `true` solo
+ * si la escritura se completó; el panel usa ese resultado para marcar el botón
+ * como copiado y no anunciar un éxito que no ocurrió.
+ */
 private fun copiarAlPortapapeles(
     contexto: Context,
     texto: String,
-) {
-    val gestor = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-    gestor.setPrimaryClip(ClipData.newPlainText("Diagnóstico", texto))
+): Boolean {
+    val gestor = contexto.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return false
+    return try {
+        gestor.setPrimaryClip(ClipData.newPlainText("Diagnóstico", texto))
+        true
+    } catch (excepcion: SecurityException) {
+        false
+    }
 }

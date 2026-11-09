@@ -68,6 +68,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.copernicotv.app.R
+import com.copernicotv.app.player.DiagnosticoReproductor
 import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
@@ -130,6 +131,21 @@ const val TAG_REPRODUCTOR_BUFFER = "reproductor-buffer"
 /** Etiqueta del aviso de reintento durante la recuperación (E6-T4). */
 const val TAG_REPRODUCTOR_REINTENTO = "reproductor-reintento"
 
+/** Etiqueta del botón que abre el diagnóstico técnico (E6-T5). */
+const val TAG_REPRODUCTOR_DIAGNOSTICO = "reproductor-diagnostico"
+
+/** Etiqueta del panel de diagnóstico abierto. */
+const val TAG_REPRODUCTOR_PANEL_DIAGNOSTICO = "reproductor-panel-diagnostico"
+
+/** Etiqueta del texto técnico visible y copiable. */
+const val TAG_REPRODUCTOR_DIAGNOSTICO_TEXTO = "reproductor-diagnostico-texto"
+
+/** Etiqueta del botón que copia el diagnóstico. */
+const val TAG_REPRODUCTOR_COPIAR_DIAGNOSTICO = "reproductor-copiar-diagnostico"
+
+/** Etiqueta del botón que cierra el panel de diagnóstico. */
+const val TAG_REPRODUCTOR_CERRAR_DIAGNOSTICO = "reproductor-cerrar-diagnostico"
+
 /** Etiqueta del selector de pista de audio (E6-T3). */
 const val TAG_REPRODUCTOR_AUDIO = "reproductor-audio"
 
@@ -179,6 +195,7 @@ fun ReproductorScreen(
     val estadoPistas by viewModel.estadoPistas.collectAsStateWithLifecycle()
     val modoAspecto by viewModel.modoAspecto.collectAsStateWithLifecycle()
     val controlesSecundariosVisibles by viewModel.controlesSecundariosVisibles.collectAsStateWithLifecycle()
+    val diagnostico by viewModel.diagnostico.collectAsStateWithLifecycle()
     LaunchedEffect(canalId) { viewModel.cargar(canalId) }
     val salir = {
         viewModel.cerrar()
@@ -198,12 +215,18 @@ fun ReproductorScreen(
                     modifier = Modifier.align(Alignment.Center),
                     color = MaterialTheme.colorScheme.primary,
                 )
-            is ReproductorUiState.Error -> ErrorReproduccion(actual.codigo, onVolver = salir)
+            is ReproductorUiState.Error ->
+                ErrorReproduccion(
+                    codigo = actual.codigo,
+                    diagnostico = diagnostico,
+                    onVolver = salir,
+                )
             is ReproductorUiState.Listo ->
                 SuperficieReproductor(
                     datos = actual,
                     estado = sesionEstado,
                     pistas = estadoPistas,
+                    diagnostico = diagnostico,
                     motor = viewModel.motor,
                     modos =
                         ModosReproductor(
@@ -236,6 +259,7 @@ private fun SuperficieReproductor(
     datos: ReproductorUiState.Listo,
     estado: EstadoSesion,
     pistas: EstadoPistas,
+    diagnostico: DiagnosticoReproductor,
     motor: ExoPlayer?,
     modos: ModosReproductor,
     onAlternar: () -> Unit,
@@ -250,10 +274,13 @@ private fun SuperficieReproductor(
         LocalConfiguration.current.uiMode and Configuration.UI_MODE_TYPE_MASK ==
             Configuration.UI_MODE_TYPE_TELEVISION
     var controlesVisibles by rememberSaveable { mutableStateOf(true) }
+    var diagnosticoAbierto by rememberSaveable { mutableStateOf(false) }
     var interacciones by remember { mutableLongStateOf(0L) }
     var arrastreMs by remember { mutableStateOf<Long?>(null) }
     val enfoqueRaiz = remember { FocusRequester() }
     val enfoqueAlternar = remember { FocusRequester() }
+    val enfoqueDiagnostico = remember { FocusRequester() }
+    var diagnosticoPrevio by remember { mutableStateOf(false) }
     val enfoques =
         remember {
             EnfoquesControles(
@@ -268,6 +295,13 @@ private fun SuperficieReproductor(
         controlesVisibles = true
     }
     val panelPistas = recordarPanelPistas(enfoques, revelar)
+    BackHandler(enabled = diagnosticoAbierto) { diagnosticoAbierto = false }
+    LaunchedEffect(diagnosticoAbierto) {
+        if (diagnosticoPrevio && !diagnosticoAbierto) {
+            runCatching { enfoqueDiagnostico.requestFocus() }
+        }
+        diagnosticoPrevio = diagnosticoAbierto
+    }
     val acciones =
         accionesReproductor(
             revelar = revelar,
@@ -278,6 +312,10 @@ private fun SuperficieReproductor(
             leerArrastre = { arrastreMs },
             onBuscarA = onBuscarA,
             onSalir = onSalir,
+            alAbrirDiagnostico = {
+                panelPistas.alCerrar()
+                diagnosticoAbierto = true
+            },
         )
 
     // S17b: ocultar los secundarios cierra el panel de pistas y, en TV, deja
@@ -297,7 +335,7 @@ private fun SuperficieReproductor(
         fase = fase,
         controlesVisibles = controlesVisibles,
         interacciones = interacciones,
-        panelAbierto = panelPistas.tipo != null,
+        panelAbierto = panelPistas.tipo != null || diagnosticoAbierto,
         esTelevision = esTelevision,
         enfoqueRaiz = enfoqueRaiz,
         enfoqueAlternar = enfoqueAlternar,
@@ -338,8 +376,15 @@ private fun SuperficieReproductor(
                 pistas = pistas,
                 panelPistas = panelPistas,
                 enfoques = enfoques,
+                enfoqueDiagnostico = enfoqueDiagnostico,
                 acciones = acciones,
                 accionesPistas = accionesPistas,
+            )
+        }
+        if (diagnosticoAbierto) {
+            PanelDiagnostico(
+                diagnostico = diagnostico,
+                alCerrar = { diagnosticoAbierto = false },
             )
         }
     }
@@ -355,6 +400,7 @@ private fun accionesReproductor(
     leerArrastre: () -> Long?,
     onBuscarA: (Long) -> Unit,
     onSalir: () -> Unit,
+    alAbrirDiagnostico: () -> Unit,
 ) = AccionesReproductor(
     alAlternar = {
         revelar()
@@ -384,6 +430,10 @@ private fun accionesReproductor(
         revelar()
         onSalir()
     },
+    alAbrirDiagnostico = {
+        revelar()
+        alAbrirDiagnostico()
+    },
 )
 
 /** Acciones que la barra de controles delega en la pantalla. */
@@ -395,6 +445,7 @@ private data class AccionesReproductor(
     val alCambiarModo: () -> Unit,
     val alAlternarSecundarios: () -> Unit,
     val alSalir: () -> Unit,
+    val alAbrirDiagnostico: () -> Unit,
 )
 
 /** Modos de reproducción controlados por preferencias globales (S44b/S17b). */
@@ -435,6 +486,7 @@ private fun BoxScope.Controles(
     pistas: EstadoPistas,
     panelPistas: EstadoPanelPistas,
     enfoques: EnfoquesControles,
+    enfoqueDiagnostico: FocusRequester,
     acciones: AccionesReproductor,
     accionesPistas: AccionesPistas,
 ) {
@@ -444,7 +496,13 @@ private fun BoxScope.Controles(
                 .fillMaxSize()
                 .testTag(TAG_REPRODUCTOR_CONTROLES),
     ) {
-        BarraSuperior(datos, fase, acciones.alSalir)
+        BarraSuperior(
+            datos = datos,
+            fase = fase,
+            alSalir = acciones.alSalir,
+            alAbrirDiagnostico = acciones.alAbrirDiagnostico,
+            enfoqueDiagnostico = enfoqueDiagnostico,
+        )
         BarraInferior(
             estado = estado,
             fase = fase,
@@ -464,6 +522,8 @@ private fun BoxScope.BarraSuperior(
     datos: ReproductorUiState.Listo,
     fase: EstadoReproductor,
     alSalir: () -> Unit,
+    alAbrirDiagnostico: () -> Unit,
+    enfoqueDiagnostico: FocusRequester,
 ) {
     Column(
         modifier =
@@ -504,6 +564,14 @@ private fun BoxScope.BarraSuperior(
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.testTag(TAG_REPRODUCTOR_FASE),
                 )
+            }
+            BotonControl(
+                etiqueta = stringResource(R.string.reproductor_diagnostico),
+                tag = TAG_REPRODUCTOR_DIAGNOSTICO,
+                onClick = alAbrirDiagnostico,
+                modifier = Modifier.focusRequester(enfoqueDiagnostico),
+            ) {
+                Text(stringResource(R.string.reproductor_diagnostico))
             }
         }
     }
@@ -908,9 +976,44 @@ private fun Context.actividad(): Activity? {
 @Composable
 private fun ErrorReproduccion(
     codigo: String,
+    diagnostico: DiagnosticoReproductor,
     onVolver: () -> Unit,
 ) {
+    var diagnosticoAbierto by rememberSaveable { mutableStateOf(false) }
+    var diagnosticoPrevio by remember { mutableStateOf(false) }
+    val enfoqueDiagnostico = remember { FocusRequester() }
+    BackHandler(enabled = diagnosticoAbierto) { diagnosticoAbierto = false }
+    LaunchedEffect(diagnosticoAbierto) {
+        if (diagnosticoPrevio && !diagnosticoAbierto) {
+            runCatching { enfoqueDiagnostico.requestFocus() }
+        }
+        diagnosticoPrevio = diagnosticoAbierto
+    }
     Box(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                onClick = onVolver,
+                modifier = Modifier.testTag(TAG_REPRODUCTOR_VOLVER),
+            ) {
+                Text(stringResource(R.string.reproductor_volver))
+            }
+            TextButton(
+                onClick = { diagnosticoAbierto = true },
+                modifier =
+                    Modifier
+                        .focusRequester(enfoqueDiagnostico)
+                        .testTag(TAG_REPRODUCTOR_DIAGNOSTICO),
+            ) {
+                Text(stringResource(R.string.reproductor_diagnostico))
+            }
+        }
         Text(
             text = stringResource(R.string.reproductor_error, codigo),
             color = Color.White,
@@ -921,15 +1024,11 @@ private fun ErrorReproduccion(
                     .padding(24.dp)
                     .testTag(TAG_REPRODUCTOR_ERROR),
         )
-        TextButton(
-            onClick = onVolver,
-            modifier =
-                Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .testTag(TAG_REPRODUCTOR_VOLVER),
-        ) {
-            Text(stringResource(R.string.reproductor_volver))
+        if (diagnosticoAbierto) {
+            PanelDiagnostico(
+                diagnostico = diagnostico,
+                alCerrar = { diagnosticoAbierto = false },
+            )
         }
     }
 }

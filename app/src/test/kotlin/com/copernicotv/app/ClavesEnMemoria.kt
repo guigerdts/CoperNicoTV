@@ -17,14 +17,17 @@ import javax.crypto.spec.SecretKeySpec
 class ClavesEnMemoria : ClavesApp {
     override val claveAes: SecretKey = SecretKeySpec(ByteArray(32) { it.toByte() }, "AES")
 
+    private val candado = Any()
     private val hmacPorGeneracion = mutableMapOf<Int, SecretKey>()
 
-    override fun contieneClaveHmac(generacion: Int): Boolean = hmacPorGeneracion.containsKey(generacion)
+    override fun contieneClaveHmac(generacion: Int): Boolean = synchronized(candado) { hmacPorGeneracion.containsKey(generacion) }
 
-    override fun claveHmac(generacion: Int): SecretKey? = hmacPorGeneracion[generacion]
+    override fun claveHmac(generacion: Int): SecretKey? = synchronized(candado) { hmacPorGeneracion[generacion] }
 
     override fun crearClaveHmac(generacion: Int): SecretKey =
-        hmacPorGeneracion.getOrPut(generacion) {
-            SecretKeySpec(ByteArray(32) { (it * 3 + generacion).toByte() }, "HmacSHA256")
+        synchronized(candado) {
+            hmacPorGeneracion.getOrPut(generacion) {
+                SecretKeySpec(ByteArray(32) { (it * 3 + generacion).toByte() }, "HmacSHA256")
+            }
         }
 }

@@ -95,15 +95,15 @@ class ReproductorDiagnosticoTest {
         assertFalse("Se filtró la query: $texto", texto.contains("?"))
 
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_COPIAR_DIAGNOSTICO).performClick()
-        val copiado = leerPortapapeles()
-        assertTrue("El portapapeles no copió el diagnóstico", copiado.contains("Protocolo: HTTP/HTTPS progresivo"))
+        val copiado = esperarPortapapeles()
+        assertTrue("El portapapeles no copió el diagnóstico: [$copiado]", copiado.contains("Protocolo: HTTP/HTTPS progresivo"))
         assertTrue(
-            "El portapapeles no copió la URL saneada",
+            "El portapapeles no copió la URL saneada: [$copiado]",
             copiado.contains("URL: http://127.0.0.1:${servidor.puerto}"),
         )
-        assertFalse("El portapapeles filtró el token", copiado.contains("token"))
-        assertFalse("El portapapeles filtró el secreto", copiado.contains("secreto"))
-        assertFalse("El portapapeles filtró la ruta", copiado.contains("f19_pistas"))
+        assertFalse("El portapapeles filtró el token: [$copiado]", copiado.contains("token"))
+        assertFalse("El portapapeles filtró el secreto: [$copiado]", copiado.contains("secreto"))
+        assertFalse("El portapapeles filtró la ruta: [$copiado]", copiado.contains("f19_pistas"))
     }
 
     @Test
@@ -144,6 +144,21 @@ class ReproductorDiagnosticoTest {
         composeRule.abrirReproductor()
         composeRule.esperarFase("Reproduciendo")
         composeRule.mostrarControlesConToque()
+    }
+
+    /**
+     * La escritura del portapapeles y su lectura compiten con el frame bajo
+     * prueba en el emulador: se sondea un tiempo acotado antes de declarar el
+     * fallo, y el contenido observado queda en el mensaje de la aserción.
+     */
+    private fun esperarPortapapeles(): String {
+        var texto = ""
+        repeat(20) {
+            texto = leerPortapapeles()
+            if (texto.contains("Protocolo:")) return texto
+            Thread.sleep(200)
+        }
+        return texto
     }
 
     private fun leerPortapapeles(): String {

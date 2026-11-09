@@ -2,11 +2,11 @@ package com.copernicotv.app.data
 
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.SembrarEstadoIndiceHmac
 import com.copernicotv.app.data.db.entities.EstadoIndiceHmacEntity
 import com.copernicotv.app.data.db.entities.HmacPendienteEntity
 import com.copernicotv.core.hmac.EstadoIndiceHmac
 import com.copernicotv.core.hmac.FaseIndiceHmac
-import com.copernicotv.core.hmac.GeneracionHmac
 import com.copernicotv.core.hmac.HmacPendiente
 import com.copernicotv.core.hmac.MaquinaIndiceHmac
 import com.copernicotv.core.hmac.MotivoHmacPendiente
@@ -14,6 +14,8 @@ import com.copernicotv.core.hmac.PlanReconstruccionHmac
 import com.copernicotv.core.hmac.RechazoIndiceHmac
 import com.copernicotv.core.hmac.ResultadoTransicion
 import com.copernicotv.core.hmac.VersionOrigenHmac
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -38,8 +40,25 @@ class IndiceHmacRepositorio
         private val db: AppDatabase,
         private val claves: ClavesApp,
     ) {
+        /**
+         * Serializa las operaciones que leen, validan y escriben la fila de
+         * estado: dos transiciones concurrentes no pueden leer el mismo estado
+         * anterior y pisarse con escrituras ciegas (lost update).
+         *
+         * Es un `Mutex` de corrutinas, no un monitor de JVM, porque la sección
+         * crítica incluye suspensión de Room. La garantía es de proceso: la app
+         * es de un solo proceso y este repositorio es `@Singleton`, así que no
+         * existe un segundo escritor que la necesite. No cubre el caso de un
+         * proceso externo editando Room, que está fuera del contrato.
+         *
+         * Orden de cerrojos: primero este `candado`, después el monitor HMAC de
+         * `ClavesKeystore`. Ningún camino toma el monitor HMAC y luego este
+         * `candado`, así que no hay interbloqueo.
+         */
+        private val candado = Mutex()
+
         /** Estado persistido, creando la fila singleton con `hmac:v1` si falta. */
-        suspend fun estado(ahora: Instant = Instant.now()): EstadoIndiceHmac = aModelo(asegurar(ahora))
+        suspend fun estado(ahora: Instant = Instant.now()): EstadoIndiceHmac = candado.withLock { aModelo(asegurarBloqueado(ahora)) }
 
         /**
          * Estado persistido sin inicializar la fila: `null` si nunca existió.
@@ -47,7 +66,7 @@ class IndiceHmacRepositorio
          * Permite al guardia de sello y a la guardia de arranque distinguir la
          * primera inicialización legítima de la pérdida de una clave usada.
          */
-        suspend fun estadoSinInicializar(): EstadoIndiceHmac? = db.estadoIndiceHmacDao().actual()?.let(::aModelo)
+        suspend fun estadoSinInicializar(): EstadoIndiceHmac? = candado.withLock { db.estadoIndiceHmacDao().actual()?.let(::aModelo) }
 
         /** ¿Está en la bóveda la clave de la generación [generacion]? */
         suspend fun clavePresente(generacion: Int): Boolean = claves.contieneClaveHmac(generacion)
@@ -58,10 +77,11 @@ class IndiceHmacRepositorio
          * forma explícita e idempotente, sin regenerar nada si ya existe, y
          * persiste la fila de estado operativo.
          */
-        suspend fun inicializarLegitimamente(ahora: Instant = Instant.now()): EstadoIndiceHmac {
-            claves.crearClaveHmac(GENERACION_INICIAL)
-            return estado(ahora)
-        }
+        suspend fun inicializarLegitimamente(ahora: Instant = Instant.now()): EstadoIndiceHmac =
+            candado.withLock {
+                claves.crearClaveHmac(GENERACION_INICIAL)
+                aModelo(asegurarBloqueado(ahora))
+            }
 
         /**
          * Guardia de sello (DC-04 §7, Q2): entrega la clave de la generación
@@ -74,23 +94,37 @@ class IndiceHmacRepositorio
          * primera inicialización legítima —ni fila de estado ni sobres
          * persistidos— sí incorpora su clave `v1` de forma explícita.
          */
-        suspend fun selloHmac(ahora: Instant = Instant.now()): SelloIndiceHmac {
-            val filaExistia = estadoSinInicializar() != null
-            val estado = estado(ahora)
-            if (!estado.esOperativo) {
-                return SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
+        suspend fun selloHmac(ahora: Instant = Instant.now()): SelloIndiceHmac =
+            candado.withLock {
+                val anterior = db.estadoIndiceHmacDao().actual()
+                val filaExistia = anterior != null
+                val base = anterior ?: asegurarBloqueado(ahora)
+                val estado = aModelo(base)
+                if (!estado.esOperativo) {
+                    return@withLock SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
+                }
+                val claveActiva = claves.claveHmac(estado.generacionActiva)
+                if (claveActiva != null) {
+                    return@withLock SelloIndiceHmac.Disponible(claveActiva, estado.generacionActiva)
+                }
+                val inicializacionLegitima = !filaExistia && !haySobres()
+                if (inicializacionLegitima) {
+                    return@withLock SelloIndiceHmac.Disponible(
+                        claves.crearClaveHmac(estado.generacionActiva),
+                        estado.generacionActiva,
+                    )
+                }
+                // La transición de pérdida se aplica aquí, no con
+                // `detectarPerdidaClave()`, porque el `Mutex` no es reentrante
+                // y esa llamada volvería a tomarlo: la máquina pura es la misma.
+                when (val resultado = MaquinaIndiceHmac.detectarPerdidaClave(estado, ahora)) {
+                    is ResultadoTransicion.Ok ->
+                        db.estadoIndiceHmacDao().guardar(aEntidad(resultado.estado, base))
+
+                    is ResultadoTransicion.Rechazada -> Unit
+                }
+                SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
             }
-            val claveActiva = claves.claveHmac(estado.generacionActiva)
-            if (claveActiva != null) {
-                return SelloIndiceHmac.Disponible(claveActiva, estado.generacionActiva)
-            }
-            val inicializacionLegitima = !filaExistia && !haySobres()
-            if (inicializacionLegitima) {
-                return SelloIndiceHmac.Disponible(claves.crearClaveHmac(estado.generacionActiva), estado.generacionActiva)
-            }
-            detectarPerdidaClave(ahora)
-            return SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
-        }
 
         /** ¿Hay algún sobre `hmac:vN:...` persistido en las tablas con HMAC? */
         suspend fun haySobres(): Boolean =
@@ -163,34 +197,38 @@ class IndiceHmacRepositorio
          * [RechazoIndiceHmac] con `indice_hmac_no_operativo`.
          */
         suspend fun bloqueoIgualdad(ahora: Instant = Instant.now()): RechazoIndiceHmac? =
-            PlanReconstruccionHmac.bloqueoIgualdad(aModelo(asegurar(ahora)))
+            candado.withLock {
+                PlanReconstruccionHmac.bloqueoIgualdad(aModelo(asegurarBloqueado(ahora)))
+            }
 
         /** Registra o actualiza una fila no reconstruible por su clave única. */
         suspend fun registrarPendiente(
             pendiente: HmacPendiente,
             ahora: Instant = Instant.now(),
         ) {
-            val dao = db.hmacPendienteDao()
-            val existente = dao.porClave(pendiente.entidad, pendiente.entidadId, pendiente.columna)
-            if (existente == null) {
-                dao.insertar(
-                    HmacPendienteEntity(
-                        entidad = pendiente.entidad,
-                        entidadId = pendiente.entidadId,
-                        columna = pendiente.columna,
-                        versionOrigen = pendiente.versionOrigen.texto,
-                        motivo = pendiente.motivo.codigo,
-                        creadoEn = ahora,
-                        actualizadoEn = ahora,
-                    ),
-                )
-            } else {
-                dao.actualizar(
-                    existente.id,
-                    pendiente.versionOrigen.texto,
-                    pendiente.motivo.codigo,
-                    ahora,
-                )
+            candado.withLock {
+                val dao = db.hmacPendienteDao()
+                val existente = dao.porClave(pendiente.entidad, pendiente.entidadId, pendiente.columna)
+                if (existente == null) {
+                    dao.insertar(
+                        HmacPendienteEntity(
+                            entidad = pendiente.entidad,
+                            entidadId = pendiente.entidadId,
+                            columna = pendiente.columna,
+                            versionOrigen = pendiente.versionOrigen.texto,
+                            motivo = pendiente.motivo.codigo,
+                            creadoEn = ahora,
+                            actualizadoEn = ahora,
+                        ),
+                    )
+                } else {
+                    dao.actualizar(
+                        existente.id,
+                        pendiente.versionOrigen.texto,
+                        pendiente.motivo.codigo,
+                        ahora,
+                    )
+                }
             }
         }
 
@@ -213,36 +251,30 @@ class IndiceHmacRepositorio
         private suspend fun transicion(
             ahora: Instant,
             bloque: (EstadoIndiceHmac) -> ResultadoTransicion,
-        ): ResultadoTransicion {
-            val anterior = asegurar(ahora)
-            return when (val resultado = bloque(aModelo(anterior))) {
-                is ResultadoTransicion.Ok -> {
-                    db.estadoIndiceHmacDao().guardar(aEntidad(resultado.estado, anterior))
-                    resultado
+        ): ResultadoTransicion =
+            candado.withLock {
+                val anterior = asegurarBloqueado(ahora)
+                when (val resultado = bloque(aModelo(anterior))) {
+                    is ResultadoTransicion.Ok -> {
+                        db.estadoIndiceHmacDao().guardar(aEntidad(resultado.estado, anterior))
+                        resultado
+                    }
+
+                    is ResultadoTransicion.Rechazada -> resultado
                 }
-
-                is ResultadoTransicion.Rechazada -> resultado
             }
-        }
 
-        private suspend fun asegurar(ahora: Instant): EstadoIndiceHmacEntity {
+        /**
+         * Fila de estado vigente, creándola si falta. Requiere que el llamador
+         * ya tenga [candado]: el `Mutex` no es reentrante y tomarlo aquí
+         * rompería las transiciones atómicas.
+         */
+        private suspend fun asegurarBloqueado(ahora: Instant): EstadoIndiceHmacEntity {
             val dao = db.estadoIndiceHmacDao()
             return dao.actual() ?: filaInicial(ahora).also { dao.guardar(it) }
         }
 
-        private fun filaInicial(ahora: Instant): EstadoIndiceHmacEntity =
-            EstadoIndiceHmacEntity(
-                id = ID_SINGLETON,
-                estado = FaseIndiceHmac.OPERATIVO.codigo,
-                versionActiva = GeneracionHmac.formatear(1),
-                versionObjetivo = null,
-                iniciadoEn = ahora,
-                actualizadoEn = ahora,
-                filasTotales = 0,
-                filasReconstruidas = 0,
-                filasPendientes = 0,
-                ultimoErrorTipo = null,
-            )
+        private fun filaInicial(ahora: Instant): EstadoIndiceHmacEntity = SembrarEstadoIndiceHmac.fila(ahora)
 
         private fun aModelo(fila: EstadoIndiceHmacEntity): EstadoIndiceHmac =
             EstadoIndiceHmac(
@@ -290,9 +322,9 @@ class IndiceHmacRepositorio
             )
 
         private companion object {
-            const val ID_SINGLETON = 1L
+            const val ID_SINGLETON = SembrarEstadoIndiceHmac.ID_SINGLETON
 
             /** Generación inicial del contrato: `hmac:v1`. */
-            const val GENERACION_INICIAL = 1
+            const val GENERACION_INICIAL = SembrarEstadoIndiceHmac.GENERACION_INICIAL
         }
     }

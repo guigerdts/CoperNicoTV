@@ -25,7 +25,13 @@ data class StreamResuelto(
     val nombre: String?,
     val url: String,
     val protocolo: ProtocoloStream,
-)
+) {
+    /**
+     * La URL descifrada nunca debe aparecer en un log accidental. Solo se
+     * exponen identificadores y el protocolo (S57a).
+     */
+    override fun toString(): String = "StreamResuelto(canalId=$canalId, nombre=$nombre, protocolo=$protocolo)"
+}
 
 /** Resultado tipado de resolver la URL reproducible de un Canal. */
 sealed interface ResultadoStream {

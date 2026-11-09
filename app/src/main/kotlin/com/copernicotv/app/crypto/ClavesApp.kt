@@ -44,6 +44,10 @@ interface ClavesApp {
      * nueva: la primera inicialización legítima del índice o la reconstrucción
      * acordada. Nunca se invoca en respuesta a una ausencia detectada en una
      * escritura normal (DC-04 §5, Q2).
+     *
+     * Dos llamadas concurrentes para la misma generación deben devolver la
+     * misma clave: la implementación serializa la comprobación y la creación
+     * para que ninguna observe el alias vacío entre ambas.
      */
     fun crearClaveHmac(generacion: Int): SecretKey
 }
@@ -77,23 +81,26 @@ class ClavesKeystore @Inject constructor() : ClavesApp {
 
     override fun contieneClaveHmac(generacion: Int): Boolean {
         val alias = aliasHmac(generacion)
-        val almacen = almacen()
-        return almacen.containsAlias(alias) &&
-            almacen.getEntry(alias, null) is KeyStore.SecretKeyEntry
+        return synchronized(candadoHmac) {
+            val almacen = almacen()
+            almacen.containsAlias(alias) &&
+                almacen.getEntry(alias, null) is KeyStore.SecretKeyEntry
+        }
     }
 
-    override fun claveHmac(generacion: Int): SecretKey? {
-        val existente =
-            almacen().getEntry(aliasHmac(generacion), null) as? KeyStore.SecretKeyEntry
-        return existente?.secretKey
-    }
+    override fun claveHmac(generacion: Int): SecretKey? =
+        synchronized(candadoHmac) {
+            val existente =
+                almacen().getEntry(aliasHmac(generacion), null) as? KeyStore.SecretKeyEntry
+            existente?.secretKey
+        }
 
-    override fun crearClaveHmac(generacion: Int): SecretKey {
-        val alias = aliasHmac(generacion)
-        val almacen = almacen()
-        val existente = almacen.getEntry(alias, null) as? KeyStore.SecretKeyEntry
-        return existente?.secretKey ?: generadorHmac(alias)
-    }
+    override fun crearClaveHmac(generacion: Int): SecretKey =
+        synchronized(candadoHmac) {
+            val alias = aliasHmac(generacion)
+            val existente = almacen().getEntry(alias, null) as? KeyStore.SecretKeyEntry
+            existente?.secretKey ?: generadorHmac(alias)
+        }
 
     /**
      * Devuelve la clave AES vigente y la regenera si la existente no puede
@@ -177,5 +184,20 @@ class ClavesKeystore @Inject constructor() : ClavesApp {
         const val TAG = "ClavesKeystore"
         const val AAD_SONDA = "ClavesKeystore.sonda"
         val SONDA = byteArrayOf(0)
+
+        /**
+         * Serializa lectura y creación de claves HMAC en todo el proceso.
+         *
+         * Keystore es un almacén único del proceso y `KeyGenerator.generateKey`
+         * reemplaza una entrada existente: si dos inicializaciones leen "no
+         * existe" antes de que la primera genere, ambas crean material distinto
+         * y la última sobrescribe el alias, dejando sobres sellados con una
+         * clave que ya no está en la bóveda. El candado debe cubrir también las
+         * lecturas: así nadie observa el hueco entre la comprobación y el
+         * `generateKey`. Es un monitor de JVM, no reentrante entre hilos de
+         * corrutinas que solo hacen llamadas bloqueantes de Keystore; no se
+         * mantiene a través de ninguna suspensión.
+         */
+        val candadoHmac = Any()
     }
 }

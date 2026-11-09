@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.SembrarEstadoIndiceHmac
 import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
@@ -78,6 +79,36 @@ class GuardiaArranqueIndiceHmacTest {
             guardia.evaluar(ahora)
 
             assertEquals(GuardiaArranqueIndiceHmac.ResultadoArranque.Operativo, guardia.evaluar(ahora))
+        }
+
+    /**
+     * La base de producción siembra la fila `v1` al crearse
+     * ([SembrarEstadoIndiceHmac.callback]), así que una instalación nueva ve una
+     * fila operativa **sin clave**. Debe inicializarse, no declararse pérdida.
+     */
+    @Test
+    fun `una fila sembrada sin clave ni sobres se inicializa sin declarar perdida`() =
+        runBlocking {
+            val contexto = ApplicationProvider.getApplicationContext<Context>()
+            val sembrada =
+                Room
+                    .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
+                    .allowMainThreadQueries()
+                    .addCallback(SembrarEstadoIndiceHmac.callback())
+                    .build()
+            try {
+                // Abrir la base dispara el callback de producción.
+                assertEquals(1, sembrada.estadoIndiceHmacDao().contar())
+                val indiceSembrado = IndiceHmacRepositorio(sembrada, claves)
+
+                val resultado = GuardiaArranqueIndiceHmac(indiceSembrado).evaluar(ahora)
+
+                assertEquals(GuardiaArranqueIndiceHmac.ResultadoArranque.Inicializado, resultado)
+                assertEquals(FaseIndiceHmac.OPERATIVO, indiceSembrado.estado(ahora).fase)
+                assertTrue(claves.contieneClaveHmac(1))
+            } finally {
+                sembrada.close()
+            }
         }
 
     @Test

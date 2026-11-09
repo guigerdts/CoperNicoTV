@@ -252,19 +252,20 @@ class ClavesKeystoreTest {
         assertFalse(claves.contieneClaveHmac(generacion))
 
         val indice = IndiceHmacRepositorio(db, claves)
-        val sello = runBlocking { indice.selloHmac(ahora) }
-        val bloqueada = sello as? SelloIndiceHmac.Bloqueada
-        assertNotNull("el sello debe bloquearse tras la pérdida: $sello", bloqueada)
-        assertEquals(RechazoIndiceHmac.CODIGO, bloqueada?.codigo)
-
+        // El defecto de igualdad se reproduce con la fila todavía `operativo`:
+        // la clave ya no está, pero el estado no lo refleja.
+        val bloqueo = runBlocking { indice.bloqueoIgualdad(ahora) }
+        assertNotNull("la igualdad debe bloquearse aunque la fila siga operativa", bloqueo)
+        assertEquals(RechazoIndiceHmac.CODIGO, bloqueo?.codigo)
         assertEquals(
             FaseIndiceHmac.RECUPERACION_PENDIENTE,
             runBlocking { indice.estado(ahora) }.fase,
         )
-        assertNotNull(
-            "las igualdades deben quedar bloqueadas",
-            runBlocking { indice.bloqueoIgualdad(ahora) },
-        )
+
+        val sello = runBlocking { indice.selloHmac(ahora) }
+        val bloqueada = sello as? SelloIndiceHmac.Bloqueada
+        assertNotNull("el sello debe bloquearse tras la pérdida: $sello", bloqueada)
+        assertEquals(RechazoIndiceHmac.CODIGO, bloqueada?.codigo)
 
         val segunda = runBlocking { repositorio.importarFixture() }
         assertEquals(

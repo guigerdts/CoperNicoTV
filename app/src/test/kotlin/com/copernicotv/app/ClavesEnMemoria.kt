@@ -19,6 +19,7 @@ class ClavesEnMemoria : ClavesApp {
 
     private val candado = Any()
     private val hmacPorGeneracion = mutableMapOf<Int, SecretKey>()
+    private val creacionesPorGeneracion = mutableMapOf<Int, Int>()
 
     override fun contieneClaveHmac(generacion: Int): Boolean = synchronized(candado) { hmacPorGeneracion.containsKey(generacion) }
 
@@ -27,7 +28,21 @@ class ClavesEnMemoria : ClavesApp {
     override fun crearClaveHmac(generacion: Int): SecretKey =
         synchronized(candado) {
             hmacPorGeneracion.getOrPut(generacion) {
+                creacionesPorGeneracion[generacion] = (creacionesPorGeneracion[generacion] ?: 0) + 1
                 SecretKeySpec(ByteArray(32) { (it * 3 + generacion).toByte() }, "HmacSHA256")
             }
         }
+
+    /**
+     * Elimina la clave HMAC de una generación para simular su pérdida.
+     *
+     * Solo existe en el doble de pruebas: producción nunca expone una operación
+     * para borrar claves.
+     */
+    fun borrarClaveHmac(generacion: Int) {
+        synchronized(candado) { hmacPorGeneracion.remove(generacion) }
+    }
+
+    /** Cantidad de veces que se materializó una clave para [generacion]; solo pruebas. */
+    fun creacionesHmac(generacion: Int): Int = synchronized(candado) { creacionesPorGeneracion[generacion] ?: 0 }
 }

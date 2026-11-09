@@ -10,13 +10,13 @@ import com.copernicotv.core.hmac.FaseIndiceHmac
 import com.copernicotv.core.hmac.HmacPendiente
 import com.copernicotv.core.hmac.MaquinaIndiceHmac
 import com.copernicotv.core.hmac.MotivoHmacPendiente
-import com.copernicotv.core.hmac.PlanReconstruccionHmac
 import com.copernicotv.core.hmac.RechazoIndiceHmac
 import com.copernicotv.core.hmac.ResultadoTransicion
 import com.copernicotv.core.hmac.VersionOrigenHmac
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Instant
+import javax.crypto.SecretKey
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -57,73 +57,56 @@ class IndiceHmacRepositorio
          */
         private val candado = Mutex()
 
-        /** Estado persistido, creando la fila singleton con `hmac:v1` si falta. */
+        /**
+         * Estado persistido, creando la fila singleton con `hmac:v1` si falta.
+         *
+         * Es una lectura de fase, no una puerta de integridad: no comprueba la
+         * clave ni los sobres. Las operaciones que sellan o comparan usan
+         * [evaluarIntegridad] bajo el mismo [candado], de modo que la fase que
+         * devuelve este método nunca habilita por sí sola una comparación.
+         */
         suspend fun estado(ahora: Instant = Instant.now()): EstadoIndiceHmac = candado.withLock { aModelo(asegurarBloqueado(ahora)) }
 
         /**
-         * Estado persistido sin inicializar la fila: `null` si nunca existió.
+         * Conciliación completa en una sola sección crítica: fila persistida,
+         * sobres existentes y clave de la generación activa.
          *
-         * Permite al guardia de sello y a la guardia de arranque distinguir la
-         * primera inicialización legítima de la pérdida de una clave usada.
+         * Es la fuente única para [selloHmac], [bloqueoIgualdad],
+         * [inicializarLegitimamente] y la guardia de arranque. Así ninguna
+         * operación que decide sobre la integridad observa un índice `operativo`
+         * sin haber comprobado su clave, y la guardia y las operaciones normales
+         * comparten el mismo [candado]. [estado] solo informa la fase persistida.
          */
-        suspend fun estadoSinInicializar(): EstadoIndiceHmac? = candado.withLock { db.estadoIndiceHmacDao().actual()?.let(::aModelo) }
-
-        /** ¿Está en la bóveda la clave de la generación [generacion]? */
-        suspend fun clavePresente(generacion: Int): Boolean = claves.contieneClaveHmac(generacion)
+        suspend fun evaluarIntegridad(ahora: Instant = Instant.now()): IntegridadIndiceHmac =
+            candado.withLock { conciliarBloqueado(ahora).publica() }
 
         /**
-         * Primera inicialización legítima (instalación virgen: sin fila de
-         * estado ni sobres). Incorpora la clave de la generación inicial de
-         * forma explícita e idempotente, sin regenerar nada si ya existe, y
-         * persiste la fila de estado operativo.
+         * Primera inicialización legítima: sin sobres `hmac:vN` persistidos.
+         * Incorpora la clave de la generación inicial de forma explícita e
+         * idempotente y persiste la fila de estado operativo. Si la clave falta
+         * y ya hay sobres, declara la pérdida y no crea ninguna clave.
          */
         suspend fun inicializarLegitimamente(ahora: Instant = Instant.now()): EstadoIndiceHmac =
-            candado.withLock {
-                claves.crearClaveHmac(GENERACION_INICIAL)
-                aModelo(asegurarBloqueado(ahora))
-            }
+            candado.withLock { conciliarBloqueado(ahora).estado }
 
         /**
          * Guardia de sello (DC-04 §7, Q2): entrega la clave de la generación
          * activa para producir un sobre, o bloquea con `indice_hmac_no_operativo`.
          *
-         * Nunca genera una clave sustituta. Dos caminos para no quedar
-         * operativo: el índice ya está en recuperación o bloqueado, o la clave
-         * de la generación activa desapareció en una escritura real, en cuyo
-         * caso se transiciona a `recuperacion_pendiente` y se bloquea. La
-         * primera inicialización legítima —ni fila de estado ni sobres
-         * persistidos— sí incorpora su clave `v1` de forma explícita.
+         * Nunca genera una clave sustituta. La conciliación bajo [candado] deja
+         * el índice en `recuperacion_pendiente` si la clave de la generación
+         * activa desapareció con sobres persistidos, y solo incorpora una clave
+         * cuando no hay datos protegidos que puedan quedar inverificables.
          */
         suspend fun selloHmac(ahora: Instant = Instant.now()): SelloIndiceHmac =
             candado.withLock {
-                val anterior = db.estadoIndiceHmacDao().actual()
-                val filaExistia = anterior != null
-                val base = anterior ?: asegurarBloqueado(ahora)
-                val estado = aModelo(base)
-                if (!estado.esOperativo) {
-                    return@withLock SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
-                }
-                val claveActiva = claves.claveHmac(estado.generacionActiva)
-                if (claveActiva != null) {
-                    return@withLock SelloIndiceHmac.Disponible(claveActiva, estado.generacionActiva)
-                }
-                val inicializacionLegitima = !filaExistia && !haySobres()
-                if (inicializacionLegitima) {
-                    return@withLock SelloIndiceHmac.Disponible(
-                        claves.crearClaveHmac(estado.generacionActiva),
-                        estado.generacionActiva,
-                    )
-                }
-                // La transición de pérdida se aplica aquí, no con
-                // `detectarPerdidaClave()`, porque el `Mutex` no es reentrante
-                // y esa llamada volvería a tomarlo: la máquina pura es la misma.
-                when (val resultado = MaquinaIndiceHmac.detectarPerdidaClave(estado, ahora)) {
-                    is ResultadoTransicion.Ok ->
-                        db.estadoIndiceHmacDao().guardar(aEntidad(resultado.estado, base))
+                when (val integridad = conciliarBloqueado(ahora)) {
+                    is Conciliacion.Listo ->
+                        SelloIndiceHmac.Disponible(integridad.clave, integridad.estado.generacionActiva)
 
-                    is ResultadoTransicion.Rechazada -> Unit
+                    is Conciliacion.Perdida, is Conciliacion.Recuperacion ->
+                        SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
                 }
-                SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())
             }
 
         /** ¿Hay algún sobre `hmac:vN:...` persistido en las tablas con HMAC? */
@@ -193,12 +176,18 @@ class IndiceHmacRepositorio
         /**
          * Bloqueo tipado de las operaciones de igualdad HMAC.
          *
-         * Es `null` solo en `operativo`; en cualquier otra fase devuelve
-         * [RechazoIndiceHmac] con `indice_hmac_no_operativo`.
+         * Es `null` solo cuando la conciliación confirma que el índice está
+         * operativo **y** su clave activa sigue en la bóveda; en cualquier otro
+         * caso devuelve [RechazoIndiceHmac] con `indice_hmac_no_operativo`. Si
+         * la clave desapareció con sobres persistidos, la conciliación deja el
+         * índice en `recuperacion_pendiente` antes de bloquear.
          */
         suspend fun bloqueoIgualdad(ahora: Instant = Instant.now()): RechazoIndiceHmac? =
             candado.withLock {
-                PlanReconstruccionHmac.bloqueoIgualdad(aModelo(asegurarBloqueado(ahora)))
+                when (conciliarBloqueado(ahora)) {
+                    is Conciliacion.Listo -> null
+                    is Conciliacion.Perdida, is Conciliacion.Recuperacion -> RechazoIndiceHmac()
+                }
             }
 
         /** Registra o actualiza una fila no reconstruible por su clave única. */
@@ -247,6 +236,60 @@ class IndiceHmacRepositorio
 
         /** Elimina todas las filas pendientes (solo tras resolverlas por reingreso o borrado). */
         suspend fun eliminarPendientes() = db.hmacPendienteDao().eliminarTodas()
+
+        /**
+         * Conciliación interna. Requiere que el llamador ya tenga [candado]: el
+         * `Mutex` no es reentrante. Distingue la instalación sin datos de la
+         * pérdida real por la presencia de sobres, nunca por el estado solo.
+         */
+        private suspend fun conciliarBloqueado(ahora: Instant): Conciliacion {
+            val dao = db.estadoIndiceHmacDao()
+            val anterior = dao.actual()
+            if (anterior == null) {
+                if (haySobres()) {
+                    // Anomalía: sobres sellados sin la fila que describe su
+                    // generación. Se preservan los datos y se declara la pérdida
+                    // sin crear ninguna clave.
+                    val base = filaInicial(ahora).also { dao.guardar(it) }
+                    return declararPerdidaBloqueado(base, ahora)
+                }
+                val clave = claves.crearClaveHmac(GENERACION_INICIAL)
+                val fila = filaInicial(ahora).also { dao.guardar(it) }
+                return Conciliacion.Listo(aModelo(fila), clave, inicializado = true)
+            }
+            val estado = aModelo(anterior)
+            if (!estado.esOperativo) return Conciliacion.Recuperacion(estado)
+            val clave = claves.claveHmac(estado.generacionActiva)
+            if (clave != null) return Conciliacion.Listo(estado, clave, inicializado = false)
+            if (haySobres()) return declararPerdidaBloqueado(anterior, ahora)
+            // Sin sobres no hay valores protegidos que puedan quedar
+            // inverificables: se materializa la generación persistida, nunca
+            // una sustituta.
+            return Conciliacion.Listo(
+                estado,
+                claves.crearClaveHmac(estado.generacionActiva),
+                inicializado = true,
+            )
+        }
+
+        /**
+         * `operativo → recuperacion_pendiente` dentro de la conciliación. Una
+         * transición rechazada conserva el estado y no escribe nada.
+         */
+        private suspend fun declararPerdidaBloqueado(
+            anterior: EstadoIndiceHmacEntity,
+            ahora: Instant,
+        ): Conciliacion {
+            val estado = aModelo(anterior)
+            return when (val resultado = MaquinaIndiceHmac.detectarPerdidaClave(estado, ahora)) {
+                is ResultadoTransicion.Ok -> {
+                    db.estadoIndiceHmacDao().guardar(aEntidad(resultado.estado, anterior))
+                    Conciliacion.Perdida(resultado.estado)
+                }
+
+                is ResultadoTransicion.Rechazada -> Conciliacion.Recuperacion(estado)
+            }
+        }
 
         private suspend fun transicion(
             ahora: Instant,
@@ -320,6 +363,37 @@ class IndiceHmacRepositorio
                         "motivo HMAC pendiente inválido"
                     },
             )
+
+        /**
+         * Resultado interno de conciliar fila, sobres y clave. [Listo] garantiza
+         * que [clave] es la de la generación activa de [estado].
+         */
+        private sealed interface Conciliacion {
+            val estado: EstadoIndiceHmac
+
+            data class Listo(
+                override val estado: EstadoIndiceHmac,
+                val clave: SecretKey,
+                val inicializado: Boolean,
+            ) : Conciliacion
+
+            data class Perdida(override val estado: EstadoIndiceHmac) : Conciliacion
+
+            data class Recuperacion(override val estado: EstadoIndiceHmac) : Conciliacion
+        }
+
+        private fun Conciliacion.publica(): IntegridadIndiceHmac =
+            when (this) {
+                is Conciliacion.Listo ->
+                    if (inicializado) {
+                        IntegridadIndiceHmac.Inicializado(estado)
+                    } else {
+                        IntegridadIndiceHmac.Operativo(estado)
+                    }
+
+                is Conciliacion.Perdida -> IntegridadIndiceHmac.Perdida(estado)
+                is Conciliacion.Recuperacion -> IntegridadIndiceHmac.Recuperacion(estado)
+            }
 
         private companion object {
             const val ID_SINGLETON = SembrarEstadoIndiceHmac.ID_SINGLETON

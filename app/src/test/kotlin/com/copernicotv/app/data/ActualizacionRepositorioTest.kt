@@ -57,7 +57,7 @@ class ActualizacionRepositorioTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = ActualizacionRepositorio(db, claves, contexto)
+        repositorio = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
         runBlocking { sembrarFuenteYLista() }
     }
 
@@ -384,7 +384,7 @@ class ActualizacionRepositorioTest {
                     .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                     .allowMainThreadQueries()
                     .build()
-            repositorio = ActualizacionRepositorio(db, claves, contexto)
+            repositorio = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
 
             val actualizado = requireNotNull(db.canalDao().porId(original.id))
             assertEquals(original.id, actualizado.id)
@@ -399,7 +399,7 @@ class ActualizacionRepositorioTest {
         texto: String,
         causa: String = CausasActualizacion.MANUAL,
     ): ResumenActualizacion {
-        val importado = ImportadorM3U.importar(texto, claves.claveHmac)
+        val importado = ImportadorM3U.importar(texto, claves.crearClaveHmac(1))
         return repositorio.actualizarConImportado(listaId, importado, causa)
     }
 

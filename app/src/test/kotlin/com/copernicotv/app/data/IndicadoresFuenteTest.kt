@@ -52,9 +52,17 @@ class IndicadoresFuenteTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        actualizacion = ActualizacionRepositorio(db, claves, contexto)
+        val indice = IndiceHmacRepositorio(db, claves)
+        actualizacion = ActualizacionRepositorio(db, claves, indice, contexto)
         indicadores = IndicadoresFuenteRepositorioRoom(db)
-        runBlocking { sembrarFuenteYLista() }
+        runBlocking {
+            // Producción siembra la fila al crear la base y la guardia incorpora
+            // la clave antes de aceptar datos protegidos. Este fixture usa
+            // `databaseBuilder` sin ese callback: inicializa el índice antes de
+            // sembrar la Lista con sobre HMAC.
+            indice.inicializarLegitimamente()
+            sembrarFuenteYLista()
+        }
     }
 
     @After
@@ -66,7 +74,7 @@ class IndicadoresFuenteTest {
     @Test
     fun `S7b un intento exitoso registra exito y conserva la disponibilidad`() {
         runBlocking {
-            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.claveHmac))
+            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.crearClaveHmac(1)))
 
             val indicador = indicadores.observar().first().single()
 
@@ -80,7 +88,7 @@ class IndicadoresFuenteTest {
     @Test
     fun `S7c el fallo de actualizacion no cambia la disponibilidad`() {
         runBlocking {
-            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.claveHmac))
+            actualizacion.actualizarConImportado(listaId, ImportadorM3U.importar(TEXTO, claves.crearClaveHmac(1)))
             assertEquals(DisponibilidadFuente.DISPONIBLE, indicadores.observar().first().single().disponibilidad)
 
             // La ubicación cifrada de la Lista está corrupta: `leer` falla antes

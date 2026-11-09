@@ -97,7 +97,7 @@ class ColeccionRepositorioTest {
     fun `el orden de la coleccion no toca el orden de las listas y viceversa`() {
         runBlocking {
             val colecciones = ColeccionRepositorio(db)
-            val crud = CatalogoCrudRepositorio(db, claves, preferencias)
+            val crud = CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias)
             assertEquals(listOf("C1", "C2", "C3"), nombresLista(lista1))
             assertEquals(listOf("C3", "C2", "C1"), nombresLista(lista2))
 

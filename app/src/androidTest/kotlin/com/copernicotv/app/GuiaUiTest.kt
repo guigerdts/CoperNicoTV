@@ -13,6 +13,7 @@ import androidx.compose.ui.test.printToString
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.AsociacionRepositorio
 import com.copernicotv.app.data.EpgRepositorio
+import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.PreferenciasRetencion
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -86,7 +87,7 @@ class GuiaUiTest {
         val ahora = Instant.now()
         val canalId = sembrarCanal(ahora)
         val fuenteGuiaId = sembrarFuenteGuia(ahora)
-        val repositorio = EpgRepositorio(db, claves, preferenciasRetencion)
+        val repositorio = EpgRepositorio(db, IndiceHmacRepositorio(db, claves), preferenciasRetencion)
         val resumen =
             repositorio.importar(
                 fuenteGuiaId = fuenteGuiaId,

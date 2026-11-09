@@ -71,6 +71,7 @@ class ActualizacionRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
     ) {
@@ -527,6 +528,11 @@ class ActualizacionRepositorio
         }
 
         private suspend fun leer(lista: ListaEntity): Lectura {
+            // DC-04 §7 (Q2/Q3): sin índice operativo no se descarga ni se sella;
+            // el bloqueo es real para esta lectura y toda escritura aguas abajo.
+            val sello =
+                indice.selloHmac() as? SelloIndiceHmac.Disponible
+                    ?: return Lectura.Fallo(ERROR_INDICE_HMAC_NO_OPERATIVO)
             val descifrado =
                 CifradoAes.descifrar(
                     claves.claveAes,
@@ -537,16 +543,25 @@ class ActualizacionRepositorio
                 (descifrado as? ResultadoDescifrado.Ok)?.bytes?.toString(Charsets.UTF_8)
                     ?: return Lectura.Fallo(ERROR_UBICACION_INVALIDA)
             return when (lista.esquema) {
-                "content" -> leerSaf(ubicacion)
-                "http", "https" -> leerHttp(ubicacion)
+                "content" -> leerSaf(ubicacion, sello)
+                "http", "https" -> leerHttp(ubicacion, sello)
                 else -> Lectura.Fallo(ERROR_ESQUEMA_NO_ADMITIDO)
             }
         }
 
-        private fun leerSaf(ubicacion: String): Lectura =
+        private fun leerSaf(
+            ubicacion: String,
+            sello: SelloIndiceHmac.Disponible,
+        ): Lectura =
             try {
                 contexto.contentResolver.openInputStream(Uri.parse(ubicacion))?.use { entrada ->
-                    Lectura.Ok(ImportadorM3U.importar(entrada, claves.claveHmac))
+                    Lectura.Ok(
+                        ImportadorM3U.importar(
+                            entrada = entrada,
+                            claveHmac = sello.clave,
+                            generacionHmac = sello.generacion,
+                        ),
+                    )
                 } ?: Lectura.Fallo(ERROR_ARCHIVO_INACCESIBLE)
             } catch (_: SecurityException) {
                 Lectura.Fallo(ERROR_ARCHIVO_INACCESIBLE)
@@ -554,7 +569,10 @@ class ActualizacionRepositorio
                 Lectura.Fallo(ERROR_ARCHIVO_INACCESIBLE)
             }
 
-        private fun leerHttp(ubicacion: String): Lectura {
+        private fun leerHttp(
+            ubicacion: String,
+            sello: SelloIndiceHmac.Disponible,
+        ): Lectura {
             val conexion =
                 URL(ubicacion).openConnection() as? HttpURLConnection
                     ?: return Lectura.Fallo(ERROR_SIN_CONEXION)
@@ -566,7 +584,11 @@ class ActualizacionRepositorio
                     in 200..299 ->
                         Lectura.Ok(
                             conexion.inputStream.use { entrada ->
-                                ImportadorM3U.importar(entrada, claves.claveHmac)
+                                ImportadorM3U.importar(
+                                    entrada = entrada,
+                                    claveHmac = sello.clave,
+                                    generacionHmac = sello.generacion,
+                                )
                             },
                         )
                     in 400..499 -> Lectura.Fallo(ERROR_HTTP_4XX)
@@ -684,6 +706,7 @@ class ActualizacionRepositorio
             const val ERROR_TIMEOUT = "timeout"
             const val ERROR_HTTP_4XX = "http_4xx"
             const val ERROR_HTTP_5XX = "http_5xx"
+            const val ERROR_INDICE_HMAC_NO_OPERATIVO = "indice_hmac_no_operativo"
             const val ERROR_SIN_CANALES = "sin_canales"
             const val ERROR_ACTUALIZACION_FALLIDA = "actualizacion_fallida"
         }

@@ -20,7 +20,6 @@ import com.copernicotv.core.identity.ClaveCanal
 import com.copernicotv.core.identity.ClavePresentacion
 import com.copernicotv.core.identity.EstadoCanal
 import com.copernicotv.core.identity.ResultadoCanonizacion
-import com.copernicotv.core.m3u.ImportadorM3U
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -58,6 +57,7 @@ class CatalogoCrudRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val indice: IndiceHmacRepositorio,
         private val preferencias: PreferenciasOrden,
     ) {
         fun listas(): Flow<List<ListaResumen>> =
@@ -81,6 +81,9 @@ class CatalogoCrudRepositorio
                     CanonicalizadorUrl.canonizar(ubicacion, CampoUrl.LISTA_UBICACION)
                         as? ResultadoCanonizacion.Ok
                         ?: return@withContext ResultadoAccion.Error(ERROR_UBICACION_INVALIDA)
+                val sello =
+                    indice.selloHmac() as? SelloIndiceHmac.Disponible
+                        ?: return@withContext ResultadoAccion.Error(ERROR_INDICE_HMAC_NO_OPERATIVO)
                 try {
                     db.withTransaction {
                         val ahora = Instant.now()
@@ -108,8 +111,8 @@ class CatalogoCrudRepositorio
                                 ubicacionHmac =
                                     HmacUrl
                                         .calcularSobre(
-                                            clave = claves.claveHmac,
-                                            generacion = ImportadorM3U.GENERACION_HMAC,
+                                            clave = sello.clave,
+                                            generacion = sello.generacion,
                                             campo = CampoUrl.LISTA_UBICACION,
                                             clase = canonica.clase,
                                             urlCanonica = canonica.urlCanonica,
@@ -208,6 +211,9 @@ class CatalogoCrudRepositorio
                     CanonicalizadorUrl.canonizar(url.trim(), CampoUrl.CANAL_URL_STREAM)
                         as? ResultadoCanonizacion.Ok
                         ?: return@withContext ResultadoAccion.Error(ERROR_URL_INVALIDA)
+                val sello =
+                    indice.selloHmac() as? SelloIndiceHmac.Disponible
+                        ?: return@withContext ResultadoAccion.Error(ERROR_INDICE_HMAC_NO_OPERATIVO)
                 val nombrePersistido = nombre?.takeIf { it.isNotEmpty() }
                 val identidad =
                     ClaveCanal.derivar(
@@ -234,8 +240,8 @@ class CatalogoCrudRepositorio
                                     urlStreamHmac =
                                         HmacUrl
                                             .calcularSobre(
-                                                clave = claves.claveHmac,
-                                                generacion = ImportadorM3U.GENERACION_HMAC,
+                                                clave = sello.clave,
+                                                generacion = sello.generacion,
                                                 campo = CampoUrl.CANAL_URL_STREAM,
                                                 clase = canonica.clase,
                                                 urlCanonica = canonica.urlCanonica,
@@ -433,6 +439,7 @@ class CatalogoCrudRepositorio
             const val ERROR_LISTA_NO_EXISTE = "lista_no_existe"
             const val ERROR_ELIMINAR_LISTA = "eliminar_lista_fallida"
             const val ERROR_URL_INVALIDA = "url_invalida"
+            const val ERROR_INDICE_HMAC_NO_OPERATIVO = "indice_hmac_no_operativo"
             const val ERROR_URL_ILEGIBLE = "url_ilegible"
             const val ERROR_CANAL_DUPLICADO = "canal_duplicado"
             const val ERROR_CANAL_NO_EXISTE = "canal_no_existe"

@@ -3,6 +3,7 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.hmac.FaseIndiceHmac
 import com.copernicotv.core.hmac.HmacPendiente
@@ -37,6 +38,8 @@ class IndiceHmacRepositorioTest {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: IndiceHmacRepositorio
 
+    private val claves = ClavesEnMemoria()
+
     private val ahora: Instant = Instant.parse("2026-01-01T00:00:00Z")
 
     @Before
@@ -47,7 +50,7 @@ class IndiceHmacRepositorioTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = IndiceHmacRepositorio(db)
+        repositorio = IndiceHmacRepositorio(db, claves)
     }
 
     @After
@@ -203,7 +206,7 @@ class IndiceHmacRepositorioTest {
             repositorio.detectarPerdidaClave(ahora)
             repositorio.iniciarReconstruccion(2, ahora)
 
-            val otraInstancia = IndiceHmacRepositorio(db)
+            val otraInstancia = IndiceHmacRepositorio(db, claves)
             val estado = otraInstancia.estado(ahora)
 
             assertEquals(FaseIndiceHmac.RECUPERACION_EN_CURSO, estado.fase)

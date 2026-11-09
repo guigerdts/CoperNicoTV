@@ -45,7 +45,7 @@ class ImportacionE2Test {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = CatalogoRepositorio(db, claves, contexto)
+        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
     }
 
     @After
@@ -206,7 +206,8 @@ class ImportacionE2Test {
         runBlocking {
             val primera = repositorio.importar(TEXTO_E2, "Fuente E2", UBICACION)
             assertEquals(1, primera.canales)
-            val rapido = CatalogoRepositorio(db, claves, contexto, TiemposHttp(lecturaMs = 300))
+            val rapido =
+                CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, TiemposHttp(lecturaMs = 300))
             conServidorMudo { url ->
                 val resumen = rapido.importarDesdeUrl("Fuente E2", url)
 

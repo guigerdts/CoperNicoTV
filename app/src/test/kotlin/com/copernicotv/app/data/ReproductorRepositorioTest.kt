@@ -36,7 +36,7 @@ class ReproductorRepositorioTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        catalogo = CatalogoRepositorio(db, claves, contexto)
+        catalogo = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
         reproductor = ReproductorRepositorio(db, claves)
     }
 

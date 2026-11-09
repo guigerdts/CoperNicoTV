@@ -40,6 +40,7 @@ import java.time.Instant
 class EpgRepositorioTest {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: EpgRepositorio
+    private val claves = ClavesEnMemoria()
     private lateinit var preferencias: FakePreferenciasRetencion
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
@@ -51,7 +52,7 @@ class EpgRepositorioTest {
                 .allowMainThreadQueries()
                 .build()
         preferencias = FakePreferenciasRetencion()
-        repositorio = EpgRepositorio(db, ClavesEnMemoria(), preferencias)
+        repositorio = EpgRepositorio(db, IndiceHmacRepositorio(db, claves), preferencias)
         repositorio.reloj = { AHORA }
     }
 

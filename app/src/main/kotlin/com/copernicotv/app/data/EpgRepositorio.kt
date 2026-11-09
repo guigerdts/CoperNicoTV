@@ -1,7 +1,6 @@
 package com.copernicotv.app.data
 
 import androidx.room.withTransaction
-import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AsociacionEntity
 import com.copernicotv.app.data.db.entities.EstadoActualizacionEntity
@@ -70,7 +69,7 @@ class EpgRepositorio
     @Inject
     constructor(
         private val db: AppDatabase,
-        private val claves: ClavesApp,
+        private val indice: IndiceHmacRepositorio,
         private val preferenciasRetencion: PreferenciasRetencion,
         private val parser: ParserXmltv = ParserXmltv(),
     ) {
@@ -252,11 +251,11 @@ class EpgRepositorio
             var total = tamanos.sumOf { it.tamano }
             if (total <= limites.presupuestoBytes) return
             val aEliminar = mutableListOf<Long>()
-            var indice = 0
-            while (total > limites.presupuestoBytes && indice < tamanos.size) {
-                total -= tamanos[indice].tamano
-                aEliminar += tamanos[indice].id
-                indice++
+            var posicion = 0
+            while (total > limites.presupuestoBytes && posicion < tamanos.size) {
+                total -= tamanos[posicion].tamano
+                aEliminar += tamanos[posicion].id
+                posicion++
             }
             for (bloque in aEliminar.chunked(TAMANO_BORRADO)) {
                 dao.eliminarPorIds(bloque)
@@ -269,11 +268,16 @@ class EpgRepositorio
             canales: Map<String, CanalXmltv>,
             ahora: Instant,
         ) {
+            // Clave del índice en su generación activa, sin regenerarla
+            // (DC-04 §5): si el índice no está operativo o la clave activa
+            // falta, las huellas se calculan sin clave (ruta grácil de E3,
+            // con `requiereClaveHmac`); nunca se crea una clave sustituta.
+            val claveHuella = (indice.selloHmac() as? SelloIndiceHmac.Disponible)?.clave
             val observados =
                 canales.values.map { canal ->
                     ObservacionCanalGuia(
                         channelIdTexto = canal.id,
-                        resultadoHuella = HuellaAsociacion.calcular(canal.nombres, canal.iconos, claves.claveHmac),
+                        resultadoHuella = HuellaAsociacion.calcular(canal.nombres, canal.iconos, claveHuella),
                     )
                 }
             db.withTransaction {

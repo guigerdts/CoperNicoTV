@@ -2,6 +2,7 @@ package com.copernicotv.app.data.cache
 
 import android.util.Log
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CacheM3UEntity
 import com.copernicotv.app.data.db.entities.CacheXmltvEntity
@@ -97,6 +98,7 @@ class RepositorioCache(
     private val almacen: AlmacenCache,
     private val descargador: Descargador,
     private val claves: ClavesApp,
+    private val indice: IndiceHmacRepositorio,
     private val presupuesto: PresupuestoCache = PresupuestoCache(),
 ) {
     /** Referencias abiertas para lectura: nunca se evictan mientras se sirven. */
@@ -106,6 +108,10 @@ class RepositorioCache(
         clave: ClaveCache,
         ahora: Instant,
     ): ResultadoLecturaCache {
+        // El golpe de caché es una igualdad por `url_hmac` dependiente del
+        // índice (DC-04 §7): sin índice operativo es una omisión segura,
+        // nunca un golpe falso ni lectura de sobres de otra generación.
+        if (indice.bloqueoIgualdad() != null) return ResultadoLecturaCache.SinCopia
         val fila = filaPorClave(clave) ?: return ResultadoLecturaCache.SinCopia
         val flujo = almacen.abrir(fila.archivoRef, clave.tipo) ?: return ResultadoLecturaCache.Ilegible
         enUso.add(fila.archivoRef)
@@ -130,6 +136,10 @@ class RepositorioCache(
         intervalo: Duration,
         ahora: Instant,
     ): ResultadoActualizacion {
+        // Escritura dependiente del índice (DC-04 §7): sin índice operativo no
+        // se descarga ni se persiste ninguna columna HMAC.
+        val rechazo = indice.bloqueoIgualdad()
+        if (rechazo != null) return ResultadoActualizacion.Fallo(rechazo.codigo, existeCopia(clave))
         val temporal = almacen.temporalNuevo()
         return try {
             when (val descarga = descargador.descargar(url, temporal)) {
@@ -164,6 +174,10 @@ class RepositorioCache(
      * vigente: un cambio de URL deja la copia anterior inutilizable.
      */
     suspend fun invalidarOtrasUrls(vigente: ClaveCache) {
+        // Compara sobres `url_hmac` (DC-04 §7): con el índice no operativo la
+        // invalidación queda pospuesta en lugar de decidir con sobres que no
+        // pueden compararse; el barrido posterior la reintenta.
+        if (indice.bloqueoIgualdad() != null) return
         val vigenteBytes = vigente.urlHmac.toByteArray(Charsets.UTF_8)
         when (vigente) {
             is ClaveCache.M3U -> {

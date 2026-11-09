@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
@@ -58,7 +59,13 @@ class RepositorioCacheTest {
         directorio = File(contexto.cacheDir, "cache-test-${UUID.randomUUID()}")
         almacen = AlmacenCache(directorio, claves)
         descargador = DescargadorContador()
-        repositorio = RepositorioCache(db, almacen, descargador, claves)
+        val indice = IndiceHmacRepositorio(db, claves)
+        repositorio = RepositorioCache(db, almacen, descargador, claves, indice)
+        // Producción siembra la fila al crear la base y la guardia incorpora la
+        // clave antes de aceptar datos protegidos. Estos fixtures usan
+        // `inMemoryDatabaseBuilder` sin ese callback, así que inicializan el
+        // índice antes de sembrar sobres HMAC.
+        runBlocking { indice.inicializarLegitimamente(t0) }
     }
 
     @After
@@ -253,6 +260,7 @@ class RepositorioCacheTest {
                     AlmacenCache(directorio, claves) { false },
                     descargador,
                     claves,
+                    IndiceHmacRepositorio(db, claves),
                 )
 
             val informe = conFallo.barrerHuerfanos(t0)
@@ -288,6 +296,7 @@ class RepositorioCacheTest {
                     almacen,
                     descargador,
                     claves,
+                    IndiceHmacRepositorio(db, claves),
                     PresupuestoCache(m3uPorArchivo = 50, m3uPorLista = 1_000, m3uTotal = 1_000, global = 10_000),
                 )
             descargador.contenido = ByteArray(40) { 0x41 }
@@ -312,6 +321,7 @@ class RepositorioCacheTest {
                     almacen,
                     descargador,
                     claves,
+                    IndiceHmacRepositorio(db, claves),
                     PresupuestoCache(
                         m3uTotal = 140,
                         m3uPorLista = 140,
@@ -346,6 +356,7 @@ class RepositorioCacheTest {
                     almacen,
                     descargador,
                     claves,
+                    IndiceHmacRepositorio(db, claves),
                     PresupuestoCache(
                         m3uTotal = 140,
                         m3uPorLista = 140,

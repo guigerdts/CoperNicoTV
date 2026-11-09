@@ -59,7 +59,13 @@ class RepositorioCacheTest {
         directorio = File(contexto.cacheDir, "cache-test-${UUID.randomUUID()}")
         almacen = AlmacenCache(directorio, claves)
         descargador = DescargadorContador()
-        repositorio = RepositorioCache(db, almacen, descargador, claves, IndiceHmacRepositorio(db, claves))
+        val indice = IndiceHmacRepositorio(db, claves)
+        repositorio = RepositorioCache(db, almacen, descargador, claves, indice)
+        // Producción siembra la fila al crear la base y la guardia incorpora la
+        // clave antes de aceptar datos protegidos. Estos fixtures usan
+        // `inMemoryDatabaseBuilder` sin ese callback, así que inicializan el
+        // índice antes de sembrar sobres HMAC.
+        runBlocking { indice.inicializarLegitimamente(t0) }
     }
 
     @After

@@ -52,9 +52,17 @@ class IndicadoresFuenteTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        actualizacion = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+        val indice = IndiceHmacRepositorio(db, claves)
+        actualizacion = ActualizacionRepositorio(db, claves, indice, contexto)
         indicadores = IndicadoresFuenteRepositorioRoom(db)
-        runBlocking { sembrarFuenteYLista() }
+        runBlocking {
+            // Producción siembra la fila al crear la base y la guardia incorpora
+            // la clave antes de aceptar datos protegidos. Este fixture usa
+            // `databaseBuilder` sin ese callback: inicializa el índice antes de
+            // sembrar la Lista con sobre HMAC.
+            indice.inicializarLegitimamente()
+            sembrarFuenteYLista()
+        }
     }
 
     @After

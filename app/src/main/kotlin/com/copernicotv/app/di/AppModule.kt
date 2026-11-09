@@ -2,8 +2,6 @@ package com.copernicotv.app.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.room.RoomDatabase
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.IndiceHmacRepositorio
@@ -13,6 +11,7 @@ import com.copernicotv.app.data.cache.Descargador
 import com.copernicotv.app.data.cache.DescargadorHttp
 import com.copernicotv.app.data.cache.RepositorioCache
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.SembrarEstadoIndiceHmac
 import com.copernicotv.app.data.db.dao.AparienciaDao
 import com.copernicotv.app.data.db.dao.CacheM3UDao
 import com.copernicotv.app.data.db.dao.CacheXmltvDao
@@ -42,7 +41,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.io.File
-import java.time.Instant
 import javax.inject.Singleton
 
 /** Grafo de la aplicación: base Room v1, DAOs y claves de Keystore. */
@@ -58,7 +56,7 @@ object AppModule {
     ): AppDatabase =
         Room
             .databaseBuilder(contexto, AppDatabase::class.java, AppDatabase.NOMBRE)
-            .addCallback(SembrarEstadoIndiceHmac)
+            .addCallback(SembrarEstadoIndiceHmac.callback())
             .build()
 
     @Provides
@@ -156,25 +154,4 @@ object AppModule {
     @Provides
     @Singleton
     fun claves(implementacion: ClavesKeystore): ClavesApp = implementacion
-}
-
-/**
- * Siembra la fila singleton de `EstadoIndiceHmac` (`id = 1`) al crear la base.
- *
- * El índice HMAC se declara operativo con la generación `v1` y sin filas
- * pendientes; E2-T6 es dueño de la reconstrucción y de sus transiciones.
- */
-private object SembrarEstadoIndiceHmac : RoomDatabase.Callback() {
-    override fun onCreate(db: SupportSQLiteDatabase) {
-        val ahora = Instant.now().toEpochMilli()
-        db.execSQL(
-            """
-            INSERT OR IGNORE INTO EstadoIndiceHmac
-                (id, estado, versionActiva, versionObjetivo, iniciadoEn, actualizadoEn,
-                 filasTotales, filasReconstruidas, filasPendientes, ultimoErrorTipo)
-            VALUES (1, 'operativo', 'hmac:v1', NULL, ?, ?, 0, 0, 0, NULL)
-            """.trimIndent(),
-            arrayOf(ahora, ahora),
-        )
-    }
 }

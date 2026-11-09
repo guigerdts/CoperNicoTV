@@ -10,6 +10,7 @@ import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
 import com.copernicotv.core.hmac.FaseIndiceHmac
+import com.copernicotv.core.hmac.RechazoIndiceHmac
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.CanonicalizadorUrl
 import com.copernicotv.core.identity.ResultadoCanonizacion

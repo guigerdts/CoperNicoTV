@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.printToString
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
@@ -54,10 +55,17 @@ class FuentesUiTest {
     @Inject
     lateinit var claves: ClavesApp
 
+    @Inject
+    lateinit var indice: IndiceHmacRepositorio
+
     @Before
     fun preparar() {
         hiltRule.inject()
         db.clearAllTables()
+        // `clearAllTables` borra la fila sembrada al crear la base; producción
+        // siempre arranca con fila y clave antes de aceptar datos protegidos.
+        // Restituirlas aquí evita que la semilla con sobres parezca una pérdida.
+        runBlocking { indice.inicializarLegitimamente() }
     }
 
     @Test

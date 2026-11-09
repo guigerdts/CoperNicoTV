@@ -64,7 +64,7 @@ class IndiceHmacRepositorioConcurrenciaTest {
                             filasTotales = 100,
                             filasReconstruidas = avances[i],
                             filasPendientes = 0,
-                            ahora = base.plusSeconds(3 + i),
+                            ahora = base.plusSeconds(3L + i),
                         )
                     }
 

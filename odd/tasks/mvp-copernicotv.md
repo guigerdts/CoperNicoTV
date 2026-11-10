@@ -1075,7 +1075,13 @@ E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La h
 | E6-T5 | Diagnóstico | Protocolo, pistas, buffer y último error; URL saneada; validado en emuladores móvil y TV con CI verde (L82) |
 | E6-T6 | Zapeo y volumen | Volumen, siguiente/anterior y cambio sin volver al Catálogo; validado en emuladores móvil y TV con CI verde (L83) |
 
-E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 está **cerrada en el alcance de pistas** —audio y subtítulos seleccionables, ausencia segura y comportamiento D3— (L72); S44b (`resizeMode` persistido) y el caso «techo» de S44a quedan en E7-T5 y la fila S44 no se declara completa. E6-T4 está **cerrada** —S20 completa: tres reintentos de 1 s, 2 s y 4 s, error definitivo tras el tercero, sin reintento en 4xx no recuperables, recuperación sin recrear la sesión, cancelación al cambiar de Canal o salir y aviso de reintento en la UI— (L73). E6-T5 está **cerrada** —diagnóstico técnico de reproducción en panel reactivo, copiable y saneado, con cobertura instrumentada en móvil y TV— (L82). E6-T6 está **cerrada** —zapeo siguiente/anterior sin volver al Catálogo y volumen con paso, límites y valor visible, en móvil y TV— (L83). E6 en conjunto no se declara cerrada porque E6-T1 permanece **iniciada, no cerrada**: la reproducción DASH, RTSP y SmoothStreaming sigue sin validar por reproducción.
+E6-T1 está **cerrada salvo la verificación de RTSP**: la sesión Media3 configura la fuente
+según el protocolo clasificado por `:core` —el `MediaItem` declara el MIME del contenedor
+(HLS, DASH, SmoothStreaming) y la fábrica deja de deducirlo de la extensión de la URL— y
+MPEG-DASH y SmoothStreaming quedan **validados por reproducción real** en emuladores móvil
+y TV (L84). RTSP sigue sin validarse por reproducción: no hay servidor RTSP en el entorno
+de pruebas, la limitación está documentada con causa (L84) y no se declara soportado. RTMP
+continúa no soportado (L70). E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 está **cerrada en el alcance de pistas** —audio y subtítulos seleccionables, ausencia segura y comportamiento D3— (L72); S44b (`resizeMode` persistido) y el caso «techo» de S44a quedan en E7-T5 y la fila S44 no se declara completa. E6-T4 está **cerrada** —S20 completa: tres reintentos de 1 s, 2 s y 4 s, error definitivo tras el tercero, sin reintento en 4xx no recuperables, recuperación sin recrear la sesión, cancelación al cambiar de Canal o salir y aviso de reintento en la UI— (L73). E6-T5 está **cerrada** —diagnóstico técnico de reproducción en panel reactivo, copiable y saneado, con cobertura instrumentada en móvil y TV— (L82). E6-T6 está **cerrada** —zapeo siguiente/anterior sin volver al Catálogo y volumen con paso, límites y valor visible, en móvil y TV— (L83). E6 en conjunto permanece **no declarada cerrada** porque la reproducción RTSP de E6-T1 sigue sin validarse; implementación y validación no se confunden.
 
 ### 8.7 E7 — Android TV, móvil y preferencias
 
@@ -4629,3 +4635,73 @@ acepta un padding horizontal configurable (8 dp en esta fila) y acorta la etique
 del toggle a «Ocultar»/«Mostrar», conservando la descripción completa para accesibilidad.
 La compilación fallida repite la experiencia de L82: el hook GGA revisa código
 pero no compila, y los errores por referencias irresueltas solo aparecen en CI.
+
+### L84 — E6-T1: sesión Media3 por protocolo y fuentes (2026-11-10)
+
+**Autorización y objetivo.** Cerrar E6-T1 —«Sesión Media3 y fuentes»— en su alcance
+implementable: configurar el `MediaSource` correspondiente a cada protocolo clasificado,
+validar DASH y SmoothStreaming por reproducción real en CI, errores de formato y fuente
+inaccesible, ausencia de regresiones HLS/progresivo, cambio de canal y liberación de
+recursos, y comportamiento móvil y TV. Sin inventar compatibilidad: solo se declara
+soportado lo reproducido en pruebas. Rama única `e6-t1-protocolos`, worktree dedicado, PR
+único hacia `main` **abierto, no mergeado** (decisión del propietario). Base `09887ac`
+(merge de PR #24). Cuatro commits, 14 archivos con fixtures binarios incluidos
+(accumulated `git diff --stat 09887ac..HEAD`, técnica warm de GGA según
+`docs/agents/commit-review-restarts.md`), sin `--no-verify` ni `--admin`.
+
+**Implementación.** `be80cb5` —la clasificación llega al `MediaItem`: `SesionMedia3`
+recibe el `ProtocoloStream` de `ReproductorRepositorio` vía `ReproductorViewModel` y
+declara el MIME del contenedor (HLS `application/x-mpegURL`, DASH `application/dash+xml`,
+SmoothStreaming `application/vnd.ms-sstr+xml`); la vinculación se hace en
+`SesionMedia3.mediaItemDe` con el mapeo único `mimeDeProtocolo` —la misma clasificación
+de `ClasificadorStream`, sin segunda fuente de verdad—; RTSP se resuelve por esquema
+`rtsp://`, la URL progresiva no declara MIME y RTMP no llega a la sesión porque `:core` lo
+rechaza con `stream_rtmp_no_soportado`; ninguna dependencia Media3 cambió
+(1.5.0 con módulos hls, dash, rtsp y smoothstreaming ya presentes). `4645c7d` —fixtures
+generados con ffmpeg y commiteados en assets de androidTest: MPEG-DASH
+(`-f dash`: `p15.mpd`, `init-stream*.m4s`, `chunk-stream*-00001.m4s`), SmoothStreaming
+(`-f smoothstreaming`: manifest SSMPL en `f15/smooth.ism/manifest` con plantillas de URL
+reescritas a nombres de asset seguros `Frag-{video,audio}-{bitrate}-{start time}.m4s{v,a}`
+—las sustituciones exactas se confirmaron en el código de Media3 1.5.0
+(`SsManifest.buildRequestUri` sustituye `{bitrate}` y `{start time}` por el valor entero)
+y fragmentos fMP4 equivalentes—, `corrupto.m3u8` (texto plano con extensión HLS, fallo de
+parseo definitivo) y mime types del `ServidorMedios` para `.mpd`, `.ism/manifest`,
+`.m4s` y `.m4sv`/`.m4sa`; `FixturesF15.verificar` cubre las rutas nuevas para que una ruta
+de asset equivocada falle con mensaje específico. `f02db2e` —pruebas y filtros.
+`2dee4ae` —corrección de compilación.
+
+**Cobertura.** JVM `MimeDeProtocoloTest`: el MIME sale de la clasificación (HLS, DASH,
+SmoothStreaming declaran contenedor; progresivo, RTSP y RTMP no). Instrumentadas móviles
+`ReproductorProtocolosTest`: DASH reproduce y la posición avanza en el motor real
+(`READY`/`ENDED` + `posicion > 0`), SmoothStreaming reproduce y avanza, y un contenido
+corrupto produce el error tipado propio sin exponer la URL. TV `ReproductorProtocolosTvTest`:
+DASH reproduce en el emulador de Android TV. Regresiones y ciclo de vida los cubren las
+suites existentes sin reabrir: `ReproductorUiTest` (MP4 progresivo y HLS), reintentos
+(cuatro errores incluido 404 como fuente inaccesible), pistas, diagnóstico, zapeo (cambio
+de canal y liberación de la sesión) y ambas canarias. Los errores de formato, fuente
+inaccesible y protocolo no compatible en `:core` (`ClasificadorStreamTest`,
+`ReproductorRepositorioTest`) ya estaban cubiertos en JVM y no se reabrieron.
+
+**Verificación.** Primer run de CI `42875532139` falló en
+`:app:compileDebugAndroidTestKotlin` (módulo `instrumented-mobile` e `instrumented-tv`):
+las dos llamadas a `esperarReproduccionAvanzando` en `ReproductorUiTest` quedaron sin
+receiver al retirar el miembro privado; la extensión compartida exige
+`composeRule.esperarReproduccionAvanzando(...)` explícito —misma lección de L83(2)—,
+corregida en `2dee4ae`. Run final `42878199003` sobre `2dee4ae`: `jvm-tests`,
+`static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` **5/5 verdes**;
+`p1-android` y `p1-performance` omitidos por diseño. 69 pruebas instrumentadas móviles
+ejecutadas y finalizadas (incluso `ReproductorProtocolosTest`); reportes publicados como
+artifacts. La reproducción se declara validada solo en emuladores (KVM); la validación en
+dispositivo físico queda pendiente de forma transversal al proyecto.
+
+**Limitación documentada de RTSP.** La reproducción RTSP real no se demuestra en este
+entorno: el servidor de fixtures es HTTP en loopback (`ServidorMedios`) y una reproducción
+RTSP necesita un servidor RTSP real que el emulador interno no puede hospedar; convertir
+el flujo RTSP en cliente/servidor simulado dentro de la prueba sería exactamente la
+falsedad que E6-T1 prohíbe. La configuración queda cubierta por prueba: la clasificación
+RTSP (JVM) forma parte del flujo y el esquema `rtsp://` gobierna la selección de
+`RtspMediaSource` en `DefaultMediaSourceFactory` (Media3 1.5.0), pero **no se declara
+soportado** porque no existen pruebas de reproducción RTSP. Añadir un servidor RTSP a la
+infraestructura de CI (binario adicional y emulación de transporte) queda pendiente de
+decisión del propietario; el MVP no se declara completamente validado mientras esta
+verificación siga sin ejecutarse.

@@ -15,6 +15,8 @@ import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_ABRIR_DOCUMENTO
+import com.copernicotv.app.ui.TAG_ACCION_REPRODUCIR
+import com.copernicotv.app.ui.TAG_ACCIONES_CANAL
 import com.copernicotv.app.ui.TAG_REPRODUCTOR
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -26,10 +28,12 @@ import javax.inject.Inject
 /**
  * Foco del shell de TV de E7-T1.
  *
- * Recorrido solo con D-pad (Centrar y Atrás): en cada paso hay exactamente un
- * foco visible y al regresar del reproductor el catálogo restaura el foco en
- * su primer control. Además produce capturas reproducibles para la revisión
- * visual P2 de DC-11, que CI recoge con `adb pull`.
+ * Recorrido real del catálogo solo con D-pad: Centrar sobre un canal abre el
+ * diálogo de acciones, cuya primera acción (Reproducir) toma el foco inicial
+ * y abre el reproductor; cada superficie muestra exactamente un foco visible
+ * y al regresar del reproductor el catálogo restaura el foco en su primer
+ * control. Además produce capturas reproducibles para la revisión visual P2
+ * de DC-11, que CI recoge con `adb pull`.
  */
 @OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
@@ -60,20 +64,36 @@ class ShellFocoTvTest {
         }
         composeRule.focoUnico()
 
-        // Entrada al canal con D-pad: el foco se pide programáticamente (el
-        // canario E1-C fija el patrón) y Centrar abre el reproductor.
+        // Entrada al canal solo con D-pad: el foco se pide programáticamente
+        // (el canario E1-C fija el patrón) y Centrar abre el diálogo de
+        // acciones del canal, superficie propia del catálogo.
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).requestFocus()
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertIsFocused()
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0)
             .performKeyInput { pressKey(Key.DirectionCenter) }
 
-        // Reproductor abierto: la shell restituye un foco único, sin dejar la
-        // pantalla sin foco al cambiar de pantalla.
+        // Diálogo de acciones abierto: un solo foco visible mientras la
+        // superficie cambia; el foco inicial lo toma la primera acción.
+        composeRule.esperarHasta {
+            composeRule.onAllNodesWithTag(TAG_ACCIONES_CANAL).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.esperarHasta { composeRule.contarConFoco() == 1 }
+        composeRule.focoUnico()
+
+        // Reproducir abre el reproductor: la shell restituye un foco único
+        // y no deja la pantalla sin foco al cambiar de pantalla.
+        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR).requestFocus()
+        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR).assertIsFocused()
+        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR)
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.esperarHasta {
+            composeRule.onAllNodesWithTag(TAG_REPRODUCTOR).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.esperarHasta { composeRule.contarConFoco() == 1 }
         composeRule.onNodeWithTag(TAG_REPRODUCTOR).assertIsDisplayed()
         composeRule.focoUnico()
 
-        // Regreso: el catálogo se recompone y restaura el foco al primer
+        // Regreso: el catálogo se recompone y restaura el foco a su primer
         // control (TAG_ABRIR_DOCUMENTO recibe el foco inicial del shell).
         pressBack()
         composeRule.esperarHasta { composeRule.contarConFoco() == 1 }
@@ -82,7 +102,7 @@ class ShellFocoTvTest {
     }
 
     @Test
-    fun lasCapturasReproduciblesCubrenCatalogoYReproductorConFoco() {
+    fun lasCapturasReproduciblesCubrenCatalogoYSuRecorridoConFoco() {
         composeRule.esperarHasta {
             composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 0).fetchSemanticsNodes().isNotEmpty()
         }
@@ -92,6 +112,15 @@ class ShellFocoTvTest {
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0)
             .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.esperarHasta {
+            composeRule.onAllNodesWithTag(TAG_ACCIONES_CANAL).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR).requestFocus()
+        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR)
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.esperarHasta {
+            composeRule.onAllNodesWithTag(TAG_REPRODUCTOR).fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.esperarHasta { composeRule.contarConFoco() == 1 }
         val capturaReproductor = composeRule.capturarP2("e7t1-reproductor-arranque")
 

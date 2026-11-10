@@ -747,7 +747,9 @@ private fun FilaBotones(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Espaciado compacto: en la fila móvil el ancho es escaso y cada dp
+        // cuenta para que el control de secundarios no quede a ancho cero.
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // E6-T6: el zapeo es un control primario como play/pausa; permanece
@@ -761,21 +763,23 @@ private fun FilaBotones(
             tag = TAG_REPRODUCTOR_ANTERIOR,
             onClick = acciones.alZapearAnterior,
             habilitado = zapeo.tieneAnterior,
+            paddingHorizontal = 8.dp,
         ) { Text("«") }
         BotonControl(
             etiqueta = stringResource(R.string.reproductor_pausar),
             tag = TAG_REPRODUCTOR_ALTERNAR,
             onClick = acciones.alAlternar,
             modifier = Modifier.focusRequester(enfoqueAlternar),
+            paddingHorizontal = 8.dp,
         ) {
+            // Glifo compacto por la misma razón que « y »: la palabra
+            // completa vive en la descripción de contenido.
             Text(
-                stringResource(
-                    if (fase == EstadoReproductor.REPRODUCIENDO) {
-                        R.string.reproductor_pausar
-                    } else {
-                        R.string.reproductor_play
-                    },
-                ),
+                if (fase == EstadoReproductor.REPRODUCIENDO) {
+                    "⏸"
+                } else {
+                    "▶"
+                },
             )
         }
         BotonControl(
@@ -783,6 +787,7 @@ private fun FilaBotones(
             tag = TAG_REPRODUCTOR_SIGUIENTE,
             onClick = acciones.alZapearSiguiente,
             habilitado = zapeo.tieneSiguiente,
+            paddingHorizontal = 8.dp,
         ) { Text("»") }
         // S17b: retroceso, avance y aspecto son controles secundarios fijos;
         // play/pausa es el control primario y permanece siempre.
@@ -792,12 +797,14 @@ private fun FilaBotones(
                 tag = TAG_REPRODUCTOR_RETROCEDER,
                 onClick = { acciones.alDesplazar(-SALTO_BUSQUEDA_MS) },
                 habilitado = puedeBuscar,
+                paddingHorizontal = 8.dp,
             ) { Text("−10 s") }
             BotonControl(
                 etiqueta = stringResource(R.string.reproductor_avanzar),
                 tag = TAG_REPRODUCTOR_AVANZAR,
                 onClick = { acciones.alDesplazar(SALTO_BUSQUEDA_MS) },
                 habilitado = puedeBuscar,
+                paddingHorizontal = 8.dp,
             ) { Text("+10 s") }
         }
         Spacer(modifier = Modifier.weight(1f))
@@ -806,6 +813,7 @@ private fun FilaBotones(
                 etiqueta = stringResource(R.string.reproductor_aspecto),
                 tag = TAG_REPRODUCTOR_ASPECTO,
                 onClick = acciones.alCambiarModo,
+                paddingHorizontal = 8.dp,
             ) { Text(stringResource(modo.recursoEtiqueta())) }
         }
         BotonControl(
@@ -819,6 +827,7 @@ private fun FilaBotones(
                 ),
             tag = TAG_REPRODUCTOR_SECUNDARIOS,
             onClick = acciones.alAlternarSecundarios,
+            paddingHorizontal = 8.dp,
         ) {
             Text(
                 stringResource(

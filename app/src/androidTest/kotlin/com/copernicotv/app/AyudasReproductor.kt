@@ -173,3 +173,14 @@ internal fun ReglaPrincipal.esperarFocoEnAlternar() = esperarFocoEn(TAG_REPRODUC
 
 /** ViewModel de la pantalla; permite inspeccionar la sesión viva en pruebas. */
 internal fun ReglaPrincipal.viewModelReproductor(): ReproductorViewModel = ViewModelProvider(activity)[ReproductorViewModel::class.java]
+
+/**
+ * Volumen vigente del motor Media3, leído en el hilo principal como exige
+ * Media3 (`Player is accessed on the wrong thread`); la condición de un
+ * `esperarHasta` corre en el hilo de instrumentación y no puede leerlo directo.
+ */
+internal fun ReglaPrincipal.volumenMotorEn(viewModel: ReproductorViewModel): Float? {
+    var valor: Float? = null
+    runOnUiThread { valor = viewModel.motor?.volume }
+    return valor
+}

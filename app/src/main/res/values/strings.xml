@@ -129,8 +129,8 @@
     <string name="reproductor_modo_ajustar">Ajustar</string>
     <string name="reproductor_modo_rellenar">Rellenar</string>
     <string name="reproductor_modo_zoom">Zoom</string>
-    <string name="reproductor_secundarios_ocultar">Ocultar secundarios</string>
-    <string name="reproductor_secundarios_mostrar">Mostrar secundarios</string>
+    <string name="reproductor_secundarios_ocultar">Ocultar</string>
+    <string name="reproductor_secundarios_mostrar">Mostrar</string>
     <string name="reproductor_secundarios_desc_ocultar">Ocultar los controles secundarios fijos</string>
     <string name="reproductor_secundarios_desc_mostrar">Mostrar los controles secundarios fijos</string>
     <string name="reproductor_fase_cargando">Cargando</string>
@@ -163,4 +163,9 @@
     <string name="reproductor_preferencia_guardada">Preferida: %1$s (no disponible)</string>
     <string name="reproductor_aviso_audio">La pista de audio preferida (%1$s) no está disponible; se usa automático.</string>
     <string name="reproductor_aviso_subtitulos">La pista de subtítulos preferida (%1$s) no está disponible; se usa automático.</string>
+    <string name="reproductor_anterior">Canal anterior</string>
+    <string name="reproductor_siguiente">Canal siguiente</string>
+    <string name="reproductor_volumen_bajar">Bajar volumen</string>
+    <string name="reproductor_volumen_subir">Subir volumen</string>
+    <string name="reproductor_volumen_valor">Volumen: %1$d%%</string>
 </resources>

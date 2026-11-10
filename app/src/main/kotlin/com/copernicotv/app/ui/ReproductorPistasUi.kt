@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.copernicotv.app.R
 import com.copernicotv.app.player.EstadoPistas
@@ -67,6 +68,7 @@ internal class EnfoquesControles(
     val audio: FocusRequester,
     val subtitulos: FocusRequester,
     val primeraOpcion: FocusRequester,
+    val diagnostico: FocusRequester,
 )
 
 /** Panel abierto y sus dos transiciones; sobrevive a la recreación. */
@@ -400,6 +402,7 @@ internal fun BotonControl(
     habilitado: Boolean = true,
     seleccionado: Boolean = false,
     modifier: Modifier = Modifier,
+    paddingHorizontal: Dp = 12.dp,
     contenido: @Composable () -> Unit,
 ) {
     var enfocado by remember { mutableStateOf(false) }
@@ -423,7 +426,7 @@ internal fun BotonControl(
                     if (descripcionEstado != null) stateDescription = descripcionEstado
                 }
                 .alpha(if (habilitado) 1f else 0.45f)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = paddingHorizontal, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         contenido()

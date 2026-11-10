@@ -79,6 +79,7 @@ import com.copernicotv.app.player.debeOcultarse
 import com.copernicotv.app.player.formatearTiempo
 import com.copernicotv.app.player.nombreEstadoMotor
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /** Etiqueta de la superficie de reproducción (E6-T1). */
 const val TAG_REPRODUCTOR = "reproductor"
@@ -115,6 +116,21 @@ const val TAG_REPRODUCTOR_RETROCEDER = "reproductor-retroceder"
 
 /** Etiqueta del salto de búsqueda hacia adelante. */
 const val TAG_REPRODUCTOR_AVANZAR = "reproductor-avanzar"
+
+/** Etiqueta del control de zapeo al Canal anterior (E6-T6). */
+const val TAG_REPRODUCTOR_ANTERIOR = "reproductor-anterior"
+
+/** Etiqueta del control de zapeo al Canal siguiente (E6-T6). */
+const val TAG_REPRODUCTOR_SIGUIENTE = "reproductor-siguiente"
+
+/** Etiqueta del control de bajar volumen (E6-T6). */
+const val TAG_REPRODUCTOR_VOLUMEN_BAJAR = "reproductor-volumen-bajar"
+
+/** Etiqueta del control de subir volumen (E6-T6). */
+const val TAG_REPRODUCTOR_VOLUMEN_SUBIR = "reproductor-volumen-subir"
+
+/** Etiqueta del valor de volumen visible (E6-T6). */
+const val TAG_REPRODUCTOR_VOLUMEN_VALOR = "reproductor-volumen-valor"
 
 /** Etiqueta del selector de ajuste de pantalla. */
 const val TAG_REPRODUCTOR_ASPECTO = "reproductor-aspecto"
@@ -196,11 +212,29 @@ fun ReproductorScreen(
     val modoAspecto by viewModel.modoAspecto.collectAsStateWithLifecycle()
     val controlesSecundariosVisibles by viewModel.controlesSecundariosVisibles.collectAsStateWithLifecycle()
     val diagnostico by viewModel.diagnostico.collectAsStateWithLifecycle()
-    LaunchedEffect(canalId) { viewModel.cargar(canalId) }
+    val volumen by viewModel.volumen.collectAsStateWithLifecycle()
+    val zapeo by viewModel.zapeo.collectAsStateWithLifecycle()
     val salir = {
         viewModel.cerrar()
         onVolver()
     }
+    val primarios =
+        PrimariosZapeo(
+            volumen = volumen,
+            zapeo = zapeo,
+            alZapearAnterior = viewModel::zapearAnterior,
+            alZapearSiguiente = viewModel::zapearSiguiente,
+            alSubirVolumen = viewModel::subirVolumen,
+            alBajarVolumen = viewModel::bajarVolumen,
+        )
+    val navegar =
+        NavegacionReproductor(
+            alAlternar = viewModel::alternar,
+            alDesplazar = viewModel::desplazar,
+            alBuscarA = viewModel::buscarA,
+            alSalir = salir,
+        )
+    LaunchedEffect(canalId) { viewModel.cargar(canalId) }
     BackHandler(onBack = salir)
     Box(
         modifier =
@@ -227,6 +261,7 @@ fun ReproductorScreen(
                     estado = sesionEstado,
                     pistas = estadoPistas,
                     diagnostico = diagnostico,
+                    primarios = primarios,
                     motor = viewModel.motor,
                     modos =
                         ModosReproductor(
@@ -237,10 +272,7 @@ fun ReproductorScreen(
                                 viewModel.fijarControlesSecundarios(!controlesSecundariosVisibles)
                             },
                         ),
-                    onAlternar = viewModel::alternar,
-                    onDesplazar = viewModel::desplazar,
-                    onBuscarA = viewModel::buscarA,
-                    onSalir = salir,
+                    navegar = navegar,
                     accionesPistas =
                         AccionesPistas(
                             alSeleccionarAudio = viewModel::seleccionarAudio,
@@ -260,12 +292,10 @@ private fun SuperficieReproductor(
     estado: EstadoSesion,
     pistas: EstadoPistas,
     diagnostico: DiagnosticoReproductor,
+    primarios: PrimariosZapeo,
+    navegar: NavegacionReproductor,
     motor: ExoPlayer?,
     modos: ModosReproductor,
-    onAlternar: () -> Unit,
-    onDesplazar: (Long) -> Unit,
-    onBuscarA: (Long) -> Unit,
-    onSalir: () -> Unit,
     accionesPistas: AccionesPistas,
 ) {
     val vista = LocalView.current
@@ -279,7 +309,6 @@ private fun SuperficieReproductor(
     var arrastreMs by remember { mutableStateOf<Long?>(null) }
     val enfoqueRaiz = remember { FocusRequester() }
     val enfoqueAlternar = remember { FocusRequester() }
-    val enfoqueDiagnostico = remember { FocusRequester() }
     var diagnosticoPrevio by remember { mutableStateOf(false) }
     val enfoques =
         remember {
@@ -288,6 +317,7 @@ private fun SuperficieReproductor(
                 audio = FocusRequester(),
                 subtitulos = FocusRequester(),
                 primeraOpcion = FocusRequester(),
+                diagnostico = FocusRequester(),
             )
         }
     val revelar = {
@@ -298,7 +328,7 @@ private fun SuperficieReproductor(
     BackHandler(enabled = diagnosticoAbierto) { diagnosticoAbierto = false }
     LaunchedEffect(diagnosticoAbierto) {
         if (diagnosticoPrevio && !diagnosticoAbierto) {
-            runCatching { enfoqueDiagnostico.requestFocus() }
+            runCatching { enfoques.diagnostico.requestFocus() }
         }
         diagnosticoPrevio = diagnosticoAbierto
     }
@@ -306,12 +336,10 @@ private fun SuperficieReproductor(
         accionesReproductor(
             revelar = revelar,
             modos = modos,
-            onAlternar = onAlternar,
-            onDesplazar = onDesplazar,
+            navegar = navegar,
             onArrastre = { valor -> arrastreMs = valor },
             leerArrastre = { arrastreMs },
-            onBuscarA = onBuscarA,
-            onSalir = onSalir,
+            primarios = primarios,
             alAbrirDiagnostico = {
                 panelPistas.alCerrar()
                 diagnosticoAbierto = true
@@ -350,7 +378,7 @@ private fun SuperficieReproductor(
             Modifier
                 .fillMaxSize()
                 .focusRequester(enfoqueRaiz)
-                .onPreviewKeyEvent { evento -> teclaDpad(evento, controlesVisibles, revelar, onAlternar, onDesplazar) }
+                .onPreviewKeyEvent { evento -> teclaDpad(evento, controlesVisibles, revelar, navegar.alAlternar, navegar.alDesplazar) }
                 .toquesReproductor(
                     fase = fase,
                     controlesVisibles = controlesVisibles,
@@ -374,9 +402,9 @@ private fun SuperficieReproductor(
                 modos = modos,
                 arrastreMs = arrastreMs,
                 pistas = pistas,
+                primarios = primarios,
                 panelPistas = panelPistas,
                 enfoques = enfoques,
-                enfoqueDiagnostico = enfoqueDiagnostico,
                 acciones = acciones,
                 accionesPistas = accionesPistas,
             )
@@ -394,26 +422,24 @@ private fun SuperficieReproductor(
 private fun accionesReproductor(
     revelar: () -> Unit,
     modos: ModosReproductor,
-    onAlternar: () -> Unit,
-    onDesplazar: (Long) -> Unit,
+    navegar: NavegacionReproductor,
     onArrastre: (Long?) -> Unit,
     leerArrastre: () -> Long?,
-    onBuscarA: (Long) -> Unit,
-    onSalir: () -> Unit,
+    primarios: PrimariosZapeo,
     alAbrirDiagnostico: () -> Unit,
 ) = AccionesReproductor(
     alAlternar = {
         revelar()
-        onAlternar()
+        navegar.alAlternar()
     },
     alDesplazar = { salto ->
         revelar()
-        onDesplazar(salto)
+        navegar.alDesplazar(salto)
     },
     alArrastrar = onArrastre,
     alTerminarArrastre = {
         leerArrastre()?.let { valor ->
-            onBuscarA(valor)
+            navegar.alBuscarA(valor)
             revelar()
         }
         onArrastre(null)
@@ -426,14 +452,55 @@ private fun accionesReproductor(
         revelar()
         modos.onAlternarSecundarios()
     },
+    alZapearAnterior = {
+        revelar()
+        primarios.alZapearAnterior()
+    },
+    alZapearSiguiente = {
+        revelar()
+        primarios.alZapearSiguiente()
+    },
+    alSubirVolumen = {
+        revelar()
+        primarios.alSubirVolumen()
+    },
+    alBajarVolumen = {
+        revelar()
+        primarios.alBajarVolumen()
+    },
     alSalir = {
         revelar()
-        onSalir()
+        navegar.alSalir()
     },
     alAbrirDiagnostico = {
         revelar()
         alAbrirDiagnostico()
     },
+)
+
+/**
+ * Estado y acciones crudas de zapeo y volumen que la pantalla recoge del
+ * ViewModel y reparte entre la barra de controles (E6-T6). Las acciones se
+ * envuelven con el revelado de controles en [accionesReproductor].
+ */
+private data class PrimariosZapeo(
+    val volumen: Float,
+    val zapeo: ZapeoEstado,
+    val alZapearAnterior: () -> Unit,
+    val alZapearSiguiente: () -> Unit,
+    val alSubirVolumen: () -> Unit,
+    val alBajarVolumen: () -> Unit,
+)
+
+/**
+ * Destinos que los controles y el teclado ordenan a la sesión (alternar,
+ * desplazar, buscar y salir); se agrupan para atravesar la superficie juntos.
+ */
+private data class NavegacionReproductor(
+    val alAlternar: () -> Unit,
+    val alDesplazar: (Long) -> Unit,
+    val alBuscarA: (Long) -> Unit,
+    val alSalir: () -> Unit,
 )
 
 /** Acciones que la barra de controles delega en la pantalla. */
@@ -444,6 +511,10 @@ private data class AccionesReproductor(
     val alTerminarArrastre: () -> Unit,
     val alCambiarModo: () -> Unit,
     val alAlternarSecundarios: () -> Unit,
+    val alZapearAnterior: () -> Unit,
+    val alZapearSiguiente: () -> Unit,
+    val alSubirVolumen: () -> Unit,
+    val alBajarVolumen: () -> Unit,
     val alSalir: () -> Unit,
     val alAbrirDiagnostico: () -> Unit,
 )
@@ -484,9 +555,9 @@ private fun BoxScope.Controles(
     modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
+    primarios: PrimariosZapeo,
     panelPistas: EstadoPanelPistas,
     enfoques: EnfoquesControles,
-    enfoqueDiagnostico: FocusRequester,
     acciones: AccionesReproductor,
     accionesPistas: AccionesPistas,
 ) {
@@ -501,7 +572,7 @@ private fun BoxScope.Controles(
             fase = fase,
             alSalir = acciones.alSalir,
             alAbrirDiagnostico = acciones.alAbrirDiagnostico,
-            enfoqueDiagnostico = enfoqueDiagnostico,
+            enfoqueDiagnostico = enfoques.diagnostico,
         )
         BarraInferior(
             estado = estado,
@@ -509,6 +580,7 @@ private fun BoxScope.Controles(
             modos = modos,
             arrastreMs = arrastreMs,
             pistas = pistas,
+            primarios = primarios,
             panelPistas = panelPistas,
             enfoques = enfoques,
             acciones = acciones,
@@ -584,6 +656,7 @@ private fun BoxScope.BarraInferior(
     modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
+    primarios: PrimariosZapeo,
     panelPistas: EstadoPanelPistas,
     enfoques: EnfoquesControles,
     acciones: AccionesReproductor,
@@ -610,7 +683,12 @@ private fun BoxScope.BarraInferior(
         }
         AvisoPistas(pistas)
         FilaProgreso(duracion, posicion, estado.puedeBuscar, acciones)
-        FilaBotones(fase, modos.modo, modos.secundariosVisibles, estado.puedeBuscar, enfoques.alternar, acciones)
+        // E6-T6: el volumen es un control primario del contrato y permanece
+        // visible junto a la fila principal, fuera de los secundarios S17b.
+        // Vive encima de la fila primaria para que el recorrido del D-pad
+        // validado en E6-T3 (bajar desde play alcanza las pistas) no cambie.
+        FilaVolumen(primarios.volumen, acciones)
+        FilaBotones(fase, modos.modo, modos.secundariosVisibles, estado.puedeBuscar, primarios.zapeo, enfoques.alternar, acciones)
         // S17b: los selectores de pista (audio y subtítulos) también son
         // controles secundarios fijos; el aviso de preferencia no disponible
         // no lo es y permanece visible.
@@ -663,30 +741,54 @@ private fun FilaBotones(
     modo: ModoAspecto,
     secundariosVisibles: Boolean,
     puedeBuscar: Boolean,
+    zapeo: ZapeoEstado,
     enfoqueAlternar: FocusRequester,
     acciones: AccionesReproductor,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // Espaciado compacto: en la fila móvil el ancho es escaso y cada dp
+        // cuenta para que el control de secundarios no quede a ancho cero.
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // E6-T6: el zapeo es un control primario como play/pausa; permanece
+        // siempre visible y se deshabilita en los límites de navegación sin
+        // envolver la navegación. El glifo compacto deja sitio en la fila
+        // móvil a los botones secundarios de S17b (CI: sin él desbordaban a
+        // ancho cero); la etiqueta completa queda en la descripción de
+        // contenido para accesibilidad.
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_anterior),
+            tag = TAG_REPRODUCTOR_ANTERIOR,
+            onClick = acciones.alZapearAnterior,
+            habilitado = zapeo.tieneAnterior,
+            paddingHorizontal = 8.dp,
+        ) { Text("«") }
         BotonControl(
             etiqueta = stringResource(R.string.reproductor_pausar),
             tag = TAG_REPRODUCTOR_ALTERNAR,
             onClick = acciones.alAlternar,
             modifier = Modifier.focusRequester(enfoqueAlternar),
+            paddingHorizontal = 8.dp,
         ) {
+            // Glifo compacto por la misma razón que « y »: la palabra
+            // completa vive en la descripción de contenido.
             Text(
-                stringResource(
-                    if (fase == EstadoReproductor.REPRODUCIENDO) {
-                        R.string.reproductor_pausar
-                    } else {
-                        R.string.reproductor_play
-                    },
-                ),
+                if (fase == EstadoReproductor.REPRODUCIENDO) {
+                    "⏸"
+                } else {
+                    "▶"
+                },
             )
         }
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_siguiente),
+            tag = TAG_REPRODUCTOR_SIGUIENTE,
+            onClick = acciones.alZapearSiguiente,
+            habilitado = zapeo.tieneSiguiente,
+            paddingHorizontal = 8.dp,
+        ) { Text("»") }
         // S17b: retroceso, avance y aspecto son controles secundarios fijos;
         // play/pausa es el control primario y permanece siempre.
         if (secundariosVisibles) {
@@ -695,12 +797,14 @@ private fun FilaBotones(
                 tag = TAG_REPRODUCTOR_RETROCEDER,
                 onClick = { acciones.alDesplazar(-SALTO_BUSQUEDA_MS) },
                 habilitado = puedeBuscar,
+                paddingHorizontal = 8.dp,
             ) { Text("−10 s") }
             BotonControl(
                 etiqueta = stringResource(R.string.reproductor_avanzar),
                 tag = TAG_REPRODUCTOR_AVANZAR,
                 onClick = { acciones.alDesplazar(SALTO_BUSQUEDA_MS) },
                 habilitado = puedeBuscar,
+                paddingHorizontal = 8.dp,
             ) { Text("+10 s") }
         }
         Spacer(modifier = Modifier.weight(1f))
@@ -709,6 +813,7 @@ private fun FilaBotones(
                 etiqueta = stringResource(R.string.reproductor_aspecto),
                 tag = TAG_REPRODUCTOR_ASPECTO,
                 onClick = acciones.alCambiarModo,
+                paddingHorizontal = 8.dp,
             ) { Text(stringResource(modo.recursoEtiqueta())) }
         }
         BotonControl(
@@ -722,6 +827,7 @@ private fun FilaBotones(
                 ),
             tag = TAG_REPRODUCTOR_SECUNDARIOS,
             onClick = acciones.alAlternarSecundarios,
+            paddingHorizontal = 8.dp,
         ) {
             Text(
                 stringResource(
@@ -733,6 +839,39 @@ private fun FilaBotones(
                 ),
             )
         }
+    }
+}
+
+/**
+ * Fila de volumen (E6-T6): bajar, valor porcentual visible y subir. El paso y
+ * los límites son reglas puras de [limitarVolumen]; Media3 es la única verdad
+ * del nivel aplicado a la salida.
+ */
+@Composable
+private fun FilaVolumen(
+    volumen: Float,
+    acciones: AccionesReproductor,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_volumen_bajar),
+            tag = TAG_REPRODUCTOR_VOLUMEN_BAJAR,
+            onClick = acciones.alBajarVolumen,
+        ) { Text("−") }
+        Text(
+            text = stringResource(R.string.reproductor_volumen_valor, (volumen * 100).roundToInt()),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            modifier =
+                Modifier
+                    .padding(horizontal = 8.dp)
+                    .testTag(TAG_REPRODUCTOR_VOLUMEN_VALOR),
+        )
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_volumen_subir),
+            tag = TAG_REPRODUCTOR_VOLUMEN_SUBIR,
+            onClick = acciones.alSubirVolumen,
+        ) { Text("+") }
     }
 }
 

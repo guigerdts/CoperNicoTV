@@ -140,6 +140,30 @@ interface CanalDao {
     ): PagingSource<Int, CanalBusqueda>
 
     /**
+     * Universo de zapeo (E6-T6): identificadores de los Canales visibles de la
+     * Lista activa —sin ocultos de Canal ni de Grupo— en el orden manual del
+     * listado. Es el mismo universo que [buscarEnListaActiva] sin filtros,
+     * reducido a los identificadores para no duplicar la fuente del Catálogo.
+     */
+    @Query(
+        """
+        SELECT c.id
+        FROM Canal c
+        INNER JOIN Apariencia a ON a.canalId = c.id
+        WHERE a.listaId = (
+            SELECT id FROM Lista WHERE estado = 'activa' ORDER BY id DESC LIMIT 1
+        )
+          AND NOT EXISTS(SELECT 1 FROM OcultacionCanal oc WHERE oc.canalId = c.id)
+          AND (a.grupoId IS NULL OR NOT EXISTS(
+              SELECT 1 FROM OcultacionGrupo og WHERE og.grupoId = a.grupoId
+          ))
+        GROUP BY c.id
+        ORDER BY MIN(a.orden), MIN(a.id)
+        """,
+    )
+    suspend fun idsZapeoListaActiva(): List<Long>
+
+    /**
      * Todos los Canales filtrados de la Lista activa, sin paginación SQL.
      *
      * La usa el `PagingSource` en memoria de los modos A/B/C, que necesita la

@@ -3,6 +3,7 @@ package com.copernicotv.app.player
 import android.content.Context
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
@@ -10,6 +11,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.copernicotv.core.player.ProtocoloStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,12 +37,20 @@ import java.util.concurrent.atomic.AtomicBoolean
  * con [PoliticaErroresMedia3] para que la política observable sea exactamente
  * la de S20 y no una suma de reintentos internos más los propios.
  *
+ * El protocolo clasificado por `:core` fija el `mimeType` del `MediaItem`
+ * (E6-T1): la fábrica selecciona la fuente correspondiente por el MIME
+ * declarado en lugar de deducirlo de la extensión de la URL, que las URLs
+ * reales no siempre llevan. Es la misma clasificación de `ClasificadorStream`,
+ * no una segunda fuente de verdad. RTSP gobierna la selección por esquema
+ * `rtsp://` y la URL progresiva no declara MIME (véase [mimeDeProtocolo]).
+ *
  * La URL vive únicamente dentro de `MediaItem`; el estado publicado no la
  * expone ni se registra en logs (S57a).
  */
 class SesionMedia3(
     contexto: Context,
     url: String,
+    protocolo: ProtocoloStream,
     private val preferenciasIniciales: PreferenciasPista = PreferenciasPista(),
     private val intervaloMs: Long = INTERVALO_SONDEO_MS,
     private val politica: PoliticaReintentos = PoliticaReintentos(),
@@ -101,7 +111,7 @@ class SesionMedia3(
 
     init {
         reproductor.addListener(oyente)
-        reproductor.setMediaItem(MediaItem.fromUri(url))
+        reproductor.setMediaItem(mediaItemDe(url, protocolo))
         reproductor.prepare()
         reproductor.playWhenReady = true
         alcance.launch {
@@ -413,10 +423,36 @@ class SesionMedia3(
 
     private fun Long.tomarSiConocida(): Long = if (this == C.TIME_UNSET) 0L else this.coerceAtLeast(0L)
 
+    private fun mediaItemDe(
+        url: String,
+        protocolo: ProtocoloStream,
+    ): MediaItem {
+        val declaracion = MediaItem.Builder().setUri(url)
+        mimeDeProtocolo(protocolo)?.let(declaracion::setMimeType)
+        return declaracion.build()
+    }
+
     private companion object {
         const val INTERVALO_SONDEO_MS = 250L
     }
 }
+
+/**
+ * MIME declarado en el `MediaItem` por protocolo (E6-T1).
+ *
+ * La fábrica de fuentes selecciona por este MIME cuando la URL no lo deja
+ * deducir por extensión. Devuelve `null` cuando la selección nativa ya es
+ * correcta sin MIME: RTSP se resuelve por el esquema `rtsp://`, las URLs
+ * progresivas no declaran contenedor y RTMP no llega nunca a la sesión porque
+ * `:core` lo rechaza con `stream_rtmp_no_soportado`.
+ */
+internal fun mimeDeProtocolo(protocolo: ProtocoloStream): String? =
+    when (protocolo) {
+        ProtocoloStream.HLS -> MimeTypes.APPLICATION_M3U8
+        ProtocoloStream.DASH -> MimeTypes.APPLICATION_MPD
+        ProtocoloStream.SMOOTH_STREAMING -> MimeTypes.APPLICATION_SS
+        ProtocoloStream.PROGRESIVO, ProtocoloStream.RTSP, ProtocoloStream.RTMP -> null
+    }
 
 /**
  * Traduce el error del motor a un código propio y estable. El mensaje de

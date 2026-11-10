@@ -148,8 +148,12 @@ internal class ServidorMedios(
     private fun tipoDe(ruta: String): String =
         when {
             ruta.endsWith(".m3u8") -> "application/vnd.apple.mpegurl"
+            ruta.endsWith(".mpd") -> "application/dash+xml"
+            ruta.endsWith(".ism/manifest") || ruta.endsWith(".isml/manifest") -> "application/vnd.ms-sstr+xml"
             ruta.endsWith(".ts") -> "video/mp2t"
-            ruta.endsWith(".mp4") -> "video/mp4"
+            ruta.endsWith(".mp4") || ruta.endsWith(".m4s") ||
+                ruta.endsWith(".m4sv") || ruta.endsWith(".m4sa") ->
+                "video/mp4"
             else -> "application/octet-stream"
         }
 
@@ -175,6 +179,15 @@ internal object FixturesF15 {
     const val MP4 = "f15/f15.mp4"
     const val HLS = "f15/f15.m3u8"
 
+    /** Manifest MPEG-DASH (E6-T1) con sus segmentos init/chunk. */
+    const val DASH = "f15/p15.mpd"
+
+    /** Manifest SmoothStreaming client bajo el directorio `.ism`. */
+    const val SMOOTH = "f15/smooth.ism/manifest"
+
+    /** Texto plano con extensión de HLS: fallo de parseo definitivo. */
+    const val CORRUPTO = "f15/corrupto.m3u8"
+
     /**
      * Comprueba que los fixtures viajaron en el APK de pruebas.
      *
@@ -183,7 +196,20 @@ internal object FixturesF15 {
      * falta.
      */
     fun verificar(assets: AssetManager) {
-        listOf("f15/f15.mp4", "f15/f15.m3u8", "f15/f15_000.ts").forEach { ruta ->
+        listOf(
+            "f15/f15.mp4",
+            "f15/f15.m3u8",
+            "f15/f15_000.ts",
+            DASH,
+            "f15/init-stream0.m4s",
+            "f15/init-stream1.m4s",
+            "f15/chunk-stream0-00001.m4s",
+            "f15/chunk-stream1-00001.m4s",
+            SMOOTH,
+            "f15/smooth.ism/Frag-video-116874-0.m4sv",
+            "f15/smooth.ism/Frag-audio-32000-0.m4sa",
+            CORRUPTO,
+        ).forEach { ruta ->
             val primerByte = runCatching { assets.open(ruta).use { it.read() } }.getOrNull()
             if (primerByte == null || primerByte < 0) {
                 throw AssertionError("Fixture ausente o vacío en el APK de pruebas: $ruta")

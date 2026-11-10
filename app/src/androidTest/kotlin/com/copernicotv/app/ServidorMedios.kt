@@ -149,7 +149,7 @@ internal class ServidorMedios(
         when {
             ruta.endsWith(".m3u8") -> "application/vnd.apple.mpegurl"
             ruta.endsWith(".mpd") -> "application/dash+xml"
-            ruta.endsWith(".ism/manifest") || ruta.endsWith(".isml/manifest") -> "application/vnd.ms-ss"
+            ruta.endsWith(".ism/manifest") || ruta.endsWith(".isml/manifest") -> "application/vnd.ms-sstr+xml"
             ruta.endsWith(".ts") -> "video/mp2t"
             ruta.endsWith(".mp4") || ruta.endsWith(".m4s") ||
                 ruta.endsWith(".m4sv") || ruta.endsWith(".m4sa") ->

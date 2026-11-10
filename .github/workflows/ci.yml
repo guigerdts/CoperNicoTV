@@ -169,15 +169,27 @@ jobs:
           arch: x86
           profile: tv_1080p
           disable-animations: true
-          script: >-
-            ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest
+          script: |
+            gradle_exit=0
+            ./gradlew :app:connectedDebugAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ShellFocoTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest \
+              || gradle_exit=$?
+            adb pull /sdcard/Android/data/com.copernicotv.app/files/capturas-p2 \
+              ./capturas-p2 2>/dev/null || echo "Sin capturas E7-T1 en el emulador"
+            exit $gradle_exit
       - name: Publicar reportes instrumentados de TV
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reportes-instrumented-tv
           path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+      - name: Publicar capturas P2 del shell de TV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-p2-tv
+          path: capturas-p2/
           if-no-files-found: ignore
 
   p1-performance:

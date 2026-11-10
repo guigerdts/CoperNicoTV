@@ -114,6 +114,7 @@ internal fun recordarPanelPistas(
     )
 }
 
+/** Aviso persistente de preferencia guardada que el contenido no ofrece (S44d). */
 @Composable
 internal fun AvisoPistas(pistas: EstadoPistas) {
     if (!pistas.hayAviso) return

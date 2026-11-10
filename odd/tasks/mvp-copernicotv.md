@@ -1073,9 +1073,9 @@ E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La h
 | E6-T3 | Pistas | Audio y subtítulos seleccionables; ausencia no rompe. D3 aprobada: preferencias globales; la preferencia guardada no crea pistas ni capacidades y se distingue de las opciones disponibles para el contenido actual; si la pista preferida no está disponible, se usa `auto/default`, se conserva la preferencia y se avisa en la UI; S44 |
 | E6-T4 | Errores y reconexión | Reintento y recuperación con errores inyectados; interrupciones en S42. S20: 3 reintentos con backoff de 1 s, 2 s y 4 s para errores transitorios; sin reintento en 4xx no recuperables; validada con fallos inyectados en emulador (L73). No reutiliza D4, que gobierna la actualización |
 | E6-T5 | Diagnóstico | Protocolo, pistas, buffer y último error; URL saneada; validado en emuladores móvil y TV con CI verde (L82) |
-| E6-T6 | Zapeo y volumen | Volumen, siguiente/anterior y cambio sin volver al Catálogo |
+| E6-T6 | Zapeo y volumen | Volumen, siguiente/anterior y cambio sin volver al Catálogo; validado en emuladores móvil y TV con CI verde (L83) |
 
-E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 está **cerrada en el alcance de pistas** —audio y subtítulos seleccionables, ausencia segura y comportamiento D3— (L72); S44b (`resizeMode` persistido) y el caso «techo» de S44a quedan en E7-T5 y la fila S44 no se declara completa. E6-T4 está **cerrada** —S20 completa: tres reintentos de 1 s, 2 s y 4 s, error definitivo tras el tercero, sin reintento en 4xx no recuperables, recuperación sin recrear la sesión, cancelación al cambiar de Canal o salir y aviso de reintento en la UI— (L73). E6-T5 está **cerrada** —diagnóstico técnico de reproducción en panel reactivo, copiable y saneado, con cobertura instrumentada en móvil y TV— (L82). E6-T6 sigue pendiente y E6 en conjunto no se declara cerrada.
+E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 está **cerrada en el alcance de pistas** —audio y subtítulos seleccionables, ausencia segura y comportamiento D3— (L72); S44b (`resizeMode` persistido) y el caso «techo» de S44a quedan en E7-T5 y la fila S44 no se declara completa. E6-T4 está **cerrada** —S20 completa: tres reintentos de 1 s, 2 s y 4 s, error definitivo tras el tercero, sin reintento en 4xx no recuperables, recuperación sin recrear la sesión, cancelación al cambiar de Canal o salir y aviso de reintento en la UI— (L73). E6-T5 está **cerrada** —diagnóstico técnico de reproducción en panel reactivo, copiable y saneado, con cobertura instrumentada en móvil y TV— (L82). E6-T6 está **cerrada** —zapeo siguiente/anterior sin volver al Catálogo y volumen con paso, límites y valor visible, en móvil y TV— (L83). E6 en conjunto no se declara cerrada porque E6-T1 permanece **iniciada, no cerrada**: la reproducción DASH, RTSP y SmoothStreaming sigue sin validar por reproducción.
 
 ### 8.7 E7 — Android TV, móvil y preferencias
 
@@ -4570,3 +4570,62 @@ aserta el contenido completo saneado.
 detectan referencias irresueltas: el error de compilación del import incorrecto
 solo apareció en CI. Un run de CI previo (`42737413112` en `7ff4bdb`) falló exactamente así
 y se corrigió sin tocar la app.
+
+### L83 — E6-T6: zapeo y volumen del reproductor (2026-11-10)
+
+**Autorización y objetivo.** Cerrar E6-T6 —«Zapeo y volumen»—: zapeo a canal siguiente y
+anterior sin volver al Catálogo y volumen con paso, límites y valor porcentual visible;
+consumir el diferimiento de «siguiente/anterior» de L71. Sin alterar E6-T1..T5 ni tocar
+`README.md`, `GLOSSARY.md`, el baseline M3U ni `feat/e1-bootstrap`. E6-T6 no alcanza un
+número de especificación propio; su alcance es la fila de §8.6.
+
+**Implementación y entregas.** Rama única `e6-t6-zapeo`, worktree dedicado, PR único #24
+hacia `main` (abierto, no mergeado: decisión del propietario). Base `14310c7`
+(merge de PR #23). Diez commits, 14 archivos, +842/−42
+(`git diff --stat 14310c7..95a72b3`): `2fece1c` reglas puras de zapeo y volumen
+(`limitarVolumen`, direcciones y sesión de zapeo, con `ZapeoReproductorTest` JVM);
+`c8c5244` universo de zapeo derivado de la secuencia del Catálogo;
+`aec951c` volumen aplicado a la sesión Media3; `e1d052b` zapeo y volumen en el
+ViewModel; `06b269a` controles en la pantalla: fila de volumen —bajar, valor `Volumen: N%`,
+subir— colocada **encima** de la fila de botones (el orden evita interceptar el recorrido
+D-pad hacia las pistas) y botones de zapeo « y » siempre visibles, deshabilitados en los
+límites de la secuencia; `8286c8e` cobertura instrumentada móvil y TV;
+`bda3aa5` registro de ambas suites en `.github/workflows/ci.yml`. Tres commits de
+corrección de CI: `756b1bb`, `13a2b33` y `95a72b3`, detallados abajo. Todos los commits
+pasaron el hook GGA con la técnica warm documentada en
+`docs/agents/commit-review-restarts.md`, sin `--no-verify` y sin debilitar `.gga`.
+
+**Cobertura.** `ZapeoReproductorTest` (JVM, reglas puras: paso de volumen, límites 0 %/100 %
+y direcciones de zapeo); instrumentadas `ReproductorZapeoTest` (móvil) y
+`ReproductorZapeoTvTest` (TV): bajar y subir volumen con lectura real del motor Media3 y
+texto `Volumen: 50%/0%/100%`, límites sin paso negativo ni sobresalto, volumen heredado
+tras el zapeo, zapeo siguiente/anterior con deshabilitado en los límites y, en TV, foco y
+llegada a la fila de volumen con D-pad hacia arriba.
+
+**Verificación.** CI de `95a72b3` (runs `42844427342` del PR y `42843724637` del push):
+`jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv` verdes,
+5/5; `p1-android` y `p1-performance` omitidos por diseño. Reportes publicados como
+artifacts. Validado solo en emuladores; la validación en dispositivo físico queda
+pendiente de forma transversal al proyecto y no se declara el MVP terminado.
+
+**Correcciones de CI con árbol semántico.** Tres corridas fallidas, cada una diagnosticada
+con el árbol semántico de los reportes HTML subidos como artifacts.
+(1) Siete fallos en el run `42814985854`: leer `player.volume` desde el hilo de
+instrumentación lanza `Player is accessed on the wrong thread` (Media3 exige el hilo
+principal) — el helper `volumenMotorEn` lee en el hilo correcto vía `runOnUiThread`;
+la fila móvil de 1080 px desbordaba y dejaba los botones secundarios a ancho cero,
+inclickables — glifos compactos en el zapeo con descripción completa accesible; y el
+recorrido D-pad de las pruebas de pistas se interceptaba por la posición previa de la fila
+de volumen — recolocada encima de la fila principal, con el test de TV ajustado a
+`DirectionUp`. Además, el refactor para detekt extrae el bundle
+`NavegacionReproductor` (el umbral `function-threshold` dispara a partir de doce parámetros) y
+ktlint corrige cuatro violaciones preexistentes de androidTest.
+(2) El run `42833855490` falla al compilar androidTest: las llamadas al helper resuelven
+por expansión solo con receiver explícito — `composeRule.volumenMotorEn(...)`
+(`13a2b33`).
+(3) El run `42838739117` deja un fallo residual: el botón de secundarios quedaba a 6 px en
+la fila y el tap no surtía efecto — `95a72b3` reduce el espaciado de la fila a 4 dp,
+acepta un padding horizontal configurable (8 dp en esta fila) y acorta la etiqueta visible
+del toggle a «Ocultar»/«Mostrar», conservando la descripción completa para accesibilidad.
+La compilación fallida repite la experiencia de L82: el hook GGA revisa código
+pero no compila, y los errores por referencias irresueltas solo aparecen en CI.

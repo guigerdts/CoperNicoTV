@@ -84,6 +84,13 @@ class BusquedaCatalogoRepositorio
                 grupos.map { grupo -> GrupoOpcion(id = grupo.id, nombre = grupo.nombre) }
             }
 
+        /**
+         * Universo de zapeo (E6-T6): identificadores de los Canales visibles
+         * de la Lista activa en el orden manual del Catálogo. Vive aquí porque
+         * el dominio del listado es el Catálogo, no el reproductor.
+         */
+        suspend fun idsZapeo(): List<Long> = db.canalDao().idsZapeoListaActiva()
+
         fun buscar(criterios: CriteriosBusqueda): Flow<PagingData<CanalBusqueda>> {
             val texto = criterios.texto.trim()
             return Pager(

@@ -169,29 +169,29 @@ class ReproductorZapeoTest {
         composeRule.mostrarControlesConToque()
 
         repeat(5) { composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performClick() }
-        composeRule.esperarHasta { viewModel.motor?.volume == 0.5f }
+        composeRule.esperarHasta { volumenMotorEn(viewModel) == 0.5f }
         assertEquals("Volumen: 50%", composeRule.textoDeTag(TAG_REPRODUCTOR_VOLUMEN_VALOR))
 
         // El volumen vigente sobrevive al zapeo: la sesión nueva lo hereda.
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_SIGUIENTE).performClick()
         esperarCanal(ids.getValue("Canal B"))
         composeRule.esperarFase("Reproduciendo")
-        assertEquals(0.5f, viewModel.motor?.volume)
+        assertEquals(0.5f, volumenMotorEn(viewModel))
 
         composeRule.mostrarControlesConToque()
         repeat(6) { composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performClick() }
-        composeRule.esperarHasta { viewModel.motor?.volume == 0.0f }
+        composeRule.esperarHasta { volumenMotorEn(viewModel) == 0.0f }
         assertEquals("Volumen: 0%", composeRule.textoDeTag(TAG_REPRODUCTOR_VOLUMEN_VALOR))
         // Límite inferior: otro paso no inventa un volumen negativo.
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performClick()
-        assertEquals(0.0f, viewModel.motor?.volume)
+        assertEquals(0.0f, volumenMotorEn(viewModel))
 
         repeat(10) { composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_SUBIR).performClick() }
-        composeRule.esperarHasta { viewModel.motor?.volume == 1.0f }
+        composeRule.esperarHasta { volumenMotorEn(viewModel) == 1.0f }
         assertEquals("Volumen: 100%", composeRule.textoDeTag(TAG_REPRODUCTOR_VOLUMEN_VALOR))
         // Límite superior: otro paso no se pasa de la escala de Media3.
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_SUBIR).performClick()
-        assertEquals(1.0f, viewModel.motor?.volume)
+        assertEquals(1.0f, volumenMotorEn(viewModel))
     }
 
     @Test
@@ -224,17 +224,16 @@ class ReproductorZapeoTest {
     }
 
     /** Siembra Canales en una única Fuente, en orden de importación. */
-    private fun sembrarCanales(
-        vararg pares: Pair<String, String>,
-    ) {
+    private fun sembrarCanales(vararg pares: Pair<String, String>) {
         ids =
             runBlocking {
-                val texto = buildString {
-                    append("#EXTM3U\n")
-                    pares.forEachIndexed { indice, (nombre, url) ->
-                        append("#EXTINF:-1 tvg-id=\"e6zapeo$indice\",$nombre\n$url\n")
+                val texto =
+                    buildString {
+                        append("#EXTM3U\n")
+                        pares.forEachIndexed { indice, (nombre, url) ->
+                            append("#EXTINF:-1 tvg-id=\"e6zapeo$indice\",$nombre\n$url\n")
+                        }
                     }
-                }
                 catalogo.importar(texto, "Fuente Zapeo", "http://example.invalid/zapeo.m3u")
                 db.canalDao().todos().associate { it.nombre.orEmpty() to it.id }
             }

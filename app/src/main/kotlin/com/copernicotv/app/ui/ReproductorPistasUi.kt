@@ -67,6 +67,7 @@ internal class EnfoquesControles(
     val audio: FocusRequester,
     val subtitulos: FocusRequester,
     val primeraOpcion: FocusRequester,
+    val diagnostico: FocusRequester,
 )
 
 /** Panel abierto y sus dos transiciones; sobrevive a la recreación. */

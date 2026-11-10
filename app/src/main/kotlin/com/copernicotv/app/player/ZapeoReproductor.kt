@@ -1,12 +1,6 @@
 package com.copernicotv.app.player
 
 /**
- * Dirección de un zapeo (E6-T6): al Canal siguiente o anterior del universo
- * ordenado del Catálogo.
- */
-enum class DireccionZapeo { SIGUIENTE, ANTERIOR }
-
-/**
  * Paso de volumen de los botones de la barra, en la escala 0..1 de Media3.
  */
 const val PASO_VOLUMEN = 0.1f

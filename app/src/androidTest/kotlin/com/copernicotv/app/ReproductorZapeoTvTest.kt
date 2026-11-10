@@ -95,11 +95,13 @@ class ReproductorZapeoTvTest {
         composeRule.mostrarControlesConDpad()
         composeRule.esperarFocoEnAlternar()
         val viewModel = composeRule.viewModelReproductor()
-        assertEquals(1.0f, viewModel.motor?.volume)
+        assertEquals(1.0f, volumenMotorEn(viewModel))
 
-        // Bajar a la fila de volumen: la fila vive debajo de la primaria.
+        // Subir a la fila de volumen: vive encima de la primaria para que
+        // bajar desde play conserve el recorrido a las pistas validado en
+        // E6-T3 (L72).
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_ALTERNAR).performKeyInput {
-            pressKey(Key.DirectionDown)
+            pressKey(Key.DirectionUp)
         }
         composeRule.esperarHasta {
             enfocadoEn(TAG_REPRODUCTOR_VOLUMEN_BAJAR) || enfocadoEn(TAG_REPRODUCTOR_VOLUMEN_SUBIR)
@@ -114,12 +116,11 @@ class ReproductorZapeoTvTest {
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performKeyInput {
             pressKey(Key.DirectionCenter)
         }
-        composeRule.esperarHasta { viewModel.motor?.volume == 0.9f }
+        composeRule.esperarHasta { volumenMotorEn(viewModel) == 0.9f }
         composeRule.esperarTexto(TAG_REPRODUCTOR_VOLUMEN_VALOR, "Volumen: 90%")
     }
 
-    private fun enfocadoEn(tag: String): Boolean =
-        runCatching { composeRule.onNodeWithTag(tag).assertIsFocused() }.isSuccess
+    private fun enfocadoEn(tag: String): Boolean = runCatching { composeRule.onNodeWithTag(tag).assertIsFocused() }.isSuccess
 
     private fun esperarCanal(canalId: Long) {
         composeRule.esperarHasta {

@@ -10,6 +10,7 @@ import com.copernicotv.core.player.ProtocoloStream
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,6 +70,24 @@ class ReproductorRepositorioTest {
             assertEquals("https://example.invalid/vod/pelicula.mp4?token=abc", stream.url)
             assertEquals(ProtocoloStream.PROGRESIVO, stream.protocolo)
         }
+    }
+
+    @Test
+    fun `la representacion del stream no expone la url descifrada`() {
+        val stream =
+            StreamResuelto(
+                canalId = 1L,
+                nombre = "Canal E6",
+                url = "https://usuario:clave@example.invalid/vod/pelicula.mp4?token=abc",
+                protocolo = ProtocoloStream.PROGRESIVO,
+            )
+
+        val texto = stream.toString()
+
+        assertFalse(texto.contains("usuario"))
+        assertFalse(texto.contains("clave"))
+        assertFalse(texto.contains("token"))
+        assertFalse(texto.contains("example.invalid"))
     }
 
     @Test

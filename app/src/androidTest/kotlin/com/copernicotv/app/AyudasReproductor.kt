@@ -140,6 +140,18 @@ internal fun ReglaPrincipal.estadoMotor(): Pair<String, Long> {
 /** Posición actual del motor en milisegundos. */
 internal fun ReglaPrincipal.posicionMs(): Long = estadoMotor().second
 
+/**
+ * Espera a que el motor informe un estado reproducible y una posición mayor
+ * que cero. Acepta `READY` o `ENDED` porque el fixture puede terminar antes
+ * de que el sondeo lea la etiqueta.
+ */
+internal fun ReglaPrincipal.esperarReproduccionAvanzando() {
+    esperarHasta {
+        val (estado, posicion) = estadoMotor()
+        (estado == "READY" || estado == "ENDED") && posicion > 0L
+    }
+}
+
 /** Indica si la barra de controles está compuesta en este momento. */
 internal fun ReglaPrincipal.hayControles(): Boolean = onAllNodesWithTag(TAG_REPRODUCTOR_CONTROLES).fetchSemanticsNodes().isNotEmpty()
 

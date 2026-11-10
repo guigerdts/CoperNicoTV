@@ -82,16 +82,4 @@ class ReproductorUiTest {
             throw AssertionError("El error expone la URL del flujo: $texto")
         }
     }
-
-    /**
-     * Espera a que el motor informe un estado reproducible y una posición
-     * mayor que cero. Acepta `READY` o `ENDED` porque el fixture puede terminar
-     * antes de que el sondeo lea la etiqueta.
-     */
-    private fun esperarReproduccionAvanzando() {
-        composeRule.esperarHasta {
-            val (estado, posicion) = composeRule.estadoMotor()
-            (estado == "READY" || estado == "ENDED") && posicion > 0L
-        }
-    }
 }

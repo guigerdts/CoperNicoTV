@@ -163,4 +163,9 @@
     <string name="reproductor_preferencia_guardada">Preferida: %1$s (no disponible)</string>
     <string name="reproductor_aviso_audio">La pista de audio preferida (%1$s) no está disponible; se usa automático.</string>
     <string name="reproductor_aviso_subtitulos">La pista de subtítulos preferida (%1$s) no está disponible; se usa automático.</string>
+    <string name="reproductor_anterior">Canal anterior</string>
+    <string name="reproductor_siguiente">Canal siguiente</string>
+    <string name="reproductor_volumen_bajar">Bajar volumen</string>
+    <string name="reproductor_volumen_subir">Subir volumen</string>
+    <string name="reproductor_volumen_valor">Volumen: %1$d%%</string>
 </resources>

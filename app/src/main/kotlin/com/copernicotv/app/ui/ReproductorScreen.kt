@@ -79,6 +79,7 @@ import com.copernicotv.app.player.debeOcultarse
 import com.copernicotv.app.player.formatearTiempo
 import com.copernicotv.app.player.nombreEstadoMotor
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /** Etiqueta de la superficie de reproducción (E6-T1). */
 const val TAG_REPRODUCTOR = "reproductor"
@@ -115,6 +116,21 @@ const val TAG_REPRODUCTOR_RETROCEDER = "reproductor-retroceder"
 
 /** Etiqueta del salto de búsqueda hacia adelante. */
 const val TAG_REPRODUCTOR_AVANZAR = "reproductor-avanzar"
+
+/** Etiqueta del control de zapeo al Canal anterior (E6-T6). */
+const val TAG_REPRODUCTOR_ANTERIOR = "reproductor-anterior"
+
+/** Etiqueta del control de zapeo al Canal siguiente (E6-T6). */
+const val TAG_REPRODUCTOR_SIGUIENTE = "reproductor-siguiente"
+
+/** Etiqueta del control de bajar volumen (E6-T6). */
+const val TAG_REPRODUCTOR_VOLUMEN_BAJAR = "reproductor-volumen-bajar"
+
+/** Etiqueta del control de subir volumen (E6-T6). */
+const val TAG_REPRODUCTOR_VOLUMEN_SUBIR = "reproductor-volumen-subir"
+
+/** Etiqueta del valor de volumen visible (E6-T6). */
+const val TAG_REPRODUCTOR_VOLUMEN_VALOR = "reproductor-volumen-valor"
 
 /** Etiqueta del selector de ajuste de pantalla. */
 const val TAG_REPRODUCTOR_ASPECTO = "reproductor-aspecto"
@@ -196,6 +212,8 @@ fun ReproductorScreen(
     val modoAspecto by viewModel.modoAspecto.collectAsStateWithLifecycle()
     val controlesSecundariosVisibles by viewModel.controlesSecundariosVisibles.collectAsStateWithLifecycle()
     val diagnostico by viewModel.diagnostico.collectAsStateWithLifecycle()
+    val volumen by viewModel.volumen.collectAsStateWithLifecycle()
+    val zapeo by viewModel.zapeo.collectAsStateWithLifecycle()
     LaunchedEffect(canalId) { viewModel.cargar(canalId) }
     val salir = {
         viewModel.cerrar()
@@ -227,6 +245,8 @@ fun ReproductorScreen(
                     estado = sesionEstado,
                     pistas = estadoPistas,
                     diagnostico = diagnostico,
+                    volumen = volumen,
+                    zapeo = zapeo,
                     motor = viewModel.motor,
                     modos =
                         ModosReproductor(
@@ -240,6 +260,10 @@ fun ReproductorScreen(
                     onAlternar = viewModel::alternar,
                     onDesplazar = viewModel::desplazar,
                     onBuscarA = viewModel::buscarA,
+                    onZapearAnterior = viewModel::zapearAnterior,
+                    onZapearSiguiente = viewModel::zapearSiguiente,
+                    onSubirVolumen = viewModel::subirVolumen,
+                    onBajarVolumen = viewModel::bajarVolumen,
                     onSalir = salir,
                     accionesPistas =
                         AccionesPistas(
@@ -260,11 +284,17 @@ private fun SuperficieReproductor(
     estado: EstadoSesion,
     pistas: EstadoPistas,
     diagnostico: DiagnosticoReproductor,
+    volumen: Float,
+    zapeo: ZapeoEstado,
     motor: ExoPlayer?,
     modos: ModosReproductor,
     onAlternar: () -> Unit,
     onDesplazar: (Long) -> Unit,
     onBuscarA: (Long) -> Unit,
+    onZapearAnterior: () -> Unit,
+    onZapearSiguiente: () -> Unit,
+    onSubirVolumen: () -> Unit,
+    onBajarVolumen: () -> Unit,
     onSalir: () -> Unit,
     accionesPistas: AccionesPistas,
 ) {
@@ -311,6 +341,10 @@ private fun SuperficieReproductor(
             onArrastre = { valor -> arrastreMs = valor },
             leerArrastre = { arrastreMs },
             onBuscarA = onBuscarA,
+            onZapearAnterior = onZapearAnterior,
+            onZapearSiguiente = onZapearSiguiente,
+            onSubirVolumen = onSubirVolumen,
+            onBajarVolumen = onBajarVolumen,
             onSalir = onSalir,
             alAbrirDiagnostico = {
                 panelPistas.alCerrar()
@@ -374,6 +408,8 @@ private fun SuperficieReproductor(
                 modos = modos,
                 arrastreMs = arrastreMs,
                 pistas = pistas,
+                volumen = volumen,
+                zapeo = zapeo,
                 panelPistas = panelPistas,
                 enfoques = enfoques,
                 enfoqueDiagnostico = enfoqueDiagnostico,
@@ -399,6 +435,10 @@ private fun accionesReproductor(
     onArrastre: (Long?) -> Unit,
     leerArrastre: () -> Long?,
     onBuscarA: (Long) -> Unit,
+    onZapearAnterior: () -> Unit,
+    onZapearSiguiente: () -> Unit,
+    onSubirVolumen: () -> Unit,
+    onBajarVolumen: () -> Unit,
     onSalir: () -> Unit,
     alAbrirDiagnostico: () -> Unit,
 ) = AccionesReproductor(
@@ -426,6 +466,22 @@ private fun accionesReproductor(
         revelar()
         modos.onAlternarSecundarios()
     },
+    alZapearAnterior = {
+        revelar()
+        onZapearAnterior()
+    },
+    alZapearSiguiente = {
+        revelar()
+        onZapearSiguiente()
+    },
+    alSubirVolumen = {
+        revelar()
+        onSubirVolumen()
+    },
+    alBajarVolumen = {
+        revelar()
+        onBajarVolumen()
+    },
     alSalir = {
         revelar()
         onSalir()
@@ -444,6 +500,10 @@ private data class AccionesReproductor(
     val alTerminarArrastre: () -> Unit,
     val alCambiarModo: () -> Unit,
     val alAlternarSecundarios: () -> Unit,
+    val alZapearAnterior: () -> Unit,
+    val alZapearSiguiente: () -> Unit,
+    val alSubirVolumen: () -> Unit,
+    val alBajarVolumen: () -> Unit,
     val alSalir: () -> Unit,
     val alAbrirDiagnostico: () -> Unit,
 )
@@ -484,6 +544,8 @@ private fun BoxScope.Controles(
     modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
+    volumen: Float,
+    zapeo: ZapeoEstado,
     panelPistas: EstadoPanelPistas,
     enfoques: EnfoquesControles,
     enfoqueDiagnostico: FocusRequester,
@@ -509,6 +571,8 @@ private fun BoxScope.Controles(
             modos = modos,
             arrastreMs = arrastreMs,
             pistas = pistas,
+            volumen = volumen,
+            zapeo = zapeo,
             panelPistas = panelPistas,
             enfoques = enfoques,
             acciones = acciones,
@@ -584,6 +648,8 @@ private fun BoxScope.BarraInferior(
     modos: ModosReproductor,
     arrastreMs: Long?,
     pistas: EstadoPistas,
+    volumen: Float,
+    zapeo: ZapeoEstado,
     panelPistas: EstadoPanelPistas,
     enfoques: EnfoquesControles,
     acciones: AccionesReproductor,
@@ -610,7 +676,10 @@ private fun BoxScope.BarraInferior(
         }
         AvisoPistas(pistas)
         FilaProgreso(duracion, posicion, estado.puedeBuscar, acciones)
-        FilaBotones(fase, modos.modo, modos.secundariosVisibles, estado.puedeBuscar, enfoques.alternar, acciones)
+        FilaBotones(fase, modos.modo, modos.secundariosVisibles, estado.puedeBuscar, zapeo, enfoques.alternar, acciones)
+        // E6-T6: el volumen es un control primario del contrato y permanece
+        // visible junto a la fila principal, fuera de los secundarios S17b.
+        FilaVolumen(volumen, acciones)
         // S17b: los selectores de pista (audio y subtítulos) también son
         // controles secundarios fijos; el aviso de preferencia no disponible
         // no lo es y permanece visible.
@@ -663,6 +732,7 @@ private fun FilaBotones(
     modo: ModoAspecto,
     secundariosVisibles: Boolean,
     puedeBuscar: Boolean,
+    zapeo: ZapeoEstado,
     enfoqueAlternar: FocusRequester,
     acciones: AccionesReproductor,
 ) {
@@ -671,6 +741,15 @@ private fun FilaBotones(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // E6-T6: el zapeo es un control primario como play/pausa; permanece
+        // siempre visible y se deshabilita en los límites de navegación sin
+        // envolver la navegación.
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_anterior),
+            tag = TAG_REPRODUCTOR_ANTERIOR,
+            onClick = acciones.alZapearAnterior,
+            habilitado = zapeo.tieneAnterior,
+        ) { Text(stringResource(R.string.reproductor_anterior)) }
         BotonControl(
             etiqueta = stringResource(R.string.reproductor_pausar),
             tag = TAG_REPRODUCTOR_ALTERNAR,
@@ -687,6 +766,12 @@ private fun FilaBotones(
                 ),
             )
         }
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_siguiente),
+            tag = TAG_REPRODUCTOR_SIGUIENTE,
+            onClick = acciones.alZapearSiguiente,
+            habilitado = zapeo.tieneSiguiente,
+        ) { Text(stringResource(R.string.reproductor_siguiente)) }
         // S17b: retroceso, avance y aspecto son controles secundarios fijos;
         // play/pausa es el control primario y permanece siempre.
         if (secundariosVisibles) {
@@ -733,6 +818,39 @@ private fun FilaBotones(
                 ),
             )
         }
+    }
+}
+
+/**
+ * Fila de volumen (E6-T6): bajar, valor porcentual visible y subir. El paso y
+ * los límites son reglas puras de [limitarVolumen]; Media3 es la única verdad
+ * del nivel aplicado a la salida.
+ */
+@Composable
+private fun FilaVolumen(
+    volumen: Float,
+    acciones: AccionesReproductor,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_volumen_bajar),
+            tag = TAG_REPRODUCTOR_VOLUMEN_BAJAR,
+            onClick = acciones.alBajarVolumen,
+        ) { Text("−") }
+        Text(
+            text = stringResource(R.string.reproductor_volumen_valor, (volumen * 100).roundToInt()),
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium,
+            modifier =
+                Modifier
+                    .padding(horizontal = 8.dp)
+                    .testTag(TAG_REPRODUCTOR_VOLUMEN_VALOR),
+        )
+        BotonControl(
+            etiqueta = stringResource(R.string.reproductor_volumen_subir),
+            tag = TAG_REPRODUCTOR_VOLUMEN_SUBIR,
+            onClick = acciones.alSubirVolumen,
+        ) { Text("+") }
     }
 }
 

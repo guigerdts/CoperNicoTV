@@ -166,7 +166,8 @@ class ReproductorViewModel
                                     .getOrDefault(PreferenciasReproduccion())
                             _modoAspecto.value = reproduccion.modoAspecto
                             _controlesSecundariosVisibles.value = reproduccion.controlesSecundariosVisibles
-                            val nueva = abrirSesion(resultado.stream.url, preferenciasActuales)
+                            val nueva =
+                                abrirSesion(resultado.stream.url, resultado.stream.protocolo, preferenciasActuales)
                             // El volumen vigente sobrevive al zapeo: la sesión
                             // nueva hereda el nivel actual (E6-T6).
                             nueva.fijarVolumen(_volumen.value)
@@ -339,9 +340,10 @@ class ReproductorViewModel
 
         private fun abrirSesion(
             url: String,
+            protocolo: ProtocoloStream,
             preferencias: PreferenciasPista,
         ): SesionMedia3 {
-            val nueva = SesionMedia3(contexto, url, preferencias, politica = politicaReintentos)
+            val nueva = SesionMedia3(contexto, url, protocolo, preferencias, politica = politicaReintentos)
             sesion = nueva
             recolector?.cancel()
             recolector =

@@ -15,8 +15,8 @@ import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
 import com.copernicotv.app.ui.TAG_ABRIR_DOCUMENTO
-import com.copernicotv.app.ui.TAG_ACCION_REPRODUCIR
 import com.copernicotv.app.ui.TAG_ACCIONES_CANAL
+import com.copernicotv.app.ui.TAG_ACCION_REPRODUCIR
 import com.copernicotv.app.ui.TAG_REPRODUCTOR
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -72,18 +72,21 @@ class ShellFocoTvTest {
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0)
             .performKeyInput { pressKey(Key.DirectionCenter) }
 
-        // Diálogo de acciones abierto: un solo foco visible mientras la
-        // superficie cambia; el foco inicial lo toma la primera acción.
+        // Diálogo de acciones abierto: su primera acción (Reproducir) toma
+        // el foco al componerse (comportamiento E7-T1 que esta prueba fija).
+        // Detrás queda el foco del catálogo en su propio dueño de foco, por
+        // eso la superficie modal no se verifica con la cuenta global, que
+        // solo aplica a superficies de ventana completa (catálogo, TV root).
         composeRule.esperarHasta {
             composeRule.onAllNodesWithTag(TAG_ACCIONES_CANAL).fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.esperarHasta { composeRule.contarConFoco() == 1 }
-        composeRule.focoUnico()
-
+        composeRule.esperarHasta {
+            runCatching {
+                composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR).assertIsFocused()
+            }.isSuccess
+        }
         // Reproducir abre el reproductor: la shell restituye un foco único
         // y no deja la pantalla sin foco al cambiar de pantalla.
-        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR).requestFocus()
-        composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR).assertIsFocused()
         composeRule.onNodeWithTag(TAG_ACCION_REPRODUCIR)
             .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.esperarHasta {

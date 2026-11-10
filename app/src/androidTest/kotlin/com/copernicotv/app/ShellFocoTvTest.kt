@@ -97,10 +97,17 @@ class ShellFocoTvTest {
         composeRule.focoUnico()
 
         // Regreso: el catálogo se recompone y restaura el foco a su primer
-        // control (TAG_ABRIR_DOCUMENTO recibe el foco inicial del shell).
+        // control (TAG_ABRIR_DOCUMENTO recibe el foco inicial del shell). Se
+        // espera acoplada al estado real del catálogo: un conteo global puede
+        // satisfacerse antes de la recomposición con el foco que aún conserva
+        // la pantalla anterior.
         pressBack()
-        composeRule.esperarHasta { composeRule.contarConFoco() == 1 }
-        composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertIsFocused()
+        composeRule.esperarHasta {
+            runCatching {
+                composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertExists()
+                composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertIsFocused()
+            }.isSuccess
+        }
         composeRule.focoUnico()
     }
 

@@ -4,8 +4,9 @@ import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.captureToImage
-import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onAllNodes
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
@@ -13,13 +14,18 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Número de nodos de toda la jerarquía sin fusionar con foco activo. Las
- * ayudas de esta sección sostienen los criterios de foco de E7 (un solo foco
- * visible por pantalla) y la captura reproducible de la revisión visual P2
- * (DC-11).
+ * Número de nodos con foco activo en el árbol fusionado: es el foco que el
+ * espectador ve en pantalla. La propiedad `Focused` aparece en el árbol
+ * fusionado, como muestra el árbol adjunto a los fallos de CI; el matcher
+ * acepta cualquier nodo para recorrer toda la jerarquía. Las ayudas de este
+ * archivo sostienen los criterios de foco de E7 (un solo foco visible por
+ * pantalla) y la captura reproducible de la revisión visual P2 (DC-11).
  */
 internal fun ReglaPrincipal.contarConFoco(): Int =
-    onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().count { nodo ->
+    onAllNodes(
+        SemanticsMatcher("nodoCualquiera") { true },
+        useUnmergedTree = false,
+    ).fetchSemanticsNodes().count { nodo ->
         nodo.config.getOrNull(SemanticsProperties.Focused) == true
     }
 

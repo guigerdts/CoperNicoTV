@@ -1,9 +1,11 @@
 package com.copernicotv.app
 
 import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
@@ -15,9 +17,9 @@ import java.io.FileOutputStream
  * reproducible de la revisión visual P2 (DC-11).
  */
 
-/** Número de nodos de toda la jerarquía con foco activo. */
+/** Número de nodos de toda la jerarquía sin fusionar con foco activo. */
 internal fun ReglaPrincipal.contarConFoco(): Int =
-    onRoot(useUnmergedTree = true).fetchSemanticsNodes().count { nodo ->
+    onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().count { nodo ->
         nodo.config.getOrNull(SemanticsProperties.Focused) == true
     }
 
@@ -41,6 +43,15 @@ internal fun ReglaPrincipal.focoUnico() {
  * `adb pull`; el procedimiento de recuperación queda documentado en la
  * checklist física de E7-T7.
  */
+
+/** Ruta determinista de una captura P2 dentro del almacenamiento externo. */
+internal fun ReglaPrincipal.destinoCaptura(nombre: String): File =
+    File(
+        InstrumentationRegistry.getInstrumentation().targetContext
+            .getExternalFilesDir("capturas-p2"),
+        "$nombre.png",
+    )
+
 internal fun ReglaPrincipal.capturarP2(nombre: String): File {
     val destino = destinoCaptura(nombre)
     destino.parentFile?.mkdirs()
@@ -53,11 +64,3 @@ internal fun ReglaPrincipal.capturarP2(nombre: String): File {
     }
     return destino
 }
-
-/** Ruta determinista de una captura P2 dentro del almacenamiento externo. */
-internal fun ReglaPrincipal.destinoCaptura(nombre: String): File =
-    File(
-        InstrumentationRegistry.getInstrumentation().targetContext
-            .getExternalFilesDir("capturas-p2"),
-        "$nombre.png",
-    )

@@ -58,7 +58,7 @@ class ReproductorUiTest {
 
         composeRule.abrirReproductor()
 
-        esperarReproduccionAvanzando()
+        composeRule.esperarReproduccionAvanzando()
     }
 
     @Test
@@ -67,7 +67,7 @@ class ReproductorUiTest {
 
         composeRule.abrirReproductor()
 
-        esperarReproduccionAvanzando()
+        composeRule.esperarReproduccionAvanzando()
     }
 
     @Test

@@ -169,29 +169,29 @@ class ReproductorZapeoTest {
         composeRule.mostrarControlesConToque()
 
         repeat(5) { composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performClick() }
-        composeRule.esperarHasta { volumenMotorEn(viewModel) == 0.5f }
+        composeRule.esperarHasta { composeRule.volumenMotorEn(viewModel) == 0.5f }
         assertEquals("Volumen: 50%", composeRule.textoDeTag(TAG_REPRODUCTOR_VOLUMEN_VALOR))
 
         // El volumen vigente sobrevive al zapeo: la sesión nueva lo hereda.
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_SIGUIENTE).performClick()
         esperarCanal(ids.getValue("Canal B"))
         composeRule.esperarFase("Reproduciendo")
-        assertEquals(0.5f, volumenMotorEn(viewModel))
+        assertEquals(0.5f, composeRule.volumenMotorEn(viewModel))
 
         composeRule.mostrarControlesConToque()
         repeat(6) { composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performClick() }
-        composeRule.esperarHasta { volumenMotorEn(viewModel) == 0.0f }
+        composeRule.esperarHasta { composeRule.volumenMotorEn(viewModel) == 0.0f }
         assertEquals("Volumen: 0%", composeRule.textoDeTag(TAG_REPRODUCTOR_VOLUMEN_VALOR))
         // Límite inferior: otro paso no inventa un volumen negativo.
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performClick()
-        assertEquals(0.0f, volumenMotorEn(viewModel))
+        assertEquals(0.0f, composeRule.volumenMotorEn(viewModel))
 
         repeat(10) { composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_SUBIR).performClick() }
-        composeRule.esperarHasta { volumenMotorEn(viewModel) == 1.0f }
+        composeRule.esperarHasta { composeRule.volumenMotorEn(viewModel) == 1.0f }
         assertEquals("Volumen: 100%", composeRule.textoDeTag(TAG_REPRODUCTOR_VOLUMEN_VALOR))
         // Límite superior: otro paso no se pasa de la escala de Media3.
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_SUBIR).performClick()
-        assertEquals(1.0f, volumenMotorEn(viewModel))
+        assertEquals(1.0f, composeRule.volumenMotorEn(viewModel))
     }
 
     @Test

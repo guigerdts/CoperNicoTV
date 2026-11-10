@@ -95,7 +95,7 @@ class ReproductorZapeoTvTest {
         composeRule.mostrarControlesConDpad()
         composeRule.esperarFocoEnAlternar()
         val viewModel = composeRule.viewModelReproductor()
-        assertEquals(1.0f, volumenMotorEn(viewModel))
+        assertEquals(1.0f, composeRule.volumenMotorEn(viewModel))
 
         // Subir a la fila de volumen: vive encima de la primaria para que
         // bajar desde play conserve el recorrido a las pistas validado en
@@ -116,7 +116,7 @@ class ReproductorZapeoTvTest {
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLUMEN_BAJAR).performKeyInput {
             pressKey(Key.DirectionCenter)
         }
-        composeRule.esperarHasta { volumenMotorEn(viewModel) == 0.9f }
+        composeRule.esperarHasta { composeRule.volumenMotorEn(viewModel) == 0.9f }
         composeRule.esperarTexto(TAG_REPRODUCTOR_VOLUMEN_VALOR, "Volumen: 90%")
     }
 

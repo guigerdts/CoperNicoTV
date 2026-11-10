@@ -171,11 +171,8 @@ jobs:
           disable-animations: true
           script: |
             gradle_exit=0
-            ./gradlew :app:connectedDebugAndroidTest \
-              -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ShellFocoTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest \
-              || gradle_exit=$?
-            adb pull /sdcard/Android/data/com.copernicotv.app/files/capturas-p2 \
-              ./capturas-p2 2>/dev/null || echo "Sin capturas E7-T1 en el emulador"
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ShellFocoTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest || gradle_exit=$?
+            adb pull /sdcard/Android/data/com.copernicotv.app/files/capturas-p2 ./capturas-p2 2>/dev/null || echo "Sin capturas E7-T1 en el emulador"
             exit $gradle_exit
       - name: Publicar reportes instrumentados de TV
         if: always()

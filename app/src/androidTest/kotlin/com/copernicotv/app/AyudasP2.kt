@@ -13,11 +13,11 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Ayudas de E7 para los criterios de foco (un solo foco visible) y de captura
- * reproducible de la revisión visual P2 (DC-11).
+ * Número de nodos de toda la jerarquía sin fusionar con foco activo. Las
+ * ayudas de esta sección sostienen los criterios de foco de E7 (un solo foco
+ * visible por pantalla) y la captura reproducible de la revisión visual P2
+ * (DC-11).
  */
-
-/** Número de nodos de toda la jerarquía sin fusionar con foco activo. */
 internal fun ReglaPrincipal.contarConFoco(): Int =
     onAllNodes(isRoot(), useUnmergedTree = true).fetchSemanticsNodes().count { nodo ->
         nodo.config.getOrNull(SemanticsProperties.Focused) == true
@@ -37,13 +37,6 @@ internal fun ReglaPrincipal.focoUnico() {
     }
 }
 
-/**
- * Captura la pantalla como PNG reproducible para la revisión visual P2 de
- * DC-11 y la guarda en el directorio externo de la app. CI lo recoge con
- * `adb pull`; el procedimiento de recuperación queda documentado en la
- * checklist física de E7-T7.
- */
-
 /** Ruta determinista de una captura P2 dentro del almacenamiento externo. */
 internal fun ReglaPrincipal.destinoCaptura(nombre: String): File =
     File(
@@ -52,6 +45,12 @@ internal fun ReglaPrincipal.destinoCaptura(nombre: String): File =
         "$nombre.png",
     )
 
+/**
+ * Captura la pantalla como PNG reproducible para la revisión visual P2 de
+ * DC-11 y la guarda en el directorio externo de la app. CI lo recoge con
+ * `adb pull`; el procedimiento de recuperación queda documentado en la
+ * checklist física de E7-T7.
+ */
 internal fun ReglaPrincipal.capturarP2(nombre: String): File {
     val destino = destinoCaptura(nombre)
     destino.parentFile?.mkdirs()

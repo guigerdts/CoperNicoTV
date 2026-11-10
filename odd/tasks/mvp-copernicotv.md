@@ -1072,10 +1072,10 @@ E5 está **implementada y validada en CI**, pero **no se declara cerrada**. La h
 | E6-T2 | Controles, pantalla y aspecto | Play/pause, seek, siguiente/anterior; fullscreen, rotación y `resizeMode` sin perder sesión. S17: los controles secundarios fijos se ocultan/muestran con una preferencia global, sin reordenamiento; persiste tras reinicio |
 | E6-T3 | Pistas | Audio y subtítulos seleccionables; ausencia no rompe. D3 aprobada: preferencias globales; la preferencia guardada no crea pistas ni capacidades y se distingue de las opciones disponibles para el contenido actual; si la pista preferida no está disponible, se usa `auto/default`, se conserva la preferencia y se avisa en la UI; S44 |
 | E6-T4 | Errores y reconexión | Reintento y recuperación con errores inyectados; interrupciones en S42. S20: 3 reintentos con backoff de 1 s, 2 s y 4 s para errores transitorios; sin reintento en 4xx no recuperables; validada con fallos inyectados en emulador (L73). No reutiliza D4, que gobierna la actualización |
-| E6-T5 | Diagnóstico | Protocolo, pistas, buffer y último error; URL saneada |
+| E6-T5 | Diagnóstico | Protocolo, pistas, buffer y último error; URL saneada; validado en emuladores móvil y TV con CI verde (L82) |
 | E6-T6 | Zapeo y volumen | Volumen, siguiente/anterior y cambio sin volver al Catálogo |
 
-E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 está **cerrada en el alcance de pistas** —audio y subtítulos seleccionables, ausencia segura y comportamiento D3— (L72); S44b (`resizeMode` persistido) y el caso «techo» de S44a quedan en E7-T5 y la fila S44 no se declara completa. E6-T4 está **cerrada** —S20 completa: tres reintentos de 1 s, 2 s y 4 s, error definitivo tras el tercero, sin reintento en 4xx no recuperables, recuperación sin recrear la sesión, cancelación al cambiar de Canal o salir y aviso de reintento en la UI— (L73). E6-T5 y E6-T6 siguen pendientes y E6 en conjunto no se declara cerrada.
+E6-T1 está **iniciada, no cerrada**: el primer incremento funcional abre un Canal desde el Catálogo y reproduce HLS y HTTP progresivo con Media3, validado en emulador (L70). DASH, RTSP y SmoothStreaming están clasificados y cableados, pero no validados por reproducción: no se declaran soportados. E6-T2 está **cerrada en el alcance A–D autorizado** —controles, pantalla, TV y móvil— (L71); «siguiente/anterior» se difiere a E6-T6 y S17b a E7-T5. E6-T3 está **cerrada en el alcance de pistas** —audio y subtítulos seleccionables, ausencia segura y comportamiento D3— (L72); S44b (`resizeMode` persistido) y el caso «techo» de S44a quedan en E7-T5 y la fila S44 no se declara completa. E6-T4 está **cerrada** —S20 completa: tres reintentos de 1 s, 2 s y 4 s, error definitivo tras el tercero, sin reintento en 4xx no recuperables, recuperación sin recrear la sesión, cancelación al cambiar de Canal o salir y aviso de reintento en la UI— (L73). E6-T5 está **cerrada** —diagnóstico técnico de reproducción en panel reactivo, copiable y saneado, con cobertura instrumentada en móvil y TV— (L82). E6-T6 sigue pendiente y E6 en conjunto no se declara cerrada.
 
 ### 8.7 E7 — Android TV, móvil y preferencias
 
@@ -4520,3 +4520,53 @@ Se integra el PR #22 (`fix(security): completa recuperación y protección del �
 **Limitación de validación física.** `:app` no compila localmente en Termux; APK e instrumentadas se validaron solo en GitHub Actions (emulador). No hay verificación en dispositivo físico. `ClavesKeystoreTest` limpia los alias de Keystore en `@After` pero no las tablas de la base; no debe ejecutarse en un dispositivo con datos reales sin aislarlos o borrarlos antes.
 
 **Estado.** Con esta integración, E2-T6/DC-04 cubren el ciclo de vida HMAC (recuperación, pérdida real de clave, concurrencia e inicialización) y mantienen la cobertura previa de cifrado AES y de las pruebas instrumentadas de E2-T6. No se reabre E2 ni se altera el esquema Room v1. La validación física sigue pendiente y fuera de esta ronda. No se declara el MVP terminado.
+
+
+### L82 — E6-T5: diagnóstico técnico de reproducción (2026-11-10)
+
+**Autorización y objetivo.** Cerrar E6-T5 —«Diagnóstico»—: panel de diagnóstico técnico de la
+reproducción (protocolo, pistas, buffer y último error) reactivo durante la reproducción,
+saneado —sin URL, token, secreto ni ruta en la UI, en el portapapeles, en logs ni en las
+pruebas— y copiable al portapapeles; cobertura instrumentada en móvil y TV con registro de
+ambas suites en CI. Sin alterar E6-T1..T4, sin iniciar E6-T6 y sin tocar `README.md`,
+`GLOSSARY.md`, el baseline M3U ni `feat/e1-bootstrap`. E6-T5 no alcanza un número de
+especificación propio; su alcance es la fila de §8.6.
+
+**Implementación y entregas.** Rama única `e6-t5-diagnostico`, worktree dedicado, PR único
+#23 hacia `main` (no mergeado: decisión del propietario). Base `3dfa2b4`
+(merge de PR #22). Diez commits, 11 archivos, +1039/−22
+(`git diff --stat 3dfa2b4..c114ee8`): `da7bb1a` modelo puro del diagnóstico;
+`9bd5e51` representación segura del stream resuelto; `eb77bbb` diagnóstico reactivo en el
+ViewModel; `bfb55e7` panel visible y copiable en `ReproductorScreen`
+(`ReproductorDiagnosticoUi.kt`, strings locales); `0b78a15` registro de
+`ReproductorDiagnosticoTest` (móvil) y `ReproductorDiagnosticoTvTest` (TV) en el filtro
+explícito de `.github/workflows/ci.yml`; `799496e` cobertura instrumentada; correcciones
+`874c2b1`, `961aaff` (escritura del portapapeles observable y gesto en el contenedor padre),
+`7ff4bdb` (confirma el estado `Copiado` y tolera la lectura bloqueada) y `c114ee8`
+(import inválido retirado). Todos los commits pasaron el hook GGA con la técnica warm
+documentada en `docs/agents/commit-review-restarts.md`, sin `--no-verify` y sin debilitar
+`.gga`.
+
+**Cobertura.** `DiagnosticoReproductorTest` (JVM, modelo y saneado);
+`RepositorioReproductorTest` ampliado; instrumentadas `ReproductorDiagnosticoTest`
+(móvil) y `ReproductorDiagnosticoTvTest` (TV): el panel expone el estado sin credenciales,
+el botón copia y confirma, y el contenido copiado nunca contiene token, secreto ni ruta.
+
+**Verificación.** CI de `c114ee8` (runs `42739619220` del PR y `42739613525`
+del push): `jvm-tests`, `static-analysis`, `apk`, `instrumented-mobile` e `instrumented-tv`
+verdes, 5/5; `p1-android` y `p1-performance` omitidos por diseño. Reportes publicados como
+artifacts. Validado solo en emuladores; la validación en dispositivo físico queda pendiente
+de forma transversal al proyecto y no se declara el MVP terminado.
+
+**Ajuste por entorno documentado.** Android 10+ bloquea la lectura del portapapeles a apps
+sin foco de ventana; el emulador de CI mantiene la app sin foco: la escritura SÍ ocurre
+(estado `Copiado`) pero la lectura devuelve vacío en instrumentación. El test móvil exige
+siempre el estado `Copiado` (la escritura se verifica en todos los entornos), intenta
+recuperar el foco (`runOnIdle` + `requestFocus`), y si la lectura queda bloqueada (marcador
+`con texto bloqueado`) exige esa marca explícita en lugar de omitir la aserción; si se lee,
+aserta el contenido completo saneado.
+
+**Aprendizaje de flujos.** El hook GGA revisa código pero no compila, y ktlint/detekt no
+detectan referencias irresueltas: el error de compilación del import incorrecto
+solo apareció en CI. Un run de CI previo (`42737413112` en `7ff4bdb`) falló exactamente así
+y se corrigió sin tocar la app.

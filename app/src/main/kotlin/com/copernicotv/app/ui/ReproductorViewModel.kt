@@ -5,22 +5,27 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
+import com.copernicotv.app.data.BusquedaCatalogoRepositorio
 import com.copernicotv.app.data.PreferenciasReproduccion
 import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
 import com.copernicotv.app.data.ReproductorRepositorio
 import com.copernicotv.app.data.ResultadoStream
 import com.copernicotv.app.player.DiagnosticoReproductor
+import com.copernicotv.app.player.DireccionZapeo
 import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.app.player.ModoAspecto
+import com.copernicotv.app.player.PASO_VOLUMEN
 import com.copernicotv.app.player.PistaDisponible
 import com.copernicotv.app.player.PoliticaReintentos
 import com.copernicotv.app.player.PreferenciaPista
 import com.copernicotv.app.player.PreferenciasPista
 import com.copernicotv.app.player.SesionMedia3
+import com.copernicotv.app.player.canalVecino
 import com.copernicotv.app.player.construirDiagnostico
+import com.copernicotv.app.player.limitarVolumen
 import com.copernicotv.app.player.sanearUrl
 import com.copernicotv.core.player.ProtocoloStream
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,6 +61,17 @@ sealed interface ReproductorUiState {
 }
 
 /**
+ * Disponibilidad de zapeo del Canal activo (E6-T6).
+ *
+ * Se calcula contra el universo visible del Catálogo: un Canal sin anterior o
+ * sin siguiente deshabilita su botón en lugar de envolver la navegación.
+ */
+data class ZapeoEstado(
+    val tieneAnterior: Boolean = false,
+    val tieneSiguiente: Boolean = false,
+)
+
+/**
  * Dueño de la sesión Media3 de un Canal (E6-T2).
  *
  * La sesión se crea una sola vez por Canal y sobrevive a los cambios de
@@ -68,6 +84,7 @@ class ReproductorViewModel
     @Inject
     constructor(
         private val repositorio: ReproductorRepositorio,
+        private val busqueda: BusquedaCatalogoRepositorio,
         @ApplicationContext private val contexto: Context,
         private val preferenciasPista: RepositorioPreferenciasPista,
         private val preferenciasReproduccion: RepositorioPreferenciasReproduccion,
@@ -90,6 +107,14 @@ class ReproductorViewModel
 
         private val _controlesSecundariosVisibles = MutableStateFlow(true)
         val controlesSecundariosVisibles: StateFlow<Boolean> = _controlesSecundariosVisibles.asStateFlow()
+
+        /** Volumen vigente en la escala 0..1 de Media3; no se persiste (E6-T6). */
+        private val _volumen = MutableStateFlow(VOLUMEN_INICIAL)
+        val volumen: StateFlow<Float> = _volumen.asStateFlow()
+
+        /** Disponibilidad de zapeo del Canal activo (E6-T6). */
+        private val _zapeo = MutableStateFlow(ZapeoEstado())
+        val zapeo: StateFlow<ZapeoEstado> = _zapeo.asStateFlow()
 
         /** Motor de la sesión activa; `null` mientras no hay sesión abierta. */
         val motor: ExoPlayer?
@@ -142,9 +167,15 @@ class ReproductorViewModel
                             _modoAspecto.value = reproduccion.modoAspecto
                             _controlesSecundariosVisibles.value = reproduccion.controlesSecundariosVisibles
                             val nueva = abrirSesion(resultado.stream.url, preferenciasActuales)
+                            // El volumen vigente sobrevive al zapeo: la sesión
+                            // nueva hereda el nivel actual (E6-T6).
+                            nueva.fijarVolumen(_volumen.value)
                             // Si la sesión falló antes de publicar el Canal, el
                             // error definitivo ya ganó: no lo pisamos con Listo.
-                            if (sesion === nueva) _estado.value = datos
+                            if (sesion === nueva) {
+                                _estado.value = datos
+                                refrescarZapeo(resultado.stream.canalId)
+                            }
                         }
                         is ResultadoStream.Error -> {
                             _diagnostico.value =
@@ -162,6 +193,60 @@ class ReproductorViewModel
         /** Alterna play y pausa de la sesión activa. */
         fun alternar() {
             sesion?.alternar()
+        }
+
+        /** Zapea al Canal siguiente del Catálogo sin salir de la pantalla (E6-T6). */
+        fun zapearSiguiente() = zapear(DireccionZapeo.SIGUIENTE)
+
+        /** Zapea al Canal anterior del Catálogo sin salir de la pantalla (E6-T6). */
+        fun zapearAnterior() = zapear(DireccionZapeo.ANTERIOR)
+
+        /** Sube el volumen un paso, acotado a la escala de Media3 (E6-T6). */
+        fun subirVolumen() = fijarVolumen(_volumen.value + PASO_VOLUMEN)
+
+        /** Baja el volumen un paso, acotado a la escala de Media3 (E6-T6). */
+        fun bajarVolumen() = fijarVolumen(_volumen.value - PASO_VOLUMEN)
+
+        /** Fija el volumen y lo aplica a la sesión activa; no se persiste. */
+        fun fijarVolumen(valor: Float) {
+            val nuevo = limitarVolumen(valor)
+            _volumen.value = nuevo
+            sesion?.fijarVolumen(nuevo)
+        }
+
+        /**
+         * Consulta el universo de zapeo y carga el Canal vecino.
+         *
+         * El destino se calcula con el Canal vigente al resolverse la consulta,
+         * de modo que dos zapeos consecutivos avanzan en orden. En los límites
+         * de navegación o sin Canal cargado no hay destino: no se toca la
+         * sesión y [cargar] reutiliza toda la maquinaria de sustitución.
+         */
+        private fun zapear(direccion: DireccionZapeo) {
+            viewModelScope.launch {
+                val vecinos = runCatching { busqueda.idsZapeo() }.getOrDefault(emptyList())
+                val vigente = canalCargado ?: return@launch
+                val destino = canalVecino(vecinos, vigente, direccion) ?: return@launch
+                cargar(destino)
+            }
+        }
+
+        /**
+         * Recalcula la disponibilidad de zapeo tras una carga Ok.
+         *
+         * El guard contra `canalCargado` evita que un refresco en vuelo de un
+         * zapeo anterior pise el estado del Canal actual (E6-T6).
+         */
+        private fun refrescarZapeo(canalId: Long) {
+            viewModelScope.launch {
+                val vecinos = runCatching { busqueda.idsZapeo() }.getOrDefault(emptyList())
+                if (canalCargado != canalId) return@launch
+                _zapeo.value =
+                    ZapeoEstado(
+                        tieneAnterior = canalVecino(vecinos, canalId, DireccionZapeo.ANTERIOR) != null,
+                        tieneSiguiente = canalVecino(vecinos, canalId, DireccionZapeo.SIGUIENTE) != null,
+                    )
+            }
         }
 
         /** Desplaza la posición actual (positivo avanza, negativo retrocede). */
@@ -237,6 +322,7 @@ class ReproductorViewModel
             carga = null
             cerrarSesion()
             canalCargado = null
+            _zapeo.value = ZapeoEstado()
             if (_estado.value !is ReproductorUiState.Error) {
                 _estado.value = ReproductorUiState.Cargando
             }
@@ -337,5 +423,9 @@ class ReproductorViewModel
             protocoloActual = null
             urlSaneadaActual = null
             ultimoError = null
+        }
+
+        private companion object {
+            const val VOLUMEN_INICIAL = 1.0f
         }
     }

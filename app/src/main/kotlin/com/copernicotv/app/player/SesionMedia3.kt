@@ -132,6 +132,15 @@ class SesionMedia3(
     }
 
     /**
+     * Fija el volumen de la salida del motor en la escala 0..1 de Media3
+     * (E6-T6). No recrea la sesión ni toca la reproducción: solo el nivel.
+     */
+    fun fijarVolumen(volumen: Float) {
+        if (liberada.get()) return
+        reproductor.volume = limitarVolumen(volumen)
+    }
+
+    /**
      * Selecciona una pista de audio del contenido actual.
      *
      * Solo cambia `TrackSelectionParameters`: no recrea el motor ni la sesión.

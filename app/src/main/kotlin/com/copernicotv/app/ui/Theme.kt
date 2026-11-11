@@ -7,6 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme as MaterialThemeTv
 
+/** Base de la escala de TV: la tipografía por defecto de Material 3. */
+private val tipografiaBase: Typography = Typography()
+
 /**
  * Escala tipográfica de TV de DC-11 (umbrales mínimos de P2).
  *
@@ -17,6 +20,9 @@ import androidx.tv.material3.MaterialTheme as MaterialThemeTv
  * dentro de `CoperNicoTheme`; el móvil conserva la tipografía por defecto
  * hasta la adaptación de E7-T3. `CanarioFocoDpadTvTest` verifica los
  * valores contra DC-11.
+ *
+ * La base se declara antes: las propiedades top-level se inicializan en
+ * orden de declaración y `TipografiaTv` la consume al componerse.
  */
 val TipografiaTv: Typography =
     tipografiaBase.copy(
@@ -30,9 +36,6 @@ val TipografiaTv: Typography =
         labelSmall = tipografiaBase.labelSmall.copy(fontSize = 16.sp),
         labelMedium = tipografiaBase.labelMedium.copy(fontSize = 16.sp),
     )
-
-/** Base de la escala de TV: la tipografía por defecto de Material 3. */
-private val tipografiaBase: Typography = Typography()
 
 /**
  * Tema único del canario: oscuro, apto para TV y móvil.

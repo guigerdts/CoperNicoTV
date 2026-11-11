@@ -1,6 +1,8 @@
 package com.copernicotv.app
 
+import android.content.ContentValues
 import android.graphics.Bitmap
+import android.provider.MediaStore
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -10,6 +12,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 
 /**
@@ -52,9 +55,12 @@ internal fun ReglaPrincipal.destinoCaptura(nombre: String): File =
 
 /**
  * Captura la pantalla como PNG reproducible para la revisión visual P2 de
- * DC-11 y la guarda en el directorio externo de la app. CI lo recoge con
- * `adb pull`; el procedimiento de recuperación queda documentado en la
- * checklist física de E7-T7.
+ * DC-11. Escribe el archivo en el directorio externo de la app y lo publica
+ * además en `Pictures/capturas-p2` vía MediaStore: en imágenes production el
+ * shell user no puede leer `Android/data` (sin `adb root` ni `run-as`), así
+ * que CI extrae las capturas con `adb pull` desde el almacenamiento
+ * compartido. El procedimiento queda documentado en la checklist física de
+ * E7-T7.
  */
 internal fun ReglaPrincipal.capturarP2(nombre: String): File {
     val destino = destinoCaptura(nombre)
@@ -66,6 +72,26 @@ internal fun ReglaPrincipal.capturarP2(nombre: String): File {
     if (!destino.exists() || destino.length() <= 0L) {
         throw AssertionError("La captura $nombre quedó vacía o inexistente: $destino")
     }
+    publicarP2EnGaleria(nombre, destino)
     println("CAPTURA_P2: ${destino.absolutePath}")
     return destino
+}
+
+/** Copia una captura ya escrita al almacenamiento compartido vía MediaStore
+ * con ruta relativa `Pictures/capturas-p2`, visible para el shell user de CI
+ * sin permisos adicionales en API 34. */
+internal fun ReglaPrincipal.publicarP2EnGaleria(nombre: String, origen: File) {
+    val contexto = InstrumentationRegistry.getInstrumentation().targetContext
+    val valores = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, "$nombre.png")
+        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/capturas-p2")
+    }
+    val uri = contexto.contentResolver.insert(
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        valores,
+    ) ?: throw AssertionError("MediaStore rechazó la captura $nombre")
+    contexto.contentResolver.openOutputStream(uri)?.use { flujo ->
+        FileInputStream(origen).use { entrada -> entrada.copyTo(flujo) }
+    } ?: throw AssertionError("Sin salida para la captura $nombre")
 }

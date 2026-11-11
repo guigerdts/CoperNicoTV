@@ -1,6 +1,7 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -34,6 +35,7 @@ import javax.inject.Inject
  * reproducibles para la revisión visual humana a 10 pies, que sigue
  * pendiente y no se declara cerrada por CI.
  */
+@OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
 class CanarioFocoDpadTvTest {
     @get:Rule(order = 0)

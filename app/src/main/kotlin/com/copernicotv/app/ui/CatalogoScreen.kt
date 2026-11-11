@@ -33,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -344,6 +345,7 @@ data class CatalogoAcciones(
 @Composable
 fun CatalogoScreen(
     estado: CatalogoUiState,
+    anchoVentana: WindowWidthSizeClass,
     criterios: CriteriosBusqueda,
     grupos: List<GrupoOpcion>,
     listas: List<ListaResumen>,
@@ -363,8 +365,10 @@ fun CatalogoScreen(
             criterios.grupoId != null ||
             criterios.soloFavoritos ||
             criterios.mostrarOcultos
+    // E7-T3: la rama de layout sigue los breakpoints de ancho de Material en
+    // vez de comparar ancho y alto de la pantalla.
+    val horizontal = anchoVentana != WindowWidthSizeClass.Compact
     val configuracion = LocalConfiguration.current
-    val horizontal = configuracion.screenWidthDp > configuracion.screenHeightDp
 
     Surface(
         modifier =

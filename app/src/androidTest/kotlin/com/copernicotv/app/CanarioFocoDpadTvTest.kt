@@ -104,7 +104,8 @@ class CanarioFocoDpadTvTest {
         assertTrue(
             "Área de foco de canal-0 bajo el mínimo de DC-11 (56 dp): " +
                 "${limitesCanal0.height / densidad} dp de alto, " +
-                "${limitesCanal0.width / densidad} dp de ancho",
+                "${limitesCanal0.width / densidad} dp de ancho " +
+                "(${limitesCanal0.height}px, densidad $densidad)",
             limitesCanal0.height / densidad >= 56f && limitesCanal0.width / densidad >= 56f,
         )
         composeRule.capturarP2("e7t2-catalogo-canal0")

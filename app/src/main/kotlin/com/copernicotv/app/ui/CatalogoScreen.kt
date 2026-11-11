@@ -1241,7 +1241,10 @@ private fun CanalFila(
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            // DC-11: el relleno vertical lleva la altura natural de la fila
+            // por encima del mínimo de 56 dp sin depender de la coerción de
+            // heightIn en el emulador.
+            modifier = Modifier.weight(1f).padding(vertical = 16.dp),
         )
         if (canal.esFavorito) {
             Text(

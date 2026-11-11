@@ -174,7 +174,7 @@ jobs:
           # sola línea física (`;` en vez de saltos), que preserva el código de
           # salida real de Gradle aunque las capturas fallen en el pull.
           script: |
-            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ShellFocoTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest ; codigo=$? ; adb pull /sdcard/Android/data/com.copernicotv.app/files/capturas-p2 ./capturas-p2 2>/dev/null || echo "Sin capturas E7-T1 en el emulador" ; exit $codigo
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ShellFocoTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest ; codigo=$? ; adb shell ls -la /storage/emulated/0/Android/data/com.copernicotv.app/files/ ; adb pull /storage/emulated/0/Android/data/com.copernicotv.app/files/capturas-p2 ./capturas-p2 || echo "Sin capturas E7-T1 en el emulador" ; exit $codigo
       - name: Publicar reportes instrumentados de TV
         if: always()
         uses: actions/upload-artifact@v4

@@ -17,7 +17,8 @@
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.CoperNicoTV">
+        android:theme="@style/Theme.CoperNicoTV"
+        android:enableOnBackInvokedCallback="true">
 
         <!--
           WorkManager se inicializa con la Configuration del Application para

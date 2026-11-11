@@ -80,17 +80,22 @@ internal fun ReglaPrincipal.capturarP2(nombre: String): File {
 /** Copia una captura ya escrita al almacenamiento compartido vía MediaStore
  * con ruta relativa `Pictures/capturas-p2`, visible para el shell user de CI
  * sin permisos adicionales en API 34. */
-internal fun ReglaPrincipal.publicarP2EnGaleria(nombre: String, origen: File) {
+internal fun ReglaPrincipal.publicarP2EnGaleria(
+    nombre: String,
+    origen: File,
+) {
     val contexto = InstrumentationRegistry.getInstrumentation().targetContext
-    val valores = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, "$nombre.png")
-        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/capturas-p2")
-    }
-    val uri = contexto.contentResolver.insert(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        valores,
-    )
+    val valores =
+        ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$nombre.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/capturas-p2")
+        }
+    val uri =
+        contexto.contentResolver.insert(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            valores,
+        )
     if (uri == null) {
         throw AssertionError("MediaStore rechazó la captura $nombre")
     }

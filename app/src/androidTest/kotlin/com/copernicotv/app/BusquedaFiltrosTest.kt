@@ -1,5 +1,6 @@
 package com.copernicotv.app
 
+import android.view.WindowInsets
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -83,10 +84,16 @@ class BusquedaFiltrosTest {
             }.isSuccess
         if (!sinCanalUno) {
             // Diagnóstico temporal E7-T3: el fallo original no muestra el
-            // estado de la UI; se vuelca el árbol para ver chips seleccionados
-            // y filas de canal presentes en el momento del timeout.
+            // estado de la UI; se vuelca el inset del teclado y el árbol para
+            // ver chips seleccionados y filas de canal en el momento del
+            // timeout.
+            val imeInferior =
+                composeRule.activity.window.decorView.rootWindowInsets
+                    .getInsets(WindowInsets.Type.ime())
+                    .bottom
             throw AssertionError(
-                "El filtro por grupo no redujo los resultados.\nÁrbol:\n${composeRule.onRoot().printToString()}",
+                "El filtro por grupo no redujo los resultados (imeInferiorPx=$imeInferior).\n" +
+                    "Árbol:\n${composeRule.onRoot().printToString()}",
             )
         }
 

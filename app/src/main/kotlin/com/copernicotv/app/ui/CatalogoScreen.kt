@@ -55,6 +55,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -418,12 +419,22 @@ fun CatalogoScreen(
             // En pantallas bajas los controles no deben dejar sin altura a los
             // resultados: se acotan y pasan a hacer scroll, y la lista conserva
             // un mínimo visible para seguir siendo usable. El tope se calcula
-            // desde la configuración para no introducir una subcomposición: el
-            // foco inicial se pide en un `LaunchedEffect` y necesita que el nodo
-            // con `focusRequester` ya esté adjunto en el primer frame.
+            // desde la configuración descontando los insets reales (barras del
+            // sistema y teclado con edge-to-edge) para no introducir una
+            // subcomposición: el foco inicial se pide en un `LaunchedEffect` y
+            // necesita que el nodo con `focusRequester` ya esté adjunto en el
+            // primer frame.
+            val densidad = LocalDensity.current
+            val insetsVerticales =
+                with(densidad) {
+                    (
+                        WindowInsets.safeDrawing.getTop(densidad) +
+                            WindowInsets.safeDrawing.getBottom(densidad)
+                    ).toDp()
+                }
             val altoMaximoControles =
                 (
-                    configuracion.screenHeightDp.dp - 48.dp -
+                    configuracion.screenHeightDp.dp - insetsVerticales - 48.dp -
                         ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp
                 ).coerceAtLeast(0.dp)
             Column(

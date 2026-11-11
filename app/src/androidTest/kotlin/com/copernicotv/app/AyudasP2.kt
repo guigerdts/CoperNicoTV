@@ -90,8 +90,17 @@ internal fun ReglaPrincipal.publicarP2EnGaleria(nombre: String, origen: File) {
     val uri = contexto.contentResolver.insert(
         MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
         valores,
-    ) ?: throw AssertionError("MediaStore rechazó la captura $nombre")
-    contexto.contentResolver.openOutputStream(uri)?.use { flujo ->
-        FileInputStream(origen).use { entrada -> entrada.copyTo(flujo) }
-    } ?: throw AssertionError("Sin salida para la captura $nombre")
+    )
+    if (uri == null) {
+        throw AssertionError("MediaStore rechazó la captura $nombre")
+    }
+    val flujoSalida = contexto.contentResolver.openOutputStream(uri)
+    if (flujoSalida == null) {
+        throw AssertionError("Sin salida para la captura $nombre")
+    }
+    flujoSalida.use { destino ->
+        FileInputStream(origen).use { entrada ->
+            entrada.copyTo(destino)
+        }
+    }
 }

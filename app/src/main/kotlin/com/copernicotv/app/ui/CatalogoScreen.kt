@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -45,9 +46,11 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -531,12 +534,27 @@ private fun Controles(
             modifier = Modifier.testTag(TAG_ERROR_ACCION),
         )
     }
+    // En TV el campo de una línea consume D-pad Abajo/Arriba y atrapa el
+    // foco: la intercepción en preview mueve el foco a destino antes de que
+    // el campo trate la tecla como edición de texto.
+    val manejadorFoco = LocalFocusManager.current
     OutlinedTextField(
         value = criterios.texto,
         onValueChange = acciones.onTexto,
         label = { Text(stringResource(R.string.catalogo_buscar)) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth().testTag(TAG_BUSCAR),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onPreviewKeyEvent { evento ->
+                    evento.type == KeyEventType.KeyUp &&
+                        when (evento.key) {
+                            Key.DirectionDown -> manejadorFoco.moveFocus(FocusDirection.Down)
+                            Key.DirectionUp -> manejadorFoco.moveFocus(FocusDirection.Up)
+                            else -> false
+                        }
+                }
+                .testTag(TAG_BUSCAR),
     )
     if (criterios.texto.isNotEmpty() || criterios.grupoId != null || criterios.soloFavoritos) {
         TextButton(

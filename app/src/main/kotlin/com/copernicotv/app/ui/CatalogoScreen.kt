@@ -1131,6 +1131,8 @@ private fun CanalFila(
         modifier =
             Modifier
                 .fillMaxWidth()
+                // DC-11: el área de foco en TV mide al menos 56 × 56 dp.
+                .heightIn(min = 56.dp)
                 .onFocusChanged { enfocado = it.isFocused }
                 .onKeyEvent { evento ->
                     if (evento.type == KeyEventType.KeyUp &&

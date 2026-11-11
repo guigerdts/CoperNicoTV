@@ -625,6 +625,10 @@ private fun BotonNuevoCanal(
                         Modifier.focusProperties { down = focoPrimerCanal }
                     },
                 )
+                // DC-11: en material3 1.3 la enforcement del mínimo táctil de
+                // 48 dp está desactivada por defecto; el Button queda en 40 dp
+                // si no se declara explícito.
+                .heightIn(min = 48.dp)
                 .testTag(TAG_NUEVO_CANAL),
     ) {
         Text(stringResource(R.string.catalogo_nuevo_canal))
@@ -1048,26 +1052,26 @@ private fun FiltrosYOrden(
             selected = criterios.grupoId == null && !criterios.soloFavoritos,
             onClick = onTodos,
             label = { Text(stringResource(R.string.catalogo_todos)) },
-            modifier = Modifier.testTag(TAG_FILTRO_TODOS),
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FILTRO_TODOS),
         )
         FilterChip(
             selected = criterios.soloFavoritos,
             onClick = onFavoritos,
             label = { Text(stringResource(R.string.catalogo_favoritos)) },
-            modifier = Modifier.testTag(TAG_FILTRO_FAVORITOS),
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FILTRO_FAVORITOS),
         )
         FilterChip(
             selected = criterios.mostrarOcultos,
             onClick = onMostrarOcultos,
             label = { Text(stringResource(R.string.catalogo_mostrar_ocultos)) },
-            modifier = Modifier.testTag(TAG_FILTRO_OCULTOS),
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FILTRO_OCULTOS),
         )
         grupos.forEach { grupo ->
             FilterChip(
                 selected = criterios.grupoId == grupo.id,
                 onClick = { onGrupo(if (criterios.grupoId == grupo.id) null else grupo.id) },
                 label = { Text(grupo.nombre) },
-                modifier = Modifier.testTag(PREFIJO_TAG_GRUPO + grupo.id),
+                modifier = Modifier.heightIn(min = 48.dp).testTag(PREFIJO_TAG_GRUPO + grupo.id),
             )
         }
         SelectorOrden(

@@ -5,10 +5,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -106,7 +109,14 @@ fun GuiaScreen(
     onVolver: () -> Unit,
 ) {
     var editarId by remember { mutableStateOf<Long?>(null) }
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(
+        modifier =
+            Modifier
+                // E7-T3 (edge-to-edge): el contenido respeta las barras del
+                // sistema en vez de quedar debajo de ellas.
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+    ) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             CabeceraGuia(onVolver = onVolver)
             SelectorFuentes(estado = estado, onSeleccionarFuente = onSeleccionarFuente)

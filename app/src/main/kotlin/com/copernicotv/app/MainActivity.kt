@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -44,6 +45,10 @@ class MainActivity : ComponentActivity() {
         // Reconciliación de programaciones de DC-07 punto 5. Es idempotente por
         // proceso, así que una recreación de la Activity no la repite.
         inicializador.iniciar()
+        // E7-T3: dibujo edge-to-edge; cada pantalla raíz consume los insets de
+        // barras del sistema con windowInsetsPadding (el reproductor ya los
+        // maneja en sus overlays).
+        enableEdgeToEdge()
         setContent {
             CoperNicoTheme(esTv = recordarEsTv()) {
                 var pantalla by rememberSaveable { mutableStateOf(Pantalla.CATALOGO) }

@@ -315,6 +315,8 @@ private fun FilaCanal(
         modifier =
             Modifier
                 .fillMaxWidth()
+                // DC-11: área táctil de fila de al menos 48 dp.
+                .heightIn(min = 48.dp)
                 .clickable(onClick = onAbrir)
                 .testTag(tagCanalGuia(fila.canal.canalId)),
     ) {
@@ -340,6 +342,7 @@ private fun FilaPrograma(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .heightIn(min = 48.dp)
                 .clickable(onClick = onAbrir)
                 .testTag(tagProgramaGuia(programa.id)),
     ) {

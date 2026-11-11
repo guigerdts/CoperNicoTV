@@ -111,7 +111,8 @@ class MedicionTouchMovilTest {
         )
         val minimo = MINIMO_TACTIL_DP * densidad
         assertTrue(
-            "Área táctil de $tag = ${limites.width / densidad} × ${limites.height / densidad} dp (< 48 × 48 dp)",
+            "Área táctil de $tag = ${limites.width / densidad} × ${limites.height / densidad} dp " +
+                "(< 48 × 48 dp)\nÁrbol:\n${arbol()}",
             limites.width >= minimo && limites.height >= minimo,
         )
         return limites

@@ -1,6 +1,8 @@
 package com.copernicotv.app
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -9,7 +11,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
@@ -80,20 +81,20 @@ class CanarioFocoDpadTvTest {
         // foco caiga en canal-0, sin requestFocus en el trayecto. Entre el
         // disparador y la lista hay SelectorLista, Actualización, la fila
         // lateral, la búsqueda, los filtros y Nuevo Canal (≈ 16 pasos), por
-        // eso el límite admite holgura y el fallo incluye el árbol.
+        // eso el límite admite holgura y el fallo incluye la secuencia de
+        // foco visitada, compacta para sobrevivir al límite del log.
+        val visitados = mutableListOf<String>()
         var presiones = 0
         while (!canalEnfocado(0) && presiones < MAXIMO_PRESIONES) {
             presionarAbajo()
             composeRule.focoUnico()
+            visitados.add(etiquetaDeFoco())
             presiones++
         }
         if (!canalEnfocado(0)) {
-            val arbol =
-                runCatching { composeRule.onRoot().printToString() }
-                    .getOrElse { "no disponible: ${it::class.simpleName}" }
             throw AssertionError(
                 "D-pad no llegó a canal-0 en $MAXIMO_PRESIONES presiones. " +
-                    "Árbol de semántica:\n$arbol",
+                    "Secuencia de foco: ${visitados.joinToString(" > ")}",
             )
         }
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertIsFocused()
@@ -201,6 +202,24 @@ class CanarioFocoDpadTvTest {
         runCatching {
             composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + posicion).assertIsFocused()
         }.isSuccess
+
+    /**
+     * Etiqueta del nodo enfocado en pantalla, por búsqueda en anchura sobre
+     * el árbol sin fusionar; sirve para reconstruir el recorrido de D-pad
+     * cuando la caminata no llega a destino.
+     */
+    private fun etiquetaDeFoco(): String {
+        val pila = ArrayDeque<SemanticsNode>()
+        pila.add(composeRule.onRoot().fetchSemanticsNode())
+        while (pila.isNotEmpty()) {
+            val nodo = pila.removeFirst()
+            if (nodo.config.getOrNull(SemanticsProperties.Focused) == true) {
+                return nodo.config.getOrNull(SemanticsProperties.TestTag) ?: "sin-tag"
+            }
+            pila.addAll(nodo.children)
+        }
+        return "sin-foco"
+    }
 
     /** Límites del nodo del canal de la posición dada, en píxeles. */
     private fun limitesCanal(posicion: Int) =

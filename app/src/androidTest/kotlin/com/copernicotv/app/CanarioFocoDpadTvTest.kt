@@ -76,12 +76,24 @@ class CanarioFocoDpadTvTest {
         composeRule.focoUnico()
 
         // Camino puro de D-pad hasta el primer Canal: Abajo hasta que el
-        // foco caiga en canal-0, sin requestFocus en el trayecto.
+        // foco caiga en canal-0, sin requestFocus en el trayecto. Entre el
+        // disparador y la lista hay SelectorLista, Actualización, la fila
+        // lateral, la búsqueda, los filtros y Nuevo Canal (≈ 16 pasos), por
+        // eso el límite admite holgura y el fallo incluye el árbol.
         var presiones = 0
         while (!canalEnfocado(0) && presiones < MAXIMO_PRESIONES) {
             presionarAbajo()
             composeRule.focoUnico()
             presiones++
+        }
+        if (!canalEnfocado(0)) {
+            val arbol =
+                runCatching { composeRule.onRoot().printToString() }
+                    .getOrElse { "no disponible: ${it::class.simpleName}" }
+            throw AssertionError(
+                "D-pad no llegó a canal-0 en $MAXIMO_PRESIONES presiones. " +
+                    "Árbol de semántica:\n$arbol",
+            )
         }
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertIsFocused()
         val densidad = densidadDelDispositivo()
@@ -201,6 +213,6 @@ class CanarioFocoDpadTvTest {
             .resources.displayMetrics.density
 
     private companion object {
-        const val MAXIMO_PRESIONES = 12
+        const val MAXIMO_PRESIONES = 30
     }
 }

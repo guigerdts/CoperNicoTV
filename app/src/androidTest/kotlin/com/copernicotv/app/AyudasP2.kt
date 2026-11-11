@@ -66,5 +66,6 @@ internal fun ReglaPrincipal.capturarP2(nombre: String): File {
     if (!destino.exists() || destino.length() <= 0L) {
         throw AssertionError("La captura $nombre quedó vacía o inexistente: $destino")
     }
+    println("CAPTURA_P2: ${destino.absolutePath}")
     return destino
 }

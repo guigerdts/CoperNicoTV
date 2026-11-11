@@ -7,10 +7,10 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
-import androidx.test.espresso.Espresso.pressBack
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.PREFIJO_TAG_CANAL
@@ -18,6 +18,7 @@ import com.copernicotv.app.ui.TAG_ABRIR_DOCUMENTO
 import com.copernicotv.app.ui.TAG_ACCIONES_CANAL
 import com.copernicotv.app.ui.TAG_ACCION_REPRODUCIR
 import com.copernicotv.app.ui.TAG_REPRODUCTOR
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_VOLVER
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Before
@@ -97,11 +98,14 @@ class ShellFocoTvTest {
         composeRule.focoUnico()
 
         // Regreso: el catálogo se recompone y restaura el foco a su primer
-        // control (TAG_ABRIR_DOCUMENTO recibe el foco inicial del shell). Se
-        // espera acoplada al estado real del catálogo: un conteo global puede
-        // satisfacerse antes de la recomposición con el foco que aún conserva
-        // la pantalla anterior.
-        pressBack()
+        // control (TAG_ABRIR_DOCUMENTO recibe el foco inicial del shell). La
+        // salida es por el control visible del reproductor, el patrón de las
+        // pruebas E6: en el emulador TV el back del sistema no llega de forma
+        // confiable a la composición. Se espera acoplada al estado real del
+        // catálogo: un conteo global puede satisfacerse antes de la
+        // recomposición con el foco que aún conserva la pantalla anterior.
+        composeRule.esperarTag(TAG_REPRODUCTOR_VOLVER)
+        composeRule.onNodeWithTag(TAG_REPRODUCTOR_VOLVER).performClick()
         composeRule.esperarHasta {
             runCatching {
                 composeRule.onNodeWithTag(TAG_ABRIR_DOCUMENTO).assertExists()

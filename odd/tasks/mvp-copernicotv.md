@@ -1095,6 +1095,8 @@ continúa no soportado (L70). E6-T2 está **cerrada en el alcance A–D autoriza
 | E7-T6 | Privacidad, interrupciones y ciclo de vida | Borrado de Historial/Favoritos; audio focus, permisos y ciclo de vida; S47 y S42. S47 aprobada: privacidad del MVP limitada al borrado de Historial/Favoritos y ausencia de telemetría o tráfico no solicitado; no hay opciones adicionales en el MVP. D5: la UI no muestra la credencial completa; consume E2-T6; inventario, gestión de claves, backup/restauración y recuperación en DC-04; no se asume que toda URL sea credencial, pero todas las columnas URL se cifran por uniformidad |
 | E7-T7 | Verificación física | Checklist con procedimiento, resultado esperado y estado; S33, S35, S36 y S42. P2 aprobada: incluye capturas reproducibles y revisión visual humana a 10 pies (aprox. 3 m); el procedimiento de aceptación visual se fija en DC-11; la revisión humana y la firma siguen pendientes; no se declara cerrada ni validada visualmente por CI. |
 
+**Estado E7-T1** — implementación y cobertura automatizada completas; no se declara cerrada porque la revisión visual humana a 10 pies sigue pendiente. Entregado: shell Compose for TV con un solo foco visible por pantalla, foco raíz en el reproductor, BackHandler con salida por control visible (patrón E6: `performClick` sobre `TAG_REPRODUCTOR_VOLVER`; `pressBack()` no es confiable en TV — L86), foco inicial del diálogo de acciones de canal y recorrido D-pad real automatizado (Canal → diálogo → Reproducir → reproductor → volver), con conteo de foco sobre el árbol fusionado. Verificación dura: corrida `42952057958` en `f81e389` — 5/5 jobs verdes (`instrumented-tv` con `ShellFocoTvTest` 2/2 PASSED y canarios TV, móvil 69/69, `static-analysis`, `jvm-tests`, `apk`). Capturas P2 reproducibles publicadas como artifact `capturas-p2-tv` (2 PNG 1920×1080: `e7t1-catalogo-canal0.png`, `e7t1-reproductor-arranque.png`). Lección de infraestructura: la imagen `android-tv` API 34 de CI es *production* (sin `adb root` ni `run-as`) y el shell user no lee `Android/data` (ENOENT por FUSE); las capturas se publican vía MediaStore en `Pictures/capturas-p2` y CI extrae con `adb pull /sdcard/Pictures/capturas-p2` — procedimiento registrado para las capturas de E7-T2..T7.
+
 ## 9. Criterios de aceptación
 
 ### 9.1 Criterios globales
@@ -4705,3 +4707,56 @@ soportado** porque no existen pruebas de reproducción RTSP. Añadir un servidor
 infraestructura de CI (binario adicional y emulación de transporte) queda pendiente de
 decisión del propietario; el MVP no se declara completamente validado mientras esta
 verificación siga sin ejecutarse.
+
+### L85 — E7-T1: shell Compose for TV, foco único y capturas P2 (2026-11-11)
+
+**Autorización y objetivo.** Ejecutar E7-T1 —«Shell Compose for TV»— según la definición
+vigente (§8.7): navegación con D-pad, un solo foco visible, pruebas automatizadas de foco,
+captura reproducible y revisión visual humana a 10 pies pendiente (DC-11). La entrega va
+en una rama con PR abierto sin fusionar, tras el merge de PR #25 (`84baa93`) del parche de
+travis CI.
+
+**Alcance implementado.** Shell de TV con foco raíz en el reproductor
+(`ReproductorScreen.kt`), `BackHandler` con salida por control visible
+(`TAG_REPRODUCTOR_VOLVER`), foco inicial del diálogo de acciones de canal
+(`FocusRequester` en la primera acción, verificado con `assertIsFocused`
+(`TAG_ACCION_REPRODUCIR`)), conteo de foco sobre el árbol fusionado
+(`contarConFoco()` en `AyudasP2.kt` con matcher que recorre toda la jerarquía; la
+propiedad `Focused` aparece en el árbol fusionado) e invariante documentada: en
+superficie modal el conteo global de foco no aplica porque el canal detrás conserva
+`Focused` en su propio dueño. El recorrido automatizado sigue el flujo real del
+espectador: centrar sobre el canal → diálogo AccionesCanal → Reproducir → reproductor →
+volver.
+
+**Verificación dura.** Corrida `42952057958` en `f81e389`: 5/5 jobs verdes;
+`instrumented-tv` con `ShellFocoTvTest` 2/2 PASSED (recorrido D-pad 3,3 s y capturas
+100%) además de los canarios TV existentes; móvil 69/69; `static-analysis`, `jvm-tests`
+y `apk` verdes. Los reportes XML de CI se inspeccionaron directamente (la conclusión de
+GitHub no se toma como prueba; ver L83). Capturas P2 publicadas como artifact
+`capturas-p2-tv`: 2 PNG 1920×1080 verificados (cabecera PNG válida y revisión visual del
+catálogo con «Canal E6» enfocado): `e7t1-catalogo-canal0.png` y
+`e7t1-reproductor-arranque.png`.
+
+**No cerrada.** La revisión visual humana a 10 pies (≈ 3 m) de DC-11 sigue pendiente y
+requiere dispositivo físico; E7-T1 no se declara cerrada.
+
+### L86 — E7-T1: lecciones de infraestructura TV para E7-T2..T7 (2026-11-11)
+
+**Salida del reproductor en TV.** `pressBack()` no es confiable en el emulador TV de CI
+(corrida `42919103429`: tras 45 s el árbol seguía mostrando el reproductor). Patrón
+establecido en E6 y adoptado aquí: salida con `performClick()` sobre
+`TAG_REPRODUCTOR_VOLVER` (`ReproductorControlesTest.kt`, `ReproductorPistasTest.kt`).
+**Capturas P2 en CI.** La imagen `android-tv` API 34 es *production*: `adb root` denegado
+y `run-as: unknown package`, y el shell user recibe ENOENT por FUSE al leer
+`Android/data` (corrida `42947505909`), aunque el test afirme en el dispositivo que los
+PNG existen. Solución: `capturarP2` escribe el archivo del app y lo publica además vía
+MediaStore (`publicarP2EnGaleria`, `Pictures/capturas-p2`), y CI extrae con
+`adb pull /sdcard/Pictures/capturas-p2` (corrida `42952057958`: «2 files pulled»).
+Procedimiento de recuperación de capturas para la checklist física de E7-T7: (1)
+descargar artifact `capturas-p2-tv` del run; (2) si no hay artifact, `adb pull
+/sdcard/Pictures/capturas-p2` desde un dispositivo con la app corriendo los tests.
+**Validación local de formato.** `./gradlew :app:ktlintAndroidTestSourceSetCheck` corre
+en Termux (≈ 19 s) y reproduce exacto los errores de CI; el bloque completo
+`./gradlew ktlintCheck detekt` tarda ≈ 1 min. Reglas que mordieron: el RHS multilínea
+tras `=` debe empezar en línea nueva y las firmas largas de función llevan un parámetro
+por línea. Validar el formato localmente antes de pushear evita ciclos de CI.

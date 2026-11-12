@@ -1,6 +1,8 @@
 package com.copernicotv.app.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.copernicotv.core.tema.TemaUi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -70,8 +72,8 @@ class PreferenciasTemaDataStoreTest {
     fun `un valor desconocido persistido cae al oscuro`() {
         runBlocking {
             val dataStore = crearDataStore()
-            androidx.datastore.preferences.core.edit(dataStore) { prefs ->
-                prefs[androidx.datastore.preferences.core.stringPreferencesKey(CLAVE_TEMA)] = "sepia"
+            dataStore.edit { prefs ->
+                prefs[stringPreferencesKey(CLAVE_TEMA)] = "sepia"
             }
             val preferencias = PreferenciasTemaDataStore(dataStore)
             assertEquals(TemaUi.OSCURO, preferencias.tema().first())

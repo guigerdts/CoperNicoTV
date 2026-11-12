@@ -22,7 +22,8 @@ import javax.inject.Inject
  * E7-T6 (S42d) en un emulador: enviar el reproductor a segundo plano y
  * traerlo de vuelta conserva la sesión. El motor vive en el ViewModel, así
  * que la instancia es la misma, la posición no se reinicia y la reproducción
- * sigue avanzando; se lee el estado y la posición en cada paso.
+ * sigue avanzando; se lee el estado y la posición en cada paso. También la
+ * recreación de la Activity conserva la sesión y la posición.
  */
 @OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
@@ -91,5 +92,38 @@ class ReproductorCicloVidaTest {
 
         composeRule.esperarFase("Reproduciendo")
         composeRule.esperarHasta { composeRule.posicionMs() > posicionEnSegundoPlano }
+    }
+
+    @Test
+    fun laSesionSobreviveARecreacionDeActivity() {
+        sembrarCanal(catalogo, FixturesF15.url(servidor, FixturesF15.MP4))
+        composeRule.abrirReproductor()
+        composeRule.esperarFase("Reproduciendo")
+        composeRule.esperarHasta { composeRule.posicionMs() > 1_000L }
+
+        val viewModel = composeRule.viewModelReproductor()
+        var motorAntes: ExoPlayer? = null
+        composeRule.activityRule.scenario.onActivity { motorAntes = viewModel.motor }
+        val posicionAntes = composeRule.posicionMs()
+
+        // La Activity se destruye y se reconstruye (cambio de configuración):
+        // el ViewModel y su sesión Media3 sobreviven, la navegación vuelve al
+        // reproductor y la reproducción continúa desde la posición previa.
+        // Esto NO es muerte del proceso: ahí el arnés E3 cubre la renovación.
+        composeRule.activityRule.scenario.recreate()
+        composeRule.esperarFase("Reproduciendo")
+        var motorDespues: ExoPlayer? = null
+        var posicionInmediata = -1L
+        composeRule.activityRule.scenario.onActivity {
+            motorDespues = viewModel.motor
+            posicionInmediata = viewModel.motor?.currentPosition ?: -1L
+        }
+        assertEquals("La recreación de Activity recreó el motor", motorAntes, motorDespues)
+        assertTrue(
+            "La sesión arrancó desde cero tras recrear la Activity: $posicionInmediata",
+            posicionInmediata >= posicionAntes,
+        )
+
+        composeRule.esperarHasta { composeRule.posicionMs() > posicionInmediata }
     }
 }

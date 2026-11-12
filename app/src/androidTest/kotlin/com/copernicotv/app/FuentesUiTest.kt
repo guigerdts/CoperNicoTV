@@ -24,6 +24,7 @@ import com.copernicotv.core.crypto.CifradoAes
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -34,6 +35,9 @@ import javax.inject.Inject
  * E4-T8/S7d: la pantalla de Fuentes muestra los tres indicadores sin
  * reutilizar uno por otro, y una Actualización correcta no cambia la
  * disponibilidad.
+ *
+ * E7-T6 (D5): una Actualización que falla contra una URL con credenciales
+ * presenta el motivo tipado sin mostrar la URL, el usuario ni la contraseña.
  *
  * El catálogo se siembra directamente, sin intentos previos: la importación de
  * `CatalogoRepositorio.importarFixture` ya registra un intento completado y
@@ -92,6 +96,41 @@ class FuentesUiTest {
         composeRule.onNodeWithTag(tagDisponibilidad).assertTextEquals("Disponibilidad: disponible")
     }
 
+    @Test
+    fun unaActualizacionConCredencialesNoLasMuestra() {
+        // Servidor local que responde 401 a la ruta protegida: la Actualización
+        // falla y la UI debe presentar solo el motivo tipado (D5/S47).
+        val assets = InstrumentationRegistry.getInstrumentation().context.assets
+        val servidorLocal =
+            ServidorMedios(
+                assets,
+                decidirFallo = { ruta, _ -> if (ruta == "protegida.m3u") 401 else null },
+            ).also { it.iniciar() }
+        try {
+            val fuenteId =
+                sembrarFuenteSinIntentos(
+                    ubicacion = "http://usuario:secreto@127.0.0.1:${servidorLocal.puerto}/protegida.m3u",
+                    esquema = "http",
+                )
+
+            esperarTag(TAG_FUENTES)
+            composeRule.onNodeWithTag(TAG_FUENTES).performScrollTo().performClick()
+
+            val tagActualizacion = tagFuente(TAG_FUENTE_ACTUALIZACION, fuenteId)
+            val tagActualizar = tagFuente(TAG_FUENTE_ACTUALIZAR, fuenteId)
+            esperarTag(tagActualizar)
+            composeRule.onNodeWithTag(tagActualizar).performScrollTo().performClick()
+
+            esperarTexto(tagActualizacion, "Actualización: última fallida (http_4xx)")
+            val arbolCompleto = composeRule.onRoot().printToString()
+            for (prohibida in listOf("usuario", "secreto", "127.0.0.1", "protegida")) {
+                assertFalse("La UI muestra '$prohibida'", arbolCompleto.contains(prohibida))
+            }
+        } finally {
+            servidorLocal.close()
+        }
+    }
+
     /**
      * Fuente con una Lista legible y un Canal, sin ningún intento registrado.
      *
@@ -99,7 +138,10 @@ class FuentesUiTest {
      * resultado de la Actualización: por eso la semilla trae un Canal y la
      * Actualización posterior no la altera.
      */
-    private fun sembrarFuenteSinIntentos(): Long =
+    private fun sembrarFuenteSinIntentos(
+        ubicacion: String = UBICACION_FIXTURE,
+        esquema: String = "content",
+    ): Long =
         runBlocking {
             val ahora = Instant.parse("2026-01-01T00:00:00Z")
             val fuenteId =
@@ -120,10 +162,10 @@ class FuentesUiTest {
                         CifradoAes.cifrar(
                             claves.claveAes,
                             CifradoAes.aad("Lista", "ubicacion_cifrada"),
-                            UBICACION_FIXTURE.toByteArray(Charsets.UTF_8),
+                            ubicacion.toByteArray(Charsets.UTF_8),
                         ),
                     ubicacionHmac = ByteArray(32),
-                    esquema = "content",
+                    esquema = esquema,
                     orden = 0,
                     estado = "activa",
                     creadoEn = ahora,

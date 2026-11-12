@@ -5,15 +5,19 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.media3.common.Player
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_ALTERNAR
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -25,7 +29,8 @@ import javax.inject.Inject
  * audio. Una petición transitoria con permiso de atenuar baja el volumen sin
  * pausar (duck) y al abandonarla el motor lo restaura; una petición
  * transitoria sin permiso pausa y, al recuperar el foco, el motor reanuda en
- * la misma sesión y con la posición conservada.
+ * la misma sesión y con la posición conservada. Una pérdida permanente y una
+ * pausa voluntaria del usuario no producen reanudación automática.
  *
  * El foco lo pide el propio proceso de prueba con `AudioFocusRequest`; la
  * pérdida llega al oyente del motor aunque ambos clientes vivan en el mismo
@@ -128,4 +133,89 @@ class ReproductorAudioFocusTest {
         composeRule.esperarFase("Reproduciendo")
         composeRule.esperarHasta { composeRule.posicionMs() > posicionEnPausa + 300L }
     }
+
+    @Test
+    fun laPerdidaPermanentePausaYNoSeReanudaSola() {
+        val audioManager = iniciarReproduccionEnBucle()
+        val atributos = atributosDeMedia()
+
+        // Otra app toma el foco en modo permanente (AUDIOFOCUS_GAIN). Media3
+        // pausa con razón AUDIO_FOCUS_LOSS y libera su propio pedido, así que
+        // deja de recibir avisos de foco.
+        val pedirFoco =
+            AudioFocusRequest
+                .Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(atributos)
+                .build()
+        assertEquals(
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED,
+            audioManager.requestAudioFocus(pedirFoco),
+        )
+        composeRule.esperarFase("Pausado")
+        var razonPausa: Int? = null
+        composeRule.activityRule.scenario.onActivity {
+            razonPausa = composeRule.viewModelReproductor().motor?.playWhenReadyChangeReason
+        }
+        assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS, razonPausa)
+
+        // Aunque la otra app libere el foco, una pérdida permanente no se
+        // reanuda sola: el motor no vuelve a pedir el foco sin acción del
+        // usuario (S42a).
+        audioManager.abandonAudioFocusRequest(pedirFoco)
+        val reanudo =
+            runCatching {
+                composeRule.waitUntil(2_000L) { composeRule.faseActual() == "Reproduciendo" }
+            }.isSuccess
+        assertFalse("El motor se reanudó solo tras una pérdida permanente", reanudo)
+    }
+
+    @Test
+    fun laPausaVoluntariaNoSeReanudaSola() {
+        val audioManager = iniciarReproduccionEnBucle()
+        composeRule.mostrarControlesConToque()
+        composeRule.onNodeWithTag(TAG_REPRODUCTOR_ALTERNAR).performClick()
+        composeRule.esperarFase("Pausado")
+        var razonPausa: Int? = null
+        composeRule.activityRule.scenario.onActivity {
+            razonPausa = composeRule.viewModelReproductor().motor?.playWhenReadyChangeReason
+        }
+        assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST, razonPausa)
+
+        // Con la pausa voluntaria Media3 liberó el foco: otra app puede
+        // tomarlo y soltarlo sin que el motor se reanude solo (S42a).
+        val pedirFoco =
+            AudioFocusRequest
+                .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(atributosDeMedia())
+                .build()
+        assertEquals(
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED,
+            audioManager.requestAudioFocus(pedirFoco),
+        )
+        audioManager.abandonAudioFocusRequest(pedirFoco)
+        val reanudo =
+            runCatching {
+                composeRule.waitUntil(2_000L) { composeRule.faseActual() == "Reproduciendo" }
+            }.isSuccess
+        assertFalse("La pausa voluntaria se convirtió en reanudación automática", reanudo)
+    }
+
+    private fun iniciarReproduccionEnBucle(): AudioManager {
+        sembrarCanal(catalogo, FixturesF15.url(servidor, FixturesF15.MP4))
+        composeRule.abrirReproductor()
+        composeRule.esperarFase("Reproduciendo")
+        // El fixture dura ~20 s: lo repite para que el test de foco nunca
+        // quede sin reproducción activa.
+        composeRule.activityRule.scenario.onActivity {
+            composeRule.viewModelReproductor().motor?.repeatMode = Player.REPEAT_MODE_ONE
+        }
+        return contexto.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    }
+
+    private fun atributosDeMedia(): android.media.AudioAttributes =
+        android.media.AudioAttributes
+            .Builder()
+            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE)
+            .build()
 }

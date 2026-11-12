@@ -23,6 +23,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 
@@ -277,11 +278,18 @@ class ImportacionE2Test {
                     contexto,
                     verificaCleartext = { false },
                 )
-            conServidorConCuerpo(200, TEXTO_E2) { url ->
-                val resumen = bloqueado.importarDesdeUrl("Fuente URL", url)
+            // Socket en escucha sin aceptar conexiones: el bloqueo ocurre
+            // antes de abrir la conexión, así que nadie atiende el socket. Si
+            // el código conectara de todos modos, la lectura colgaría en el
+            // timeout y la prueba fallaría.
+            val servidor = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+            try {
+                val resumen = bloqueado.importarDesdeUrl("Fuente URL", "http://127.0.0.1:${servidor.localPort}/lista.m3u")
 
                 assertEquals("bloqueo_http", resumen.error)
                 assertEquals(0, db.fuenteDao().todas().size)
+            } finally {
+                servidor.close()
             }
         }
     }

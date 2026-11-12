@@ -50,6 +50,7 @@ import java.time.Instant
 class ActualizacionRepositorioTest {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: ActualizacionRepositorio
+    private lateinit var indice: IndiceHmacRepositorio
     private val claves = ClavesEnMemoria()
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private var fuenteId: Long = 0L
@@ -63,8 +64,16 @@ class ActualizacionRepositorioTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
-        runBlocking { sembrarFuenteYLista() }
+        indice = IndiceHmacRepositorio(db, claves)
+        repositorio = ActualizacionRepositorio(db, claves, indice, contexto)
+        runBlocking {
+            // Producción siembra la fila del índice al crear la base; este
+            // fixture usa `databaseBuilder` sin ese callback. El índice debe
+            // estar operativo ANTES de sembrar la Lista: una fila con sobre
+            // HMAC sin estado del índice se declara pérdida (DC-04 §7).
+            indice.inicializarLegitimamente()
+            sembrarFuenteYLista()
+        }
     }
 
     @After

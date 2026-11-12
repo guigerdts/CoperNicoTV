@@ -16,6 +16,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.nio.file.Files
 import java.security.KeyStore
+import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLServerSocket
@@ -289,7 +290,13 @@ class DescargadorHttpTest {
 
     /**
      * Igual que [conServidorTls] pero el cliente confía en el certificado del
-     * fixture durante el test y restaura el `SSLContext` por defecto al salir.
+     * fixture durante el test y restaura el ancla por defecto al salir.
+     *
+     * El ancla se instala con `HttpsURLConnection.setDefaultSSLSocketFactory`
+     * y no con `SSLContext.setDefault`: la fábrica por defecto de
+     * `SSLSocketFactory` se cachea la primera vez que alguien la consulta y
+     * `SSLContext.setDefault` no la reemplaza, así que el ancla no se aplicaría
+     * si otro test ya abrió una conexión TLS antes.
      */
     private suspend fun conServidorTlsDeConfianza(bloque: suspend (String) -> Unit) {
         val servidor = servidorTls()
@@ -297,8 +304,8 @@ class DescargadorHttpTest {
         fabricaConfianza.init(keystorePrueba())
         val contextoCliente = SSLContext.getInstance("TLS")
         contextoCliente.init(null, fabricaConfianza.trustManagers, null)
-        val anterior = SSLContext.getDefault()
-        SSLContext.setDefault(contextoCliente)
+        val anterior = HttpsURLConnection.getDefaultSSLSocketFactory()
+        HttpsURLConnection.setDefaultSSLSocketFactory(contextoCliente.socketFactory)
         try {
             coroutineScope {
                 val respuesta =
@@ -315,7 +322,7 @@ class DescargadorHttpTest {
                 }
             }
         } finally {
-            SSLContext.setDefault(anterior)
+            HttpsURLConnection.setDefaultSSLSocketFactory(anterior)
         }
     }
 

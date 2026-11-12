@@ -13,11 +13,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
+import com.copernicotv.app.data.PreferenciasTema
 import com.copernicotv.app.data.actualizacion.InicializadorActualizaciones
 import com.copernicotv.app.ui.CatalogoAcciones
 import com.copernicotv.app.ui.CatalogoScreen
@@ -31,7 +33,9 @@ import com.copernicotv.app.ui.GuiaViewModel
 import com.copernicotv.app.ui.PerfilesUiState
 import com.copernicotv.app.ui.ReproductorScreen
 import com.copernicotv.app.ui.recordarEsTv
+import com.copernicotv.core.tema.TemaUi
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Pantallas de la actividad única. */
@@ -42,6 +46,9 @@ private enum class Pantalla { CATALOGO, FUENTES, GUIA, REPRODUCTOR }
 class MainActivity : ComponentActivity() {
     @Inject
     lateinit var inicializador: InicializadorActualizaciones
+
+    @Inject
+    lateinit var preferenciasTema: PreferenciasTema
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +61,12 @@ class MainActivity : ComponentActivity() {
         // maneja en sus overlays).
         enableEdgeToEdge()
         setContent {
-            CoperNicoTheme(esTv = recordarEsTv()) {
+            // S43/E7-T4: el tema vive en DataStore y alimenta tanto el esquema
+            // de color como la etiqueta del toggle del catálogo. El initial
+            // value es el oscuro, el default previo a E7-T4.
+            val tema by preferenciasTema.tema().collectAsStateWithLifecycle(initialValue = TemaUi.OSCURO)
+            val alcance = rememberCoroutineScope()
+            CoperNicoTheme(esTv = recordarEsTv(), tema = tema) {
                 // E7-T3: el layout se elige por window size class de la ventana
                 // (breakpoints de Material), no por orientación de la pantalla.
                 val tamanosVentana = calculateWindowSizeClass(this)
@@ -65,6 +77,8 @@ class MainActivity : ComponentActivity() {
                     Pantalla.CATALOGO ->
                         PantallaCatalogo(
                             anchoVentana = anchoVentana,
+                            tema = tema,
+                            onAlternarTema = { alcance.launch { preferenciasTema.alternar() } },
                             onAbrirFuentes = { pantalla = Pantalla.FUENTES },
                             onAbrirGuia = { pantalla = Pantalla.GUIA },
                             onAbrirReproductor = { canalId ->
@@ -116,6 +130,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun PantallaCatalogo(
     anchoVentana: WindowWidthSizeClass,
+    tema: TemaUi,
+    onAlternarTema: () -> Unit,
     onAbrirFuentes: () -> Unit,
     onAbrirGuia: () -> Unit,
     onAbrirReproductor: (Long) -> Unit,
@@ -160,6 +176,7 @@ private fun PantallaCatalogo(
             ),
         recientes = recientes,
         resultados = resultados,
+        tema = tema,
         acciones =
             CatalogoAcciones(
                 onImportar = viewModel::importarFixture,
@@ -200,6 +217,7 @@ private fun PantallaCatalogo(
                 onDesasociarListaDePerfil = viewModel::desasociarListaDePerfil,
                 onAbrirFuentes = onAbrirFuentes,
                 onAbrirGuia = onAbrirGuia,
+                onAlternarTema = onAlternarTema,
             ),
     )
 }

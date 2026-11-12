@@ -29,13 +29,16 @@ CLASE_S45_FASE1="com.copernicotv.app.S45ProcesoFase1Test"
 CLASE_S45_FASE2="com.copernicotv.app.S45ProcesoFase2Test"
 CLASE_E7T5_FASE1="com.copernicotv.app.E7T5ProcesoFase1Test"
 CLASE_E7T5_FASE2="com.copernicotv.app.E7T5ProcesoFase2Test"
+CLASE_S47_FASE1="com.copernicotv.app.S47ProcesoFase1Test"
+CLASE_S47_FASE2="com.copernicotv.app.S47ProcesoFase2Test"
 APK_APP="app/build/outputs/apk/debug/app-debug.apk"
 APK_TEST="app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
 REPORTES="app/build/reports/androidTests"
 
 mkdir -p "$REPORTES/e3-fase1" "$REPORTES/e3-fase2" "$REPORTES/s11d-fase1" "$REPORTES/s11d-fase2" \
     "$REPORTES/s45-fase1" "$REPORTES/s45-fase2" \
-    "$REPORTES/e7t5-fase1" "$REPORTES/e7t5-fase2"
+    "$REPORTES/e7t5-fase1" "$REPORTES/e7t5-fase2" \
+    "$REPORTES/s47-fase1" "$REPORTES/s47-fase2"
 
 if [[ ! -f "$APK_APP" ]]; then
     APK_APP=$(find app/build/outputs/apk -name '*-debug.apk' -not -path '*androidTest*' -print -quit)
@@ -141,3 +144,15 @@ if ! ejecutar_fase "$CLASE_E7T5_FASE2" "$REPORTES/e7t5-fase2/instrumentation.txt
     exit 1
 fi
 capturar_logcat_e7t5 "$REPORTES/e7t5-fase2/logcat.txt"
+
+# E7-T6 (S47a/b/c): el borrado del Historial desde la UI conserva el Favorito
+# y el borrado persiste tras un proceso nuevo; la fase 2 borra también los
+# Favoritos desde la UI. No se abre servidor de medios: el borrado es una
+# operación local (S47d).
+if ! ejecutar_fase "$CLASE_S47_FASE1" "$REPORTES/s47-fase1/instrumentation.txt"; then
+    exit 1
+fi
+detener_proceso
+if ! ejecutar_fase "$CLASE_S47_FASE2" "$REPORTES/s47-fase2/instrumentation.txt"; then
+    exit 1
+fi

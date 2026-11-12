@@ -57,7 +57,7 @@ fun interface Descargador {
 class DescargadorHttp(
     private val timeoutConexionMs: Int = TIMEOUT_CONEXION_MS,
     private val timeoutLecturaMs: Int = TIMEOUT_LECTURA_MS,
-    private val verificaCleartext: (String) -> Boolean = ::politicaCleartextPermitida,
+    private val verificaCleartext: VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida),
 ) : Descargador {
     override suspend fun descargar(
         url: String,
@@ -65,7 +65,7 @@ class DescargadorHttp(
     ): ResultadoDescarga =
         withContext(Dispatchers.IO) {
             if (!esquemaAdmitido(url)) return@withContext ResultadoDescarga.Fallo(ERROR_ESQUEMA)
-            if (esTextoClaro(url) && !verificaCleartext(hostDe(url))) {
+            if (esTextoClaro(url) && !verificaCleartext.permitido(hostDe(url))) {
                 return@withContext ResultadoDescarga.Fallo(ERROR_BLOQUEO_HTTP)
             }
             try {

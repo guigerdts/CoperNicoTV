@@ -6,6 +6,7 @@ import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.TiemposHttp
+import com.copernicotv.app.data.VerificacionCleartext
 import com.copernicotv.app.data.cache.AlmacenCache
 import com.copernicotv.app.data.cache.Descargador
 import com.copernicotv.app.data.cache.DescargadorHttp
@@ -33,6 +34,7 @@ import com.copernicotv.app.data.db.dao.OcultacionCanalDao
 import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
+import com.copernicotv.app.data.politicaCleartextPermitida
 import com.copernicotv.core.identity.CaseFolder
 import com.copernicotv.core.identity.CaseFolderCompleto
 import dagger.Module
@@ -132,6 +134,11 @@ object AppModule {
     @Provides
     @Singleton
     fun descargadorHttp(): Descargador = DescargadorHttp()
+
+    /** E7-T7: la política real del sistema, inyectable por las pruebas. */
+    @Provides
+    @Singleton
+    fun verificaCleartext(): VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida)
 
     @Provides
     @Singleton

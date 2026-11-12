@@ -76,7 +76,7 @@ class ActualizacionRepositorio
         private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
-        private val verificaCleartext: (String) -> Boolean = ::politicaCleartextPermitida,
+        private val verificaCleartext: VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida),
     ) {
         private val io = Dispatchers.IO
         private val escritorCanales = CanalEscritor(db)
@@ -576,7 +576,7 @@ class ActualizacionRepositorio
             ubicacion: String,
             sello: SelloIndiceHmac.Disponible,
         ): Lectura {
-            if (ubicacion.startsWith("http://", ignoreCase = true) && !verificaCleartext(URL(ubicacion).host)) {
+            if (ubicacion.startsWith("http://", ignoreCase = true) && !verificaCleartext.permitido(URL(ubicacion).host)) {
                 return Lectura.Fallo(ERROR_BLOQUEO_HTTP)
             }
             val conexion =

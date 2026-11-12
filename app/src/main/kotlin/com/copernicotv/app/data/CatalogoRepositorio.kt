@@ -73,7 +73,7 @@ class CatalogoRepositorio
         private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
-        private val verificaCleartext: (String) -> Boolean = ::politicaCleartextPermitida,
+        private val verificaCleartext: VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida),
     ) {
         private val io = Dispatchers.IO
         private val escritorApariencias = AparienciaEscritor(db)
@@ -305,7 +305,7 @@ class CatalogoRepositorio
             url: String,
             sello: SelloIndiceHmac.Disponible,
         ): Descarga {
-            if (url.startsWith("http://", ignoreCase = true) && !verificaCleartext(URL(url).host)) {
+            if (url.startsWith("http://", ignoreCase = true) && !verificaCleartext.permitido(URL(url).host)) {
                 return Descarga.Fallo(ERROR_BLOQUEO_HTTP)
             }
             val conexion = URL(url).openConnection() as? HttpURLConnection ?: return Descarga.Fallo(ERROR_SIN_CONEXION)

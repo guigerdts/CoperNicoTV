@@ -13,9 +13,19 @@ import android.security.NetworkSecurityPolicy
  * política antes de abrir la conexión permite devolver `bloqueo_http` sin
  * intentar la conexión y sin registrar el host.
  *
- * Es el valor por defecto de las verificaciones inyectables de
- * [DescargadorHttp], `CatalogoRepositorio` y `ActualizacionRepositorio`; las
- * pruebas JVM/Robolectric inyectan su propio predicado para no depender de la
- * política del entorno.
+ * Es la implementación por defecto de [VerificacionCleartext]; las pruebas
+ * inyectan la suya para no depender de la política del entorno.
  */
 internal fun politicaCleartextPermitida(host: String): Boolean = NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted(host)
+
+/**
+ * Verificación inyectable de la política de texto claro.
+ *
+ * Es un tipo propio y no `Function1` porque Hilt inyecta los constructores de
+ * `CatalogoRepositorio` y `ActualizacionRepositorio`: el grafo necesita un
+ * binding declarado (`AppModule`) y no puede satisfacer un tipo función.
+ */
+fun interface VerificacionCleartext {
+    /** `true` si el host puede recibir HTTP en texto claro. */
+    fun permitido(host: String): Boolean
+}

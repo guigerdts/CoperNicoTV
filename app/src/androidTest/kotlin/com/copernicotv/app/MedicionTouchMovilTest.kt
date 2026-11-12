@@ -32,11 +32,16 @@ import javax.inject.Inject
  * controles clave del catálogo mide al menos 48 × 48 dp y la separación
  * entre filas contiguas es de al menos 8 dp.
  *
- * La medición usa `boundsInRoot` del nodo interactivo (píxeles, coordenadas
- * de la raíz) y compara contra los mínimos convertidos con la densidad real del emulador;
- * cada valor queda en el log con prefijo `DC11_TOUCH` / `DC11_SEPARACION`
- * para registrarlo en la checklist P2 de E7-T7. La revisión visual humana
- * de las capturas sigue pendiente y no se declara cerrada.
+ * La medición usa `positionInRoot` + `size` del nodo interactivo (píxeles,
+ * sin clipping) y compara contra los mínimos convertidos con la densidad real
+ * del emulador; cada valor queda en el log con prefijo `DC11_TOUCH` /
+ * `DC11_SEPARACION` para registrarlo en la checklist P2 de E7-T7. La revisión
+ * visual humana de las capturas sigue pendiente y no se declara cerrada.
+ *
+ * Se mide el target táctil asignado por el layout, no la porción visible:
+ * `boundsInRoot` aplica el clipping del contenedor scrollable, y un control
+ * bajo el pliegue del tope de controles conserva su target completo porque
+ * scrollea a la vista. (`TouchBoundsInRoot` no existe en compose ui 1.7.)
  */
 @OptIn(ExperimentalTestApi::class)
 @HiltAndroidTest
@@ -93,8 +98,8 @@ class MedicionTouchMovilTest {
     /**
      * Devuelve los límites del nodo con [tag] en coordenadas de la raíz,
      * registra la medición en el log y verifica el mínimo de DC-11. Se mide
-     * `boundsInRoot` del nodo interactivo (la fila y los controles M3 son el
-     * área táctil completa); `TouchBoundsInRoot` no existe en compose ui 1.7.
+     * `positionInRoot` + `size` (sin clipping; `boundsInRoot` recorta por el
+     * contenedor scrollable y el pliegue del tope de controles).
      */
     private fun limitesTactiles(
         tag: String,
@@ -104,7 +109,13 @@ class MedicionTouchMovilTest {
         val nodo =
             nodos.firstOrNull()
                 ?: throw AssertionError("Sin nodo con tag $tag para medir DC-11\nÁrbol:\n${arbol()}")
-        val limites = nodo.boundsInRoot
+        val limites =
+            Rect(
+                nodo.positionInRoot.x,
+                nodo.positionInRoot.y,
+                nodo.positionInRoot.x + nodo.size.width,
+                nodo.positionInRoot.y + nodo.size.height,
+            )
         println(
             "DC11_TOUCH: $tag = ${limites.width}x${limites.height}px " +
                 "(${limites.width / densidad} x ${limites.height / densidad} dp)",

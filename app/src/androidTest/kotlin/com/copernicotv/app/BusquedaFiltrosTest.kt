@@ -1,17 +1,14 @@
 package com.copernicotv.app
 
-import android.view.WindowInsets
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.printToString
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -73,28 +70,11 @@ class BusquedaFiltrosTest {
         esperarTexto(indice = 0, texto = TEXTO)
         composeRule.onNodeWithTag(PREFIJO_TAG_GRUPO + grupoUno).performScrollTo().performClick()
         esperarTexto(indice = 0, texto = TEXTO)
-        val sinCanalUno =
+        composeRule.waitUntil(TIEMPO_ESPERA) {
             runCatching {
-                composeRule.waitUntil(TIEMPO_ESPERA) {
-                    runCatching {
-                        composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(1)
-                    }
-                    composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isEmpty()
-                }
-            }.isSuccess
-        if (!sinCanalUno) {
-            // Diagnóstico temporal E7-T3: el fallo original no muestra el
-            // estado de la UI; se vuelca el inset del teclado y el árbol para
-            // ver chips seleccionados y filas de canal en el momento del
-            // timeout.
-            val imeInferior =
-                composeRule.activity.window.decorView.rootWindowInsets
-                    .getInsets(WindowInsets.Type.ime())
-                    .bottom
-            throw AssertionError(
-                "El filtro por grupo no redujo los resultados (imeInferiorPx=$imeInferior).\n" +
-                    "Árbol:\n${composeRule.onRoot().printToString()}",
-            )
+                composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(1)
+            }
+            composeRule.onAllNodesWithTag(PREFIJO_TAG_CANAL + 1).fetchSemanticsNodes().isEmpty()
         }
 
         composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performScrollTo().performClick()

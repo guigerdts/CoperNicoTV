@@ -68,6 +68,13 @@ android {
  * en `app/build/p1-busqueda/` para el workflow `p1-performance`.
  */
 tasks.withType<Test>().configureEach {
+    // Robolectric carga el provider TLS de Android (Conscrypt), que accede por
+    // reflexión a `java.net.InetAddress.holder()`. Con JDK 17 la encapsulación
+    // fuerte de JPMS lo bloquea (`does not "opens java.net"`), el handshake
+    // TLS del servidor de prueba muere después del intercambio de certificados
+    // y el listener se cierra antes de servir la respuesta. Solo afecta a las
+    // pruebas JVM: en Android real no hay JPMS.
+    jvmArgs("--add-opens=java.base/java.net=ALL-UNNAMED")
     if (name == "testDebugUnitTest" && providers.gradleProperty("p1.busqueda").isPresent) {
         maxHeapSize = "512m"
         systemProperty("p1.medir", "true")

@@ -243,7 +243,8 @@ internal fun PanelPistas(
                 .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(8.dp))
                 .padding(8.dp)
                 .testTag(TAG_REPRODUCTOR_PANEL_PISTAS),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        // DC-11: separación entre objetivos táctiles adyacentes de 8 dp.
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text =
@@ -412,6 +413,8 @@ internal fun BotonControl(
     Box(
         modifier =
             modifier
+                // DC-11: área táctil de fila de pista de al menos 48 dp.
+                .heightIn(min = 48.dp)
                 .testTag(tag)
                 .onFocusChanged { enfocado = it.isFocused }
                 .clip(forma)

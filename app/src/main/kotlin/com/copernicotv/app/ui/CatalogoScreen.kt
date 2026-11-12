@@ -8,12 +8,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +37,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,6 +59,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -341,6 +350,7 @@ data class CatalogoAcciones(
 @Composable
 fun CatalogoScreen(
     estado: CatalogoUiState,
+    anchoVentana: WindowWidthSizeClass,
     criterios: CriteriosBusqueda,
     grupos: List<GrupoOpcion>,
     listas: List<ListaResumen>,
@@ -360,10 +370,26 @@ fun CatalogoScreen(
             criterios.grupoId != null ||
             criterios.soloFavoritos ||
             criterios.mostrarOcultos
+    // E7-T3: la rama de layout sigue los breakpoints de ancho de Material en
+    // vez de comparar ancho y alto de la pantalla.
+    val horizontal = anchoVentana != WindowWidthSizeClass.Compact
     val configuracion = LocalConfiguration.current
-    val horizontal = configuracion.screenWidthDp > configuracion.screenHeightDp
 
-    Surface(modifier = Modifier.fillMaxSize()) {
+    Surface(
+        modifier =
+            Modifier
+                // E7-T3 (edge-to-edge): el contenido respeta las barras del
+                // sistema pero no consume el teclado: descontarlo colapsaría
+                // el catálogo y superpondría controles con la lista; el campo
+                // de búsqueda ya queda visible sobre el teclado.
+                .fillMaxSize()
+                .windowInsetsPadding(
+                    WindowInsets.safeDrawing.only(
+                        WindowInsetsSides.Horizontal + WindowInsetsSides.Top,
+                    ),
+                )
+                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
+    ) {
         if (horizontal) {
             Row(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -403,13 +429,21 @@ fun CatalogoScreen(
         } else {
             // En pantallas bajas los controles no deben dejar sin altura a los
             // resultados: se acotan y pasan a hacer scroll, y la lista conserva
-            // un mínimo visible para seguir siendo usable. El tope se calcula
-            // desde la configuración para no introducir una subcomposición: el
-            // foco inicial se pide en un `LaunchedEffect` y necesita que el nodo
-            // con `focusRequester` ya esté adjunto en el primer frame.
+            // un mínimo visible para seguir siendo usable. El tope descuenta
+            // solo las barras del sistema: el padding raíz tampoco consume el
+            // teclado, y descontarlo aquí colapsaría la columna de controles
+            // y superpondría los chips con la lista (observado en CI).
+            val densidad = LocalDensity.current
+            val insetsVerticales =
+                with(densidad) {
+                    (
+                        WindowInsets.systemBars.getTop(densidad) +
+                            WindowInsets.systemBars.getBottom(densidad)
+                    ).toDp()
+                }
             val altoMaximoControles =
                 (
-                    configuracion.screenHeightDp.dp - 48.dp -
+                    configuracion.screenHeightDp.dp - insetsVerticales - 48.dp -
                         ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp
                 ).coerceAtLeast(0.dp)
             Column(
@@ -611,6 +645,10 @@ private fun BotonNuevoCanal(
                         Modifier.focusProperties { down = focoPrimerCanal }
                     },
                 )
+                // DC-11: en material3 1.3 la enforcement del mínimo táctil de
+                // 48 dp está desactivada por defecto; el Button queda en 40 dp
+                // si no se declara explícito.
+                .heightIn(min = 48.dp)
                 .testTag(TAG_NUEVO_CANAL),
     ) {
         Text(stringResource(R.string.catalogo_nuevo_canal))
@@ -1034,26 +1072,26 @@ private fun FiltrosYOrden(
             selected = criterios.grupoId == null && !criterios.soloFavoritos,
             onClick = onTodos,
             label = { Text(stringResource(R.string.catalogo_todos)) },
-            modifier = Modifier.testTag(TAG_FILTRO_TODOS),
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FILTRO_TODOS),
         )
         FilterChip(
             selected = criterios.soloFavoritos,
             onClick = onFavoritos,
             label = { Text(stringResource(R.string.catalogo_favoritos)) },
-            modifier = Modifier.testTag(TAG_FILTRO_FAVORITOS),
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FILTRO_FAVORITOS),
         )
         FilterChip(
             selected = criterios.mostrarOcultos,
             onClick = onMostrarOcultos,
             label = { Text(stringResource(R.string.catalogo_mostrar_ocultos)) },
-            modifier = Modifier.testTag(TAG_FILTRO_OCULTOS),
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FILTRO_OCULTOS),
         )
         grupos.forEach { grupo ->
             FilterChip(
                 selected = criterios.grupoId == grupo.id,
                 onClick = { onGrupo(if (criterios.grupoId == grupo.id) null else grupo.id) },
                 label = { Text(grupo.nombre) },
-                modifier = Modifier.testTag(PREFIJO_TAG_GRUPO + grupo.id),
+                modifier = Modifier.heightIn(min = 48.dp).testTag(PREFIJO_TAG_GRUPO + grupo.id),
             )
         }
         SelectorOrden(

@@ -4,7 +4,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -39,18 +43,28 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var inicializador: InicializadorActualizaciones
 
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Reconciliación de programaciones de DC-07 punto 5. Es idempotente por
         // proceso, así que una recreación de la Activity no la repite.
         inicializador.iniciar()
+        // E7-T3: dibujo edge-to-edge; cada pantalla raíz consume los insets de
+        // barras del sistema con windowInsetsPadding (el reproductor ya los
+        // maneja en sus overlays).
+        enableEdgeToEdge()
         setContent {
             CoperNicoTheme(esTv = recordarEsTv()) {
+                // E7-T3: el layout se elige por window size class de la ventana
+                // (breakpoints de Material), no por orientación de la pantalla.
+                val tamanosVentana = calculateWindowSizeClass(this)
+                val anchoVentana = tamanosVentana.widthSizeClass
                 var pantalla by rememberSaveable { mutableStateOf(Pantalla.CATALOGO) }
                 var canalReproduciendo by rememberSaveable { mutableStateOf(-1L) }
                 when (pantalla) {
                     Pantalla.CATALOGO ->
                         PantallaCatalogo(
+                            anchoVentana = anchoVentana,
                             onAbrirFuentes = { pantalla = Pantalla.FUENTES },
                             onAbrirGuia = { pantalla = Pantalla.GUIA },
                             onAbrirReproductor = { canalId ->
@@ -101,6 +115,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun PantallaCatalogo(
+    anchoVentana: WindowWidthSizeClass,
     onAbrirFuentes: () -> Unit,
     onAbrirGuia: () -> Unit,
     onAbrirReproductor: (Long) -> Unit,
@@ -127,6 +142,7 @@ private fun PantallaCatalogo(
         }
     CatalogoScreen(
         estado = estado,
+        anchoVentana = anchoVentana,
         criterios = criterios,
         grupos = grupos,
         listas = listas,

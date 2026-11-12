@@ -1097,6 +1097,8 @@ continúa no soportado (L70). E6-T2 está **cerrada en el alcance A–D autoriza
 
 **Estado E7-T1** — implementación y cobertura automatizada completas; no se declara cerrada porque la revisión visual humana a 10 pies sigue pendiente. Entregado: shell Compose for TV con un solo foco visible por pantalla, foco raíz en el reproductor, BackHandler con salida por control visible (patrón E6: `performClick` sobre `TAG_REPRODUCTOR_VOLVER`; `pressBack()` no es confiable en TV — L86), foco inicial del diálogo de acciones de canal y recorrido D-pad real automatizado (Canal → diálogo → Reproducir → reproductor → volver), con conteo de foco sobre el árbol fusionado. Verificación dura: corrida `42952057958` en `f81e389` — 5/5 jobs verdes (`instrumented-tv` con `ShellFocoTvTest` 2/2 PASSED y canarios TV, móvil 69/69, `static-analysis`, `jvm-tests`, `apk`). Capturas P2 reproducibles publicadas como artifact `capturas-p2-tv` (2 PNG 1920×1080: `e7t1-catalogo-canal0.png`, `e7t1-reproductor-arranque.png`). Lección de infraestructura: la imagen `android-tv` API 34 de CI es *production* (sin `adb root` ni `run-as`) y el shell user no lee `Android/data` (ENOENT por FUSE); las capturas se publican vía MediaStore en `Pictures/capturas-p2` y CI extrae con `adb pull /sdcard/Pictures/capturas-p2` — procedimiento registrado para las capturas de E7-T2..T7.
 
+**Estado E7-T2** — implementación y cobertura automatizada completas; no se declara cerrada porque la revisión visual humana a 10 pies sigue pendiente. Entregado: tipografía de TV conforme a DC-11 (`TipografiaTv`, override solo en la rama TV de `CoperNicoTheme`, con la base declarada antes porque las propiedades top-level se inicializan en orden de declaración), área de foco de tarjeta de canal ≥ 56 dp y canario `CanarioFocoDpadTvTest` con recorrido D-pad puro Importar → canal-0 (límite 30 presiones, un solo foco en cada paso) y diagnóstico compacto de secuencia de foco (tags visitados, sobrevive al límite de tamaño del log de instrumentation). Dos hallazgos de D-pad corregidos en el catálogo: el buscador de una línea consume D-pad Abajo/Arriba y atrapaba el foco (intercepción `onPreviewKeyEvent` con `moveFocus`) y en el layout TV de dos paneles el Abajo desde el último control no cruza al panel derecho (`focusProperties { down }` en Nuevo Canal + `focusRequester` anclado a canal-0; en móvil retrato no cambia nada). Verificación dura: corrida `43063200085` en `c0b0f7c` — 5/5 jobs verdes (`instrumented-tv` con `CanarioFocoDpadTvTest` incluido, móvil, `static-analysis`, `jvm-tests`, `apk`). Capturas P2 reproducibles agregadas al artifact `capturas-p2-tv`: `e7t2-catalogo-canal0.png` y `e7t2-catalogo-regreso.png` (1920×1080).
+
 ## 9. Criterios de aceptación
 
 ### 9.1 Criterios globales
@@ -4760,3 +4762,26 @@ en Termux (≈ 19 s) y reproduce exacto los errores de CI; el bloque completo
 `./gradlew ktlintCheck detekt` tarda ≈ 1 min. Reglas que mordieron: el RHS multilínea
 tras `=` debe empezar en línea nueva y las firmas largas de función llevan un parámetro
 por línea. Validar el formato localmente antes de pushear evita ciclos de CI.
+
+### L87 — E7-T2: canarios de foco y D-pad, tipografía DC-11 y capturas P2 (2026-11-11)
+
+E7-T2 implementado en `e7-t2-canarios-foco` sobre el tip de E7-T1 (`19f6625`). Entregado:
+`TipografiaTv` con el mapeo DC-11 (headlineMedium 32sp, titleLarge 28, titleMedium 24,
+titleSmall 18, body 18/18, small/labels 16) activo solo en la rama TV de `CoperNicoTheme`;
+`heightIn(min = 56.dp)` en la tarjeta de canal y relleno vertical del nombre a 16 dp para
+que la altura natural supere el mínimo. Canario `CanarioFocoDpadTvTest`: importación por
+D-pad, recorrido puro Abajo hasta canal-0 con un solo foco por paso (límite 30 presiones),
+chequeo de área de foco ≥ 56×56 dp y regreso; diagnóstico compacto «Secuencia de foco»
+(`etiquetaDeFoco()` por BFS con `SemanticsProperties.Focused`) que sobrevive al límite de
+tamaño del log de instrumentation — el árbol completo se trunca. Hallazgos corregidos: el
+`OutlinedTextField` del buscador consume D-pad Abajo/Arriba (intercepción en
+`onPreviewKeyEvent` con `moveFocus(Down/Up)` en KeyUp) y en el layout TV de dos paneles la
+búsqueda direccional Abajo no cruza del panel de controles a la lista de canales
+(`focusProperties { down = focoPrimerCanal }` en Nuevo Canal + `focusRequester` en
+canal-0, solo TV horizontal). Verificación dura: corrida `43063200085` en `c0b0f7c` — 5/5
+jobs verdes; artifact `capturas-p2-tv` con `e7t2-catalogo-canal0.png` y
+`e7t2-catalogo-regreso.png` verificados descargándolos. La revisión visual humana a 10
+pies sigue pendiente: DC-11 y E7-T2 no se declaran cerrados. Lección de proceso: reutilizar
+`esperarHasta` de `AyudasReproductor.kt` en vez de reimplementar `waitUntil` (el import
+top-level de `waitUntil` no existe en esta versión de Compose test) y liberar RAM antes de
+cada commit o code review porque el warm GGA cuelga el servidor Termux.

@@ -38,16 +38,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -349,6 +353,7 @@ fun CatalogoScreen(
     var dialogo by remember { mutableStateOf<DialogoCatalogo?>(null) }
     val listaActiva = listas.firstOrNull { it.activa }
     val focoInicial = remember { FocusRequester() }
+    val focoPrimerCanal = remember { FocusRequester() }
     LaunchedEffect(Unit) { focoInicial.requestFocus() }
     val hayFiltros =
         criterios.texto.isNotEmpty() ||
@@ -381,6 +386,7 @@ fun CatalogoScreen(
                         recientes = recientes,
                         acciones = acciones,
                         focoInicial = focoInicial,
+                        focoPrimerCanal = focoPrimerCanal,
                         onDialogo = { dialogo = it },
                     )
                 }
@@ -388,6 +394,7 @@ fun CatalogoScreen(
                     modo = criterios.modo,
                     resultados = resultados,
                     hayFiltros = hayFiltros,
+                    focoPrimerCanal = focoPrimerCanal,
                     onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
                     onReintentar = { resultados.retry() },
                     modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -424,6 +431,7 @@ fun CatalogoScreen(
                         recientes = recientes,
                         acciones = acciones,
                         focoInicial = focoInicial,
+                        focoPrimerCanal = null,
                         onDialogo = { dialogo = it },
                     )
                 }
@@ -431,6 +439,7 @@ fun CatalogoScreen(
                     modo = criterios.modo,
                     resultados = resultados,
                     hayFiltros = hayFiltros,
+                    focoPrimerCanal = null,
                     onCanal = { canal -> dialogo = DialogoCatalogo.AccionesCanal(canal) },
                     onReintentar = { resultados.retry() },
                     modifier = Modifier.weight(1f),
@@ -459,6 +468,7 @@ private fun Controles(
     recientes: List<HistorialResumen>,
     acciones: CatalogoAcciones,
     focoInicial: FocusRequester,
+    focoPrimerCanal: FocusRequester?,
     onDialogo: (DialogoCatalogo) -> Unit,
 ) {
     Text(
@@ -531,12 +541,27 @@ private fun Controles(
             modifier = Modifier.testTag(TAG_ERROR_ACCION),
         )
     }
+    // En TV el campo de una línea consume D-pad Abajo/Arriba y atrapa el
+    // foco: la intercepción en preview mueve el foco a destino antes de que
+    // el campo trate la tecla como edición de texto.
+    val manejadorFoco = LocalFocusManager.current
     OutlinedTextField(
         value = criterios.texto,
         onValueChange = acciones.onTexto,
         label = { Text(stringResource(R.string.catalogo_buscar)) },
         singleLine = true,
-        modifier = Modifier.fillMaxWidth().testTag(TAG_BUSCAR),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .onPreviewKeyEvent { evento ->
+                    evento.type == KeyEventType.KeyUp &&
+                        when (evento.key) {
+                            Key.DirectionDown -> manejadorFoco.moveFocus(FocusDirection.Down)
+                            Key.DirectionUp -> manejadorFoco.moveFocus(FocusDirection.Up)
+                            else -> false
+                        }
+                }
+                .testTag(TAG_BUSCAR),
     )
     if (criterios.texto.isNotEmpty() || criterios.grupoId != null || criterios.soloFavoritos) {
         TextButton(
@@ -556,10 +581,37 @@ private fun Controles(
         onModo = acciones.onModo,
         onDireccion = acciones.onDireccion,
     )
+    BotonNuevoCanal(
+        listaActiva = listaActiva,
+        focoPrimerCanal = focoPrimerCanal,
+        onDialogo = onDialogo,
+    )
+}
+
+/** Botón de alta de canal; en TV de dos paneles baja a la lista de canales. */
+@Composable
+private fun BotonNuevoCanal(
+    listaActiva: ListaResumen?,
+    focoPrimerCanal: FocusRequester?,
+    onDialogo: (DialogoCatalogo) -> Unit,
+) {
     Button(
         onClick = { onDialogo(DialogoCatalogo.NuevoCanal) },
         enabled = listaActiva != null,
-        modifier = Modifier.testTag(TAG_NUEVO_CANAL),
+        modifier =
+            Modifier
+                // En TV de dos paneles el Abajo desde el último control debe
+                // entrar a la lista de canales: la búsqueda direccional no
+                // cruza al panel derecho porque sus elementos no quedan
+                // debajo, así que el destino se declara explícito.
+                .then(
+                    if (focoPrimerCanal == null) {
+                        Modifier
+                    } else {
+                        Modifier.focusProperties { down = focoPrimerCanal }
+                    },
+                )
+                .testTag(TAG_NUEVO_CANAL),
     ) {
         Text(stringResource(R.string.catalogo_nuevo_canal))
     }
@@ -1018,6 +1070,7 @@ private fun Resultados(
     modo: ModoOrden,
     resultados: LazyPagingItems<CanalBusqueda>,
     hayFiltros: Boolean,
+    focoPrimerCanal: FocusRequester?,
     onCanal: (CanalBusqueda) -> Unit,
     onReintentar: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1077,6 +1130,7 @@ private fun Resultados(
                         CanalFila(
                             canal = canal,
                             indice = indice,
+                            focoSolicitado = if (indice == 0) focoPrimerCanal else null,
                             alSeleccionar = { onCanal(canal) },
                         )
                     }
@@ -1123,6 +1177,7 @@ private fun CabeceraGrupo(grupoNombre: String?) {
 private fun CanalFila(
     canal: CanalBusqueda,
     indice: Int,
+    focoSolicitado: FocusRequester?,
     alSeleccionar: () -> Unit,
 ) {
     var enfocado by remember { mutableStateOf(false) }
@@ -1131,6 +1186,15 @@ private fun CanalFila(
         modifier =
             Modifier
                 .fillMaxWidth()
+                // DC-11: el área de foco en TV mide al menos 56 × 56 dp.
+                .heightIn(min = 56.dp)
+                .then(
+                    if (focoSolicitado == null) {
+                        Modifier
+                    } else {
+                        Modifier.focusRequester(focoSolicitado)
+                    },
+                )
                 .onFocusChanged { enfocado = it.isFocused }
                 .onKeyEvent { evento ->
                     if (evento.type == KeyEventType.KeyUp &&
@@ -1177,7 +1241,10 @@ private fun CanalFila(
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            // DC-11: el relleno vertical lleva la altura natural de la fila
+            // por encima del mínimo de 56 dp sin depender de la coerción de
+            // heightIn en el emulador.
+            modifier = Modifier.weight(1f).padding(vertical = 16.dp),
         )
         if (canal.esFavorito) {
             Text(

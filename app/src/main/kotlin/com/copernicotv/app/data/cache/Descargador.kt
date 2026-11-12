@@ -1,5 +1,6 @@
 package com.copernicotv.app.data.cache
 
+import com.copernicotv.app.data.VerificacionCleartext
 import com.copernicotv.app.data.politicaCleartextPermitida
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

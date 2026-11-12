@@ -58,6 +58,8 @@
     <string name="catalogo_colecciones">Colecciones</string>
     <string name="catalogo_perfiles">Perfiles</string>
     <string name="catalogo_fuentes">Fuentes</string>
+    <string name="catalogo_tema_claro">Tema: claro</string>
+    <string name="catalogo_tema_oscuro">Tema: oscuro</string>
     <string name="fuentes_titulo">Fuentes</string>
     <string name="fuentes_volver">Volver</string>
     <string name="fuentes_cargando">Cargando fuentes…</string>

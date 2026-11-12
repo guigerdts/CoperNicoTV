@@ -280,7 +280,9 @@ class DescargadorHttpTest {
                     }
                 }
             try {
-                bloque("https://127.0.0.1:${servidor.localPort}/lista.m3u")
+                // El host de la URL debe coincidir con el certificado del fixture
+                // (`CN=localhost`); con una IP la verificación de hostname fallaría.
+                bloque("https://localhost:${servidor.localPort}/lista.m3u")
             } finally {
                 servidor.close()
                 withTimeoutOrNull(TIEMPO_ESPERA_MS) { respuesta.await() }
@@ -315,7 +317,9 @@ class DescargadorHttpTest {
                         }
                     }
                 try {
-                    bloque("https://127.0.0.1:${servidor.localPort}/lista.m3u")
+                    // Igual que en [conServidorTls]: el host de la URL debe
+                    // coincidir con el certificado del fixture.
+                    bloque("https://localhost:${servidor.localPort}/lista.m3u")
                 } finally {
                     servidor.close()
                     withTimeoutOrNull(TIEMPO_ESPERA_MS) { respuesta.await() }
@@ -334,8 +338,12 @@ class DescargadorHttpTest {
         // Backlog real: con cola 0, un SYN que llega antes de que la corrutina
         // de accept() arranque es rechazado por el kernel y el cliente ve
         // `conexion_rechazada`. El mismo backlog por defecto (50) usan los
-        // helpers de `ServerSocket` de esta clase.
-        return contexto.serverSocketFactory.createServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        // helpers de `ServerSocket` de esta clase. El bind es `localhost` y no
+        // `127.0.0.1`: el certificado del fixture es `CN=localhost` y la
+        // verificación de hostname de TLS compara el host de la URL; para una
+        // IP el JDK no usa el CN como fallback, así que con `127.0.0.1` el
+        // handshake siempre fallaría.
+        return contexto.serverSocketFactory.createServerSocket(0, 50, InetAddress.getByName("localhost"))
             as SSLServerSocket
     }
 

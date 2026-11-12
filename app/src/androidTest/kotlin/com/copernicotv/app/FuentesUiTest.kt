@@ -1,5 +1,6 @@
 package com.copernicotv.app
 
+import android.security.NetworkSecurityPolicy
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -26,6 +27,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -130,6 +132,20 @@ class FuentesUiTest {
         } finally {
             servidorLocal.close()
         }
+    }
+
+    /**
+     * E7-T7: la política de red del APK instrumentado (variante debug, que
+     * hereda la configuración de `main`) permite el texto claro de proveedores
+     * elegidos por el usuario. Es la prueba reproducible del síntoma: sin la
+     * configuración, la plataforma bloquea todo HTTP sin cifrar en
+     * targetSdk >= 28 y la importación falla con «sin_conexion».
+     */
+    @Test
+    fun laPoliticaDeRedPermiteImportarListasHttpDeProveedores() {
+        val permitido = NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted("proveedor.ejemplo")
+
+        assertTrue("la política bloquea el HTTP de proveedores", permitido)
     }
 
     /**

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    E7-T7: transporte de importación de fuentes.
+
+    El usuario elige los proveedores de sus listas IPTV: muchos sirven la
+    lista M3U por HTTP sin cifrar. Con targetSdk >= 28 el valor por defecto
+    de la plataforma bloquea TODO texto claro, lo que hacía fallar cualquier
+    lista HTTP con «sin_conexion» en dispositivo real.
+
+    Política declarada (intencional y explícita, no el default del sistema):
+    - El tráfico en texto claro queda permitido a nivel de aplicación, porque
+      los dominios de los proveedores los elige el usuario y no se pueden
+      listar de antemano.
+    - HTTPS sigue siendo el camino preferido y la validación TLS se mantiene
+      intacta: este archivo no declara trust anchors personalizados ni
+      desactiva ninguna verificación de certificados.
+    - El reproductor Media3 hereda esta política: los streams HTTP que las
+      listas de proveedores declaran son tráfico de la misma decisión.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

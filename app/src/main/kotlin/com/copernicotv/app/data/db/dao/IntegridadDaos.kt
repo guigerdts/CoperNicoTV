@@ -52,6 +52,13 @@ interface HistorialDao {
     suspend fun eliminarPorCanal(canalId: Long): Int
 
     /**
+     * S47a: borra todo el Historial. Es una operación de una sola tabla: no
+     * toca Favorito, Ocultación ni ningún Canal (S47 conserva lo demás).
+     */
+    @Query("DELETE FROM Historial")
+    suspend fun borrarTodo(): Int
+
+    /**
      * Traslada la fila de Historial al Canal superviviente de una fusión.
      *
      * Solo se usa cuando el superviviente no tiene Historial propio: el índice

@@ -383,6 +383,28 @@ class CatalogoCrudRepositorio
             }
 
         /**
+         * S47a: borra todo el Historial de reproducción. El borrado es de una
+         * sola tabla: los Favoritos, las Ocultaciones y los Canales se
+         * conservan, y ninguna petición de red acompaña la operación (S47d).
+         */
+        suspend fun borrarHistorial(): ResultadoAccion =
+            withContext(Dispatchers.IO) {
+                db.historialDao().borrarTodo()
+                ResultadoAccion.Ok
+            }
+
+        /**
+         * S47b: borra todos los Favoritos. El borrado es de una sola tabla: el
+         * Historial, las Ocultaciones y los Canales se conservan, y ninguna
+         * petición de red acompaña la operación (S47d).
+         */
+        suspend fun borrarFavoritos(): ResultadoAccion =
+            withContext(Dispatchers.IO) {
+                db.favoritoDao().borrarTodo()
+                ResultadoAccion.Ok
+            }
+
+        /**
          * Mueve un Canal una posición arriba o abajo dentro de la Lista activa.
          *
          * Las Apariencias del mismo Canal se mueven como bloque y se renumera

@@ -301,6 +301,16 @@ class CatalogoViewModel
             ejecutarAccion { crud.alternarOculto(canalId) }
         }
 
+        /** S47a: borra todo el Historial; los Favoritos se conservan. */
+        fun borrarHistorial() {
+            ejecutarAccion { crud.borrarHistorial() }
+        }
+
+        /** S47b: borra todos los Favoritos; el Historial se conserva. */
+        fun borrarFavoritos() {
+            ejecutarAccion { crud.borrarFavoritos() }
+        }
+
         fun moverCanal(
             canalId: Long,
             delta: Int,

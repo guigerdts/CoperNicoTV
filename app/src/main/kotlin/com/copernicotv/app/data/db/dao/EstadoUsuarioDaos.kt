@@ -22,6 +22,13 @@ interface FavoritoDao {
     @Query("DELETE FROM Favorito WHERE canalId = :canalId")
     suspend fun eliminarPorCanal(canalId: Long): Int
 
+    /**
+     * S47b: borra todos los Favoritos. Es una operación de una sola tabla: no
+     * toca Historial, Ocultación ni ningún Canal (S47 conserva lo demás).
+     */
+    @Query("DELETE FROM Favorito")
+    suspend fun borrarTodo(): Int
+
     @Query("SELECT * FROM Favorito WHERE canalId = :canalId")
     suspend fun porCanal(canalId: Long): FavoritoEntity?
 

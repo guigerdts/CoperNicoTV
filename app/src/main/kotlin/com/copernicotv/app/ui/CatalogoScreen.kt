@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -428,18 +429,16 @@ fun CatalogoScreen(
         } else {
             // En pantallas bajas los controles no deben dejar sin altura a los
             // resultados: se acotan y pasan a hacer scroll, y la lista conserva
-            // un mínimo visible para seguir siendo usable. El tope se calcula
-            // desde la configuración descontando los insets reales (barras del
-            // sistema y teclado con edge-to-edge) para no introducir una
-            // subcomposición: el foco inicial se pide en un `LaunchedEffect` y
-            // necesita que el nodo con `focusRequester` ya esté adjunto en el
-            // primer frame.
+            // un mínimo visible para seguir siendo usable. El tope descuenta
+            // solo las barras del sistema: el padding raíz tampoco consume el
+            // teclado, y descontarlo aquí colapsaría la columna de controles
+            // y superpondría los chips con la lista (observado en CI).
             val densidad = LocalDensity.current
             val insetsVerticales =
                 with(densidad) {
                     (
-                        WindowInsets.safeDrawing.getTop(densidad) +
-                            WindowInsets.safeDrawing.getBottom(densidad)
+                        WindowInsets.systemBars.getTop(densidad) +
+                            WindowInsets.systemBars.getBottom(densidad)
                     ).toDp()
                 }
             val altoMaximoControles =

@@ -210,6 +210,18 @@ const val TAG_DIALOGO_CANCELAR = "dialogo-cancelar"
 /** Etiqueta del botón de confirmación de borrado. */
 const val TAG_CONFIRMAR_ELIMINAR = "confirmar-eliminar"
 
+/** Etiqueta del control de Privacidad de S47 (borrado de Historial/Favoritos). */
+const val TAG_PRIVACIDAD = "privacidad"
+
+/** Etiqueta de la acción de borrado del Historial de S47a. */
+const val TAG_BORRAR_HISTORIAL = "borrar-historial"
+
+/** Etiqueta de la acción de borrado de Favoritos de S47b. */
+const val TAG_BORRAR_FAVORITOS = "borrar-favoritos"
+
+/** Etiqueta del botón que confirma un borrado de S47a/S47b. */
+const val TAG_CONFIRMAR_BORRAR = "confirmar-borrar"
+
 /** Etiqueta del selector de modo de ordenación A/B/C. */
 const val TAG_MODO = "orden-modo"
 
@@ -343,6 +355,8 @@ data class CatalogoAcciones(
     val onAbrirFuentes: () -> Unit,
     val onAbrirGuia: () -> Unit,
     val onAlternarTema: () -> Unit,
+    val onBorrarHistorial: () -> Unit,
+    val onBorrarFavoritos: () -> Unit,
 )
 
 /**
@@ -551,6 +565,14 @@ private fun FilaControles(
             modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_TEMA),
         ) {
             Text(stringResource(etiquetaTema))
+        }
+        // S47: el borrado de Historial y Favoritos vive aquí, con diálogo y
+        // confirmación; cada acción es independiente y conserva la otra.
+        TextButton(
+            onClick = { onDialogo(DialogoCatalogo.Privacidad()) },
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_PRIVACIDAD),
+        ) {
+            Text(stringResource(R.string.catalogo_privacidad))
         }
     }
 }
@@ -962,18 +984,16 @@ private fun DialogoCatalogoActivo(
                 onCancelar = { onDialogo(null) },
             )
         is DialogoCatalogo.EliminarCanal ->
-            DialogoConfirmar(
-                titulo = stringResource(R.string.catalogo_eliminar),
-                texto =
-                    stringResource(
-                        R.string.catalogo_confirmar_eliminar_canal,
-                        actual.canal.nombre ?: stringResource(R.string.catalogo_sin_nombre),
-                    ),
-                onConfirmar = {
-                    acciones.onEliminarCanal(actual.canal.id)
-                    onDialogo(null)
-                },
-                onCancelar = { onDialogo(null) },
+            DialogoEliminarCanal(
+                canal = actual.canal,
+                acciones = acciones,
+                onDialogo = onDialogo,
+            )
+        is DialogoCatalogo.Privacidad ->
+            DialogoPrivacidadRama(
+                dialogo = actual,
+                acciones = acciones,
+                onDialogo = onDialogo,
             )
     }
 }
@@ -1833,6 +1853,8 @@ private fun DialogoCanal(
 private fun DialogoConfirmar(
     titulo: String,
     texto: String,
+    etiquetaConfirmar: String = stringResource(R.string.catalogo_eliminar),
+    tagConfirmar: String = TAG_CONFIRMAR_ELIMINAR,
     onConfirmar: () -> Unit,
     onCancelar: () -> Unit,
 ) {
@@ -1843,9 +1865,124 @@ private fun DialogoConfirmar(
         confirmButton = {
             TextButton(
                 onClick = onConfirmar,
-                modifier = Modifier.testTag(TAG_CONFIRMAR_ELIMINAR),
+                modifier = Modifier.testTag(tagConfirmar),
             ) {
-                Text(stringResource(R.string.catalogo_eliminar))
+                Text(etiquetaConfirmar)
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onCancelar,
+                modifier = Modifier.testTag(TAG_DIALOGO_CANCELAR),
+            ) {
+                Text(stringResource(R.string.catalogo_cancelar))
+            }
+        },
+    )
+}
+
+/**
+ * Confirmación de borrado de un Canal: el nombre sin texto se presenta como
+ * «Sin nombre» (S14).
+ */
+@Composable
+private fun DialogoEliminarCanal(
+    canal: CanalBusqueda,
+    acciones: CatalogoAcciones,
+    onDialogo: (DialogoCatalogo?) -> Unit,
+) {
+    DialogoConfirmar(
+        titulo = stringResource(R.string.catalogo_eliminar),
+        texto =
+            stringResource(
+                R.string.catalogo_confirmar_eliminar_canal,
+                canal.nombre ?: stringResource(R.string.catalogo_sin_nombre),
+            ),
+        onConfirmar = {
+            acciones.onEliminarCanal(canal.id)
+            onDialogo(null)
+        },
+        onCancelar = { onDialogo(null) },
+    )
+}
+
+/**
+ * Rama de Privacidad de S47: sin confirmación muestra el menú con los dos
+ * borrados; con confirmación pide la confirmación del borrado elegido. Cada
+ * acción ejecuta su borrado y conserva la otra tabla (S47a/S47b).
+ */
+@Composable
+private fun DialogoPrivacidadRama(
+    dialogo: DialogoCatalogo.Privacidad,
+    acciones: CatalogoAcciones,
+    onDialogo: (DialogoCatalogo?) -> Unit,
+) {
+    val confirmar = dialogo.confirmarHistorial
+    if (confirmar == null) {
+        DialogoPrivacidad(
+            onBorrarHistorial = { onDialogo(DialogoCatalogo.Privacidad(confirmarHistorial = true)) },
+            onBorrarFavoritos = { onDialogo(DialogoCatalogo.Privacidad(confirmarHistorial = false)) },
+            onCancelar = { onDialogo(null) },
+        )
+    } else {
+        val titulo =
+            if (confirmar) {
+                R.string.catalogo_confirmar_historial_titulo
+            } else {
+                R.string.catalogo_confirmar_favoritos_titulo
+            }
+        val texto =
+            if (confirmar) {
+                R.string.catalogo_confirmar_historial_texto
+            } else {
+                R.string.catalogo_confirmar_favoritos_texto
+            }
+        DialogoConfirmar(
+            titulo = stringResource(titulo),
+            texto = stringResource(texto),
+            etiquetaConfirmar = stringResource(R.string.catalogo_borrar),
+            tagConfirmar = TAG_CONFIRMAR_BORRAR,
+            onConfirmar = {
+                if (confirmar) {
+                    acciones.onBorrarHistorial()
+                } else {
+                    acciones.onBorrarFavoritos()
+                }
+                onDialogo(null)
+            },
+            onCancelar = { onDialogo(null) },
+        )
+    }
+}
+
+/**
+ * Diálogo de Privacidad de S47: dos borrados independientes con conservación
+ * cruzada. Abrirlo no borra nada; cada acción pide su propia confirmación.
+ */
+@Composable
+private fun DialogoPrivacidad(
+    onBorrarHistorial: () -> Unit,
+    onBorrarFavoritos: () -> Unit,
+    onCancelar: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onCancelar,
+        title = { Text(stringResource(R.string.catalogo_privacidad_titulo)) },
+        text = { Text(stringResource(R.string.catalogo_privacidad_texto)) },
+        confirmButton = {
+            Column {
+                TextButton(
+                    onClick = onBorrarHistorial,
+                    modifier = Modifier.testTag(TAG_BORRAR_HISTORIAL),
+                ) {
+                    Text(stringResource(R.string.catalogo_borrar_historial))
+                }
+                TextButton(
+                    onClick = onBorrarFavoritos,
+                    modifier = Modifier.testTag(TAG_BORRAR_FAVORITOS),
+                ) {
+                    Text(stringResource(R.string.catalogo_borrar_favoritos))
+                }
             }
         },
         dismissButton = {
@@ -1977,6 +2114,13 @@ private sealed interface DialogoCatalogo {
     data object ImportarUrl : DialogoCatalogo
 
     data object NuevoCanal : DialogoCatalogo
+
+    /**
+     * S47: diálogo de Privacidad con los dos borrados independientes.
+     * `confirmarHistorial` nulo muestra el menú de borrado; no nulo pide la
+     * confirmación del borrado correspondiente (S47a o S47b).
+     */
+    data class Privacidad(val confirmarHistorial: Boolean? = null) : DialogoCatalogo
 
     data class AccionesCanal(val canal: CanalBusqueda) : DialogoCatalogo
 

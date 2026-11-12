@@ -60,6 +60,16 @@
     <string name="catalogo_fuentes">Fuentes</string>
     <string name="catalogo_tema_claro">Tema: claro</string>
     <string name="catalogo_tema_oscuro">Tema: oscuro</string>
+    <string name="catalogo_privacidad">Privacidad</string>
+    <string name="catalogo_privacidad_titulo">Privacidad</string>
+    <string name="catalogo_privacidad_texto">El borrado es independiente: borrar el Historial conserva los Favoritos y borrar los Favoritos conserva el Historial. No se envía nada fuera del dispositivo.</string>
+    <string name="catalogo_borrar_historial">Borrar historial</string>
+    <string name="catalogo_borrar_favoritos">Borrar favoritos</string>
+    <string name="catalogo_confirmar_historial_titulo">¿Borrar historial?</string>
+    <string name="catalogo_confirmar_historial_texto">El Historial se vacía; los Favoritos se conservan.</string>
+    <string name="catalogo_confirmar_favoritos_titulo">¿Borrar favoritos?</string>
+    <string name="catalogo_confirmar_favoritos_texto">Los Favoritos se vacían; el Historial se conserva.</string>
+    <string name="catalogo_borrar">Borrar</string>
     <string name="fuentes_titulo">Fuentes</string>
     <string name="fuentes_volver">Volver</string>
     <string name="fuentes_cargando">Cargando fuentes…</string>

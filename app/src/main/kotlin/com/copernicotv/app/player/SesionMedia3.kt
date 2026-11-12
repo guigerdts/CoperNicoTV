@@ -1,6 +1,7 @@
 package com.copernicotv.app.player
 
 import android.content.Context
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -111,6 +112,18 @@ class SesionMedia3(
 
     init {
         reproductor.addListener(oyente)
+        // S42a/S42b: el motor gestiona el foco de audio. Una pérdida de foco
+        // (una llamada u otra app) pausa o atenúa la reproducción y, al
+        // recuperar el foco transitorio, el motor la reanuda solo. Sin
+        // MediaSession: el foco vive en el motor de la pantalla activa.
+        reproductor.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build(),
+            // S42a: el motor gestiona el foco de audio (handleAudioFocus).
+            true,
+        )
         reproductor.setMediaItem(mediaItemDe(url, protocolo))
         reproductor.prepare()
         reproductor.playWhenReady = true

@@ -218,6 +218,8 @@ private fun PantallaCatalogo(
                 onAbrirFuentes = onAbrirFuentes,
                 onAbrirGuia = onAbrirGuia,
                 onAlternarTema = onAlternarTema,
+                onBorrarHistorial = viewModel::borrarHistorial,
+                onBorrarFavoritos = viewModel::borrarFavoritos,
             ),
     )
 }

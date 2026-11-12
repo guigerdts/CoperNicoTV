@@ -82,6 +82,7 @@ import com.copernicotv.app.data.ListaResumen
 import com.copernicotv.app.data.PerfilResumen
 import com.copernicotv.core.orden.DireccionOrden
 import com.copernicotv.core.orden.ModoOrden
+import com.copernicotv.core.tema.TemaUi
 
 /** Etiqueta del disparador de importación del canario. */
 const val TAG_IMPORTAR = "importar-fixture"
@@ -233,6 +234,9 @@ const val TAG_COLECCIONES = "abrir-colecciones"
 /** Etiqueta del botón que abre la gestión de Perfiles. */
 const val TAG_PERFILES = "abrir-perfiles"
 
+/** Etiqueta del botón que alterna el tema claro/oscuro (S43, E7-T4). */
+const val TAG_TEMA = "alternar-tema"
+
 /** Etiqueta del botón para crear una Colección. */
 const val TAG_NUEVA_COLECCION = "nueva-coleccion"
 
@@ -338,6 +342,7 @@ data class CatalogoAcciones(
     val onDesasociarListaDePerfil: (Long, Long) -> Unit,
     val onAbrirFuentes: () -> Unit,
     val onAbrirGuia: () -> Unit,
+    val onAlternarTema: () -> Unit,
 )
 
 /**
@@ -358,6 +363,7 @@ fun CatalogoScreen(
     perfilesUi: PerfilesUiState,
     recientes: List<HistorialResumen>,
     resultados: LazyPagingItems<CanalBusqueda>,
+    tema: TemaUi,
     acciones: CatalogoAcciones,
 ) {
     var dialogo by remember { mutableStateOf<DialogoCatalogo?>(null) }
@@ -365,11 +371,7 @@ fun CatalogoScreen(
     val focoInicial = remember { FocusRequester() }
     val focoPrimerCanal = remember { FocusRequester() }
     LaunchedEffect(Unit) { focoInicial.requestFocus() }
-    val hayFiltros =
-        criterios.texto.isNotEmpty() ||
-            criterios.grupoId != null ||
-            criterios.soloFavoritos ||
-            criterios.mostrarOcultos
+    val hayFiltros = hayFiltrosActivos(criterios)
     // E7-T3: la rama de layout sigue los breakpoints de ancho de Material en
     // vez de comparar ancho y alto de la pantalla.
     val horizontal = anchoVentana != WindowWidthSizeClass.Compact
@@ -411,6 +413,7 @@ fun CatalogoScreen(
                         listaActiva = listaActiva,
                         recientes = recientes,
                         acciones = acciones,
+                        tema = tema,
                         focoInicial = focoInicial,
                         focoPrimerCanal = focoPrimerCanal,
                         onDialogo = { dialogo = it },
@@ -464,6 +467,7 @@ fun CatalogoScreen(
                         listaActiva = listaActiva,
                         recientes = recientes,
                         acciones = acciones,
+                        tema = tema,
                         focoInicial = focoInicial,
                         focoPrimerCanal = null,
                         onDialogo = { dialogo = it },
@@ -492,6 +496,65 @@ fun CatalogoScreen(
     )
 }
 
+/** True si hay algún criterio de búsqueda activo. */
+private fun hayFiltrosActivos(criterios: CriteriosBusqueda): Boolean =
+    criterios.texto.isNotEmpty() ||
+        criterios.grupoId != null ||
+        criterios.soloFavoritos ||
+        criterios.mostrarOcultos
+
+/** Fila de accesos del catálogo y del toggle de tema (S43, E7-T4). */
+@Composable
+private fun FilaControles(
+    acciones: CatalogoAcciones,
+    tema: TemaUi,
+    onDialogo: (DialogoCatalogo) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TextButton(
+            onClick = { onDialogo(DialogoCatalogo.Colecciones) },
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_COLECCIONES),
+        ) {
+            Text(stringResource(R.string.catalogo_colecciones))
+        }
+        TextButton(
+            onClick = { onDialogo(DialogoCatalogo.Perfiles) },
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_PERFILES),
+        ) {
+            Text(stringResource(R.string.catalogo_perfiles))
+        }
+        TextButton(
+            onClick = acciones.onAbrirFuentes,
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_FUENTES),
+        ) {
+            Text(stringResource(R.string.catalogo_fuentes))
+        }
+        TextButton(
+            onClick = acciones.onAbrirGuia,
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_GUIA),
+        ) {
+            Text(stringResource(R.string.catalogo_guia))
+        }
+        // S43: la etiqueta muestra el tema actual; un toque lo invierte.
+        val etiquetaTema =
+            if (tema == TemaUi.CLARO) {
+                R.string.catalogo_tema_claro
+            } else {
+                R.string.catalogo_tema_oscuro
+            }
+        TextButton(
+            onClick = acciones.onAlternarTema,
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_TEMA),
+        ) {
+            Text(stringResource(etiquetaTema))
+        }
+    }
+}
+
 @Composable
 private fun Controles(
     estado: CatalogoUiState,
@@ -501,6 +564,7 @@ private fun Controles(
     listaActiva: ListaResumen?,
     recientes: List<HistorialResumen>,
     acciones: CatalogoAcciones,
+    tema: TemaUi,
     focoInicial: FocusRequester,
     focoPrimerCanal: FocusRequester?,
     onDialogo: (DialogoCatalogo) -> Unit,
@@ -532,36 +596,7 @@ private fun Controles(
         recientes = recientes,
         onCanal = { reciente -> onDialogo(DialogoCatalogo.AccionesCanal(reciente.aCanalBusqueda())) },
     )
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TextButton(
-            onClick = { onDialogo(DialogoCatalogo.Colecciones) },
-            modifier = Modifier.testTag(TAG_COLECCIONES),
-        ) {
-            Text(stringResource(R.string.catalogo_colecciones))
-        }
-        TextButton(
-            onClick = { onDialogo(DialogoCatalogo.Perfiles) },
-            modifier = Modifier.testTag(TAG_PERFILES),
-        ) {
-            Text(stringResource(R.string.catalogo_perfiles))
-        }
-        TextButton(
-            onClick = acciones.onAbrirFuentes,
-            modifier = Modifier.testTag(TAG_FUENTES),
-        ) {
-            Text(stringResource(R.string.catalogo_fuentes))
-        }
-        TextButton(
-            onClick = acciones.onAbrirGuia,
-            modifier = Modifier.testTag(TAG_GUIA),
-        ) {
-            Text(stringResource(R.string.catalogo_guia))
-        }
-    }
+    FilaControles(acciones = acciones, tema = tema, onDialogo = onDialogo)
     estado.mensaje?.let { codigo ->
         Text(
             text = stringResource(R.string.catalogo_error, codigo),

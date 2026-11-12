@@ -3,9 +3,13 @@ package com.copernicotv.app.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.sp
+import com.copernicotv.core.tema.TemaUi
 import androidx.tv.material3.MaterialTheme as MaterialThemeTv
+import androidx.tv.material3.darkColorScheme as darkColorSchemeTv
+import androidx.tv.material3.lightColorScheme as lightColorSchemeTv
 
 /** Base de la escala de TV: la tipografía por defecto de Material 3. */
 private val tipografiaBase: Typography = Typography()
@@ -38,22 +42,31 @@ val TipografiaTv: Typography =
     )
 
 /**
- * Tema único del canario: oscuro, apto para TV y móvil.
+ * Tema del canario (S43): claro u oscuro, apto para TV y móvil.
  *
  * En TV (E7-T1) la shell vive bajo `androidx.tv.material3.MaterialTheme`
  * (Compose for TV); el contenido sigue en Material 3 para que las pantallas
  * compartidas no cambien, con la escala tipográfica de DC-11 aplicada solo
- * en TV (E7-T2). E7-T4 añadirá el tema claro sin duplicar esta rama.
+ * en TV (E7-T2). El parámetro `tema` (E7-T4) elige el esquema de color en
+ * ambas ramas sin duplicarlas; el default conserva el oscuro previo.
  */
 @Composable
 fun CoperNicoTheme(
     esTv: Boolean,
+    tema: TemaUi = TemaUi.POR_DEFECTO,
     contenido: @Composable () -> Unit,
 ) {
-    MaterialTheme(colorScheme = darkColorScheme()) {
+    val claro = tema == TemaUi.CLARO
+    val esquemaTv =
+        if (claro) {
+            lightColorSchemeTv()
+        } else {
+            darkColorSchemeTv()
+        }
+    MaterialTheme(colorScheme = if (claro) lightColorScheme() else darkColorScheme()) {
         if (esTv) {
             MaterialTheme(typography = TipografiaTv) {
-                MaterialThemeTv { contenido() }
+                MaterialThemeTv(colorScheme = esquemaTv) { contenido() }
             }
         } else {
             contenido()

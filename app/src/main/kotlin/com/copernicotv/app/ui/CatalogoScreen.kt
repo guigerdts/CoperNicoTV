@@ -569,7 +569,7 @@ private fun FilaControles(
         // S47: el borrado de Historial y Favoritos vive aquí, con diálogo y
         // confirmación; cada acción es independiente y conserva la otra.
         TextButton(
-            onClick = { onDialogo(DialogoCatalogo.Privacidad) },
+            onClick = { onDialogo(DialogoCatalogo.Privacidad()) },
             modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_PRIVACIDAD),
         ) {
             Text(stringResource(R.string.catalogo_privacidad))

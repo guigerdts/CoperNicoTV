@@ -5,6 +5,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.HistorialRepositorio
@@ -76,7 +77,7 @@ class S47ProcesoFase1Test {
             runBlocking { db.historialDao().contar() == 1 }
         }
 
-        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performClick()
+        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performScrollTo().performClick()
         composeRule.esperarTag(TAG_BORRAR_HISTORIAL)
         composeRule.onNodeWithTag(TAG_BORRAR_HISTORIAL).performClick()
         composeRule.esperarTag(TAG_CONFIRMAR_BORRAR)

@@ -5,6 +5,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.TAG_ACCESO_RAPIDO
@@ -75,7 +76,7 @@ class S47ProcesoFase2Test {
 
         // S47b desde la UI en el proceso nuevo: los Favoritos también se
         // borran de forma independiente.
-        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performClick()
+        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performScrollTo().performClick()
         composeRule.esperarTag(TAG_BORRAR_FAVORITOS)
         composeRule.onNodeWithTag(TAG_BORRAR_FAVORITOS).performClick()
         composeRule.esperarTag(TAG_CONFIRMAR_BORRAR)

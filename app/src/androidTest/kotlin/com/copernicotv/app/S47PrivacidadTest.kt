@@ -4,6 +4,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.HistorialRepositorio
 import com.copernicotv.app.data.db.AppDatabase
@@ -73,7 +74,7 @@ class S47PrivacidadTest {
         }
 
         // S47a: borrar el Historial conserva el Favorito.
-        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performClick()
+        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performScrollTo().performClick()
         composeRule.esperarTag(TAG_BORRAR_HISTORIAL)
         composeRule.onNodeWithTag(TAG_BORRAR_HISTORIAL).performClick()
         composeRule.esperarTag(TAG_CONFIRMAR_BORRAR)
@@ -96,7 +97,7 @@ class S47PrivacidadTest {
         composeRule.esperarHasta {
             runBlocking { db.historialDao().contar() == 1 }
         }
-        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performClick()
+        composeRule.onNodeWithTag(TAG_PRIVACIDAD).performScrollTo().performClick()
         composeRule.esperarTag(TAG_BORRAR_FAVORITOS)
         composeRule.onNodeWithTag(TAG_BORRAR_FAVORITOS).performClick()
         composeRule.esperarTag(TAG_CONFIRMAR_BORRAR)

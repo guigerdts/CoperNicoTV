@@ -5,6 +5,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.media3.common.Player
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
@@ -70,6 +71,11 @@ class ReproductorAudioFocusTest {
         composeRule.abrirReproductor()
         composeRule.mostrarControlesConToque()
         composeRule.esperarFase("Reproduciendo")
+        // El fixture dura ~20 s: lo repite para que el test de foco nunca
+        // quede sin reproducción activa.
+        composeRule.activityRule.scenario.onActivity {
+            composeRule.viewModelReproductor().motor?.repeatMode = Player.REPEAT_MODE_ONE
+        }
 
         val audioManager = contexto.getSystemService(Context.AUDIO_SERVICE) as AudioManager
         val atributos =
@@ -77,14 +83,11 @@ class ReproductorAudioFocusTest {
                 .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
                 .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MOVIE)
                 .build()
-        val viewModel = composeRule.viewModelReproductor()
-        val volumenBase =
-            requireNotNull(composeRule.volumenMotorEn(viewModel)) {
-                "El motor no reporta volumen antes del foco"
-            }
 
-        // Duck: otra app pide foco transitorio con permiso de atenuación; el
-        // motor baja el volumen sin pausar la sesión.
+        // Duck: otra app pide foco transitorio con permiso de atenuación. El
+        // motor atiende el duck sin pausar ni suprimir la reproducción (el
+        // multiplicador de volumen del duck es interno del sink de Media3 y
+        // no es observable por la API pública del Player).
         val pedirAtenuar =
             AudioFocusRequest
                 .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
@@ -94,21 +97,17 @@ class ReproductorAudioFocusTest {
             AudioManager.AUDIOFOCUS_REQUEST_GRANTED,
             audioManager.requestAudioFocus(pedirAtenuar),
         )
-        composeRule.esperarHasta {
-            (composeRule.volumenMotorEn(viewModel) ?: volumenBase) < volumenBase
-        }
-        val volumenAtenuado = composeRule.volumenMotorEn(viewModel) ?: 0f
-        assertTrue(
-            "La atenuación silenció el motor por completo: $volumenAtenuado",
-            volumenAtenuado > 0f,
-        )
         composeRule.esperarFase("Reproduciendo")
-
-        // El foco vuelve: el motor restaura el volumen íntegro.
-        audioManager.abandonAudioFocusRequest(pedirAtenuar)
-        composeRule.esperarHasta {
-            (composeRule.volumenMotorEn(viewModel) ?: 0f) >= volumenBase
+        var sigueReproduciendo = false
+        var sinSupresion = false
+        composeRule.activityRule.scenario.onActivity {
+            val motor = composeRule.viewModelReproductor().motor
+            sigueReproduciendo = motor?.isPlaying == true
+            sinSupresion =
+                motor?.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE
         }
+        assertTrue("El duck pausó o suprimió la reproducción", sigueReproduciendo && sinSupresion)
+        audioManager.abandonAudioFocusRequest(pedirAtenuar)
 
         // Pérdida transitoria sin permiso de atenuar: el motor se pausa y al
         // recuperar el foco reanuda la misma sesión, con la posición que

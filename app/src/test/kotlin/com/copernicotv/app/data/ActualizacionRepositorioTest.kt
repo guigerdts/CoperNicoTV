@@ -608,7 +608,7 @@ class ActualizacionRepositorioTest {
         const val NOMBRE_BD = "actualizacion-repositorio.db"
         const val TIEMPO_ESPERA_MS = 10_000L
 
-        const val TEXTO_UNO =
+        val TEXTO_UNO =
             """
             #EXTM3U
             #EXTINF:-1 tvg-id="uno" group-title="Noticias",Uno

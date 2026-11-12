@@ -53,6 +53,24 @@ class ReproductorAudioFocusTest {
 
     private lateinit var servidor: ServidorMedios
 
+    /**
+     * Razón del último cambio de `playWhenReady` a pausa. La razón de un
+     * cambio solo es observable por `Player.Listener.onPlayWhenReadyChanged`
+     * (la API pública de `Player` no expone un getter); el oyente se registra
+     * en [iniciarReproduccionEnBucle] y la lectura se hace en el hilo main.
+     */
+    private var razonPausaObservada: Int = -1
+
+    private val oyenteRazon =
+        object : Player.Listener {
+            override fun onPlayWhenReadyChanged(
+                playWhenReady: Boolean,
+                reason: Int,
+            ) {
+                if (!playWhenReady) razonPausaObservada = reason
+            }
+        }
+
     private val contexto: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
@@ -152,10 +170,8 @@ class ReproductorAudioFocusTest {
             audioManager.requestAudioFocus(pedirFoco),
         )
         composeRule.esperarFase("Pausado")
-        var razonPausa: Int? = null
-        composeRule.activityRule.scenario.onActivity {
-            razonPausa = composeRule.viewModelReproductor().motor?.playWhenReadyChangeReason
-        }
+        var razonPausa = -1
+        composeRule.activityRule.scenario.onActivity { razonPausa = razonPausaObservada }
         assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS, razonPausa)
 
         // Aunque la otra app libere el foco, una pérdida permanente no se
@@ -175,10 +191,8 @@ class ReproductorAudioFocusTest {
         composeRule.mostrarControlesConToque()
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_ALTERNAR).performClick()
         composeRule.esperarFase("Pausado")
-        var razonPausa: Int? = null
-        composeRule.activityRule.scenario.onActivity {
-            razonPausa = composeRule.viewModelReproductor().motor?.playWhenReadyChangeReason
-        }
+        var razonPausa = -1
+        composeRule.activityRule.scenario.onActivity { razonPausa = razonPausaObservada }
         assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST, razonPausa)
 
         // Con la pausa voluntaria Media3 liberó el foco: otra app puede
@@ -205,9 +219,12 @@ class ReproductorAudioFocusTest {
         composeRule.abrirReproductor()
         composeRule.esperarFase("Reproduciendo")
         // El fixture dura ~20 s: lo repite para que el test de foco nunca
-        // quede sin reproducción activa.
+        // quede sin reproducción activa. El oyente de razones se registra
+        // aquí porque la razón de una pausa solo es observable por Listener.
         composeRule.activityRule.scenario.onActivity {
-            composeRule.viewModelReproductor().motor?.repeatMode = Player.REPEAT_MODE_ONE
+            val motor = composeRule.viewModelReproductor().motor
+            motor?.repeatMode = Player.REPEAT_MODE_ONE
+            motor?.addListener(oyenteRazon)
         }
         return contexto.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.printToString
+import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase

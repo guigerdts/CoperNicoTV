@@ -5,6 +5,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.io.File
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.nio.file.Files
 
 /**
@@ -47,6 +49,37 @@ class DescargadorHttpTest {
             assertEquals(ResultadoDescarga.Fallo("esquema_no_admitido"), resultado)
             assertFalse(destino.exists())
         }
+
+    /**
+     * D5 (E7-T6): un fallo HTTP con credenciales en la URL no las filtra. El
+     * código del fallo es tipado y nunca incluye la URL ni sus credenciales;
+     * es el mismo valor que termina en la causa visible de Fuentes.
+     */
+    @Test
+    fun `un fallo http con credenciales en la url no las filtra`() {
+        val servidor = com.sun.net.httpserver.HttpServer.create(InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        servidor.createContext("/lista.m3u") { intercambio ->
+            intercambio.sendResponseHeaders(401, -1)
+            intercambio.close()
+        }
+        servidor.start()
+        try {
+            val puerto = servidor.address.port
+            val url = "http://usuario:secreto@127.0.0.1:$puerto/lista.m3u"
+            val destino = destinoTemporal()
+
+            val resultado = runBlocking { DescargadorHttp().descargar(url, destino) }
+
+            assertEquals(ResultadoDescarga.Fallo("http_4xx"), resultado)
+            assertFalse(
+                "El código del fallo filtró credenciales: $resultado",
+                resultado.toString().contains("usuario") || resultado.toString().contains("secreto"),
+            )
+            assertFalse(destino.exists())
+        } finally {
+            servidor.stop(0)
+        }
+    }
 
     private fun destinoTemporal(): File {
         val directorio = Files.createTempDirectory("descargador-test").toFile()

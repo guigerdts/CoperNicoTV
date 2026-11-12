@@ -45,7 +45,14 @@ class ImportacionE2Test {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+        repositorio =
+            CatalogoRepositorio(
+                db,
+                claves,
+                IndiceHmacRepositorio(db, claves),
+                contexto,
+                verificaCleartext = { true },
+            )
     }
 
     @After
@@ -207,7 +214,14 @@ class ImportacionE2Test {
             val primera = repositorio.importar(TEXTO_E2, "Fuente E2", UBICACION)
             assertEquals(1, primera.canales)
             val rapido =
-                CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, TiemposHttp(lecturaMs = 300))
+                CatalogoRepositorio(
+                    db,
+                    claves,
+                    IndiceHmacRepositorio(db, claves),
+                    contexto,
+                    TiemposHttp(lecturaMs = 300),
+                    verificaCleartext = { true },
+                )
             conServidorMudo { url ->
                 val resumen = rapido.importarDesdeUrl("Fuente E2", url)
 
@@ -217,6 +231,57 @@ class ImportacionE2Test {
                 val estado =
                     requireNotNull(db.estadoActualizacionDao().ultimoDeLista(requireNotNull(primera.listaId)))
                 assertEquals("timeout", estado.resultado)
+            }
+        }
+    }
+
+    /** E7-T7: `.invalid` es un TLD reservado (RFC 6761) que nunca resuelve. */
+    @Test
+    fun `un dominio que no resuelve devuelve dns tipado sin escribir`() {
+        runBlocking {
+            val resumen = repositorio.importarDesdeUrl("Fuente E2", "http://lista.prueba.invalid/lista.m3u")
+
+            assertEquals("dns_no_resuelto", resumen.error)
+            assertEquals(0, db.fuenteDao().todas().size)
+        }
+    }
+
+    /** E7-T7: un puerto sin oyente se informa como conexión rechazada. */
+    @Test
+    fun `una conexion rechazada devuelve error tipado sin escribir`() {
+        runBlocking {
+            val servidor = ServerSocket(0)
+            val url = "http://127.0.0.1:${servidor.localPort}/lista.m3u"
+            servidor.close()
+
+            val resumen = repositorio.importarDesdeUrl("Fuente E2", url)
+
+            assertEquals("conexion_rechazada", resumen.error)
+            assertEquals(0, db.fuenteDao().todas().size)
+        }
+    }
+
+    /**
+     * E7-T7: si la política de red bloquea el texto claro, el fallo es
+     * `bloqueo_http` y no se abre conexión (el servidor de prueba no es
+     * atendido por nadie, así que una conexión real colgaría).
+     */
+    @Test
+    fun `una politica que bloquea el texto claro se informa sin conectar`() {
+        runBlocking {
+            val bloqueado =
+                CatalogoRepositorio(
+                    db,
+                    claves,
+                    IndiceHmacRepositorio(db, claves),
+                    contexto,
+                    verificaCleartext = { false },
+                )
+            conServidorConCuerpo(200, TEXTO_E2) { url ->
+                val resumen = bloqueado.importarDesdeUrl("Fuente URL", url)
+
+                assertEquals("bloqueo_http", resumen.error)
+                assertEquals(0, db.fuenteDao().todas().size)
             }
         }
     }

@@ -1,14 +1,17 @@
 package com.copernicotv.app.data.cache
 
+import com.copernicotv.app.data.politicaCleartextPermitida
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 
 /** Resultado de una descarga de transporte. */
 sealed interface ResultadoDescarga {
@@ -39,16 +42,22 @@ fun interface Descargador {
  *
  * Usa `HttpURLConnection` como el resto de la importación de E2 y traduce los
  * fallos a los mismos códigos tipados: `sin_conexion`, `timeout`, `http_4xx`,
- * `http_5xx` y `esquema_no_admitido`. La URL solo se usa para abrir la
- * conexión: no se registra ni se incluye en el código devuelto, porque puede
- * contener credenciales (DC-04).
+ * `http_5xx`, `dns_no_resuelto`, `conexion_rechazada` y `esquema_no_admitido`.
+ * La URL solo se usa para abrir la conexión: no se registra ni se incluye en
+ * el código devuelto, porque puede contener credenciales (DC-04).
  *
  * Solo se admiten `http` y `https`: la caché nunca toca archivos SAF locales,
  * imágenes/logos ni streams (S51c).
+ *
+ * `verificaCleartext` consulta la política de red antes de abrir la conexión
+ * a un host HTTP (E7-T7): si la plataforma bloquea el texto claro, el fallo es
+ * `bloqueo_http` en lugar de la `IOException` genérica. El valor por defecto
+ * es la política real del sistema; las pruebas inyectan la suya.
  */
 class DescargadorHttp(
     private val timeoutConexionMs: Int = TIMEOUT_CONEXION_MS,
     private val timeoutLecturaMs: Int = TIMEOUT_LECTURA_MS,
+    private val verificaCleartext: (String) -> Boolean = ::politicaCleartextPermitida,
 ) : Descargador {
     override suspend fun descargar(
         url: String,
@@ -56,10 +65,17 @@ class DescargadorHttp(
     ): ResultadoDescarga =
         withContext(Dispatchers.IO) {
             if (!esquemaAdmitido(url)) return@withContext ResultadoDescarga.Fallo(ERROR_ESQUEMA)
+            if (esTextoClaro(url) && !verificaCleartext(hostDe(url))) {
+                return@withContext ResultadoDescarga.Fallo(ERROR_BLOQUEO_HTTP)
+            }
             try {
                 conectar(url, destino)
             } catch (_: SocketTimeoutException) {
                 ResultadoDescarga.Fallo(ERROR_TIMEOUT)
+            } catch (_: UnknownHostException) {
+                ResultadoDescarga.Fallo(ERROR_DNS)
+            } catch (_: ConnectException) {
+                ResultadoDescarga.Fallo(ERROR_CONEXION_RECHAZADA)
             } catch (_: IOException) {
                 ResultadoDescarga.Fallo(ERROR_SIN_CONEXION)
             }
@@ -118,6 +134,15 @@ class DescargadorHttp(
     private fun esquemaAdmitido(url: String): Boolean =
         url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)
 
+    /** Un host HTTP en texto claro sujeta a la política de red; HTTPS no. */
+    private fun esTextoClaro(url: String): Boolean = url.startsWith("http://", ignoreCase = true)
+
+    /**
+     * Host de la URL, solo para consultar la política: nunca se registra ni se
+     * incluye en un código de fallo (DC-04).
+     */
+    private fun hostDe(url: String): String = URL(url).host
+
     private companion object {
         const val TIMEOUT_CONEXION_MS = 15_000
         const val TIMEOUT_LECTURA_MS = 30_000
@@ -127,6 +152,9 @@ class DescargadorHttp(
         const val ERROR_TIMEOUT = "timeout"
         const val ERROR_HTTP_4XX = "http_4xx"
         const val ERROR_HTTP_5XX = "http_5xx"
+        const val ERROR_DNS = "dns_no_resuelto"
+        const val ERROR_CONEXION_RECHAZADA = "conexion_rechazada"
+        const val ERROR_BLOQUEO_HTTP = "bloqueo_http"
         const val ERROR_ESQUEMA = "esquema_no_admitido"
     }
 }

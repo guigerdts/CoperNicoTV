@@ -17,7 +17,11 @@ import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
 import com.copernicotv.core.identity.EstadoCanal
 import com.copernicotv.core.m3u.ImportadorM3U
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -29,6 +33,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.net.ServerSocket
+import java.net.Socket
 import java.time.Instant
 
 /**
@@ -395,6 +401,158 @@ class ActualizacionRepositorioTest {
         }
     }
 
+    // ===== E7-T7: transporte HTTP de la Actualización =====
+
+    /**
+     * Sembrado de una Lista de esquema `http` con la ubicación cifrada como
+     * en producción: la lectura HTTP descifra la URL y abre la conexión.
+     */
+    private suspend fun sembrarListaHttp(url: String): Long {
+        val ahora = Instant.parse("2026-01-01T00:00:00Z")
+        return db.listaDao().insertar(
+            ListaEntity(
+                fuenteId = fuenteId,
+                nombre = "Lista HTTP",
+                ubicacionCifrada =
+                    CifradoAes.cifrar(
+                        claves.claveAes,
+                        CifradoAes.aad("Lista", "ubicacion_cifrada"),
+                        url.toByteArray(),
+                    ),
+                ubicacionHmac = ByteArray(32),
+                esquema = "http",
+                orden = 1,
+                estado = "activa",
+                creadoEn = ahora,
+                actualizadoEn = ahora,
+            ),
+        )
+    }
+
+    /** E7-T7: una Lista `http` se actualiza de extremo a extremo contra un servidor local. */
+    @Test
+    fun `la actualizacion de una lista http local importa el cuerpo`() {
+        runBlocking {
+            conServidorConCuerpo(TEXTO_UNO) { url ->
+                val listaHttp = sembrarListaHttp(url)
+                val http = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, verificaCleartext = { true })
+
+                val resumen = http.actualizarLista(listaHttp)
+
+                assertEquals("completada", resumen.resultado)
+                assertNotNull("el canal de la lista http quedó reconciliado", db.canalDao().porTvgId(fuenteId, "uno"))
+            }
+        }
+    }
+
+    /** `.invalid` es un TLD reservado (RFC 6761) que nunca resuelve. */
+    @Test(timeout = 30_000)
+    fun `un dominio que no resuelve devuelve dns tipado`() {
+        runBlocking {
+            val listaHttp = sembrarListaHttp("http://lista.prueba.invalid/lista.m3u")
+            val http = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, verificaCleartext = { true })
+
+            val resumen = http.actualizarLista(listaHttp)
+
+            assertEquals("fallida", resumen.resultado)
+            assertEquals("dns_no_resuelto", resumen.error)
+        }
+    }
+
+    /** Un puerto sin oyente se informa como conexión rechazada. */
+    @Test
+    fun `una conexion rechazada devuelve error tipado`() {
+        runBlocking {
+            val servidor = ServerSocket(0)
+            val url = "http://127.0.0.1:${servidor.localPort}/lista.m3u"
+            servidor.close()
+            val listaHttp = sembrarListaHttp(url)
+            val http = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, verificaCleartext = { true })
+
+            val resumen = http.actualizarLista(listaHttp)
+
+            assertEquals("fallida", resumen.resultado)
+            assertEquals("conexion_rechazada", resumen.error)
+        }
+    }
+
+    /**
+     * Con la política bloqueada el fallo es `bloqueo_http` y no se abre
+     * conexión: el socket queda en escucha sin atender y una conexión real
+     * colgaría en el timeout de lectura.
+     */
+    @Test
+    fun `una politica que bloquea el texto claro se informa sin conectar`() {
+        runBlocking {
+            val servidor = ServerSocket(0)
+            try {
+                val listaHttp = sembrarListaHttp("http://127.0.0.1:${servidor.localPort}/lista.m3u")
+                val bloqueado =
+                    ActualizacionRepositorio(
+                        db,
+                        claves,
+                        IndiceHmacRepositorio(db, claves),
+                        contexto,
+                        verificaCleartext = { false },
+                    )
+
+                val resumen = bloqueado.actualizarLista(listaHttp)
+
+                assertEquals("fallida", resumen.resultado)
+                assertEquals("bloqueo_http", resumen.error)
+            } finally {
+                servidor.close()
+            }
+        }
+    }
+
+    /** Servidor HTTP de un solo uso que responde 200 con [cuerpo] y cierra. */
+    private suspend fun conServidorConCuerpo(
+        cuerpo: String,
+        bloque: suspend (String) -> Unit,
+    ) {
+        val servidor = ServerSocket(0)
+        coroutineScope {
+            val respuesta =
+                async(Dispatchers.IO) {
+                    runCatching {
+                        servidor.use { escucha ->
+                            escucha.accept().use { socket -> responderConCuerpo(socket, cuerpo) }
+                        }
+                    }
+                }
+            try {
+                bloque("http://127.0.0.1:${servidor.localPort}/lista.m3u")
+            } finally {
+                servidor.close()
+                withTimeoutOrNull(TIEMPO_ESPERA_MS) { respuesta.await() }
+            }
+        }
+    }
+
+    private fun responderConCuerpo(
+        socket: Socket,
+        cuerpo: String,
+    ) {
+        socket.soTimeout = TIEMPO_ESPERA_MS.toInt()
+        val lector = socket.getInputStream().bufferedReader(Charsets.ISO_8859_1)
+        var linea = lector.readLine()
+        while (linea != null && linea.isNotEmpty()) {
+            linea = lector.readLine()
+        }
+        val bytes = cuerpo.toByteArray(Charsets.UTF_8)
+        val cabecera =
+            "HTTP/1.1 200 Prueba\r\n" +
+                "Content-Type: audio/x-mpegurl; charset=utf-8\r\n" +
+                "Content-Length: ${bytes.size}\r\n" +
+                "Connection: close\r\n\r\n"
+        socket.getOutputStream().apply {
+            write(cabecera.toByteArray(Charsets.ISO_8859_1))
+            write(bytes)
+            flush()
+        }
+    }
+
     private suspend fun actualizar(
         texto: String,
         causa: String = CausasActualizacion.MANUAL,
@@ -448,5 +606,13 @@ class ActualizacionRepositorioTest {
 
     private companion object {
         const val NOMBRE_BD = "actualizacion-repositorio.db"
+        const val TIEMPO_ESPERA_MS = 10_000L
+
+        const val TEXTO_UNO =
+            """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="uno" group-title="Noticias",Uno
+            https://example.com/uno
+            """.trimIndent()
     }
 }

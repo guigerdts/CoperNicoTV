@@ -34,9 +34,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.time.Instant
 import javax.inject.Inject
@@ -74,6 +76,7 @@ class ActualizacionRepositorio
         private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
+        private val verificaCleartext: (String) -> Boolean = ::politicaCleartextPermitida,
     ) {
         private val io = Dispatchers.IO
         private val escritorCanales = CanalEscritor(db)
@@ -573,6 +576,9 @@ class ActualizacionRepositorio
             ubicacion: String,
             sello: SelloIndiceHmac.Disponible,
         ): Lectura {
+            if (ubicacion.startsWith("http://", ignoreCase = true) && !verificaCleartext(URL(ubicacion).host)) {
+                return Lectura.Fallo(ERROR_BLOQUEO_HTTP)
+            }
             val conexion =
                 URL(ubicacion).openConnection() as? HttpURLConnection
                     ?: return Lectura.Fallo(ERROR_SIN_CONEXION)
@@ -597,6 +603,10 @@ class ActualizacionRepositorio
                 }
             } catch (_: SocketTimeoutException) {
                 Lectura.Fallo(ERROR_TIMEOUT)
+            } catch (_: UnknownHostException) {
+                Lectura.Fallo(ERROR_DNS)
+            } catch (_: ConnectException) {
+                Lectura.Fallo(ERROR_CONEXION_RECHAZADA)
             } catch (_: IOException) {
                 Lectura.Fallo(ERROR_SIN_CONEXION)
             } finally {
@@ -706,6 +716,9 @@ class ActualizacionRepositorio
             const val ERROR_TIMEOUT = "timeout"
             const val ERROR_HTTP_4XX = "http_4xx"
             const val ERROR_HTTP_5XX = "http_5xx"
+            const val ERROR_DNS = "dns_no_resuelto"
+            const val ERROR_CONEXION_RECHAZADA = "conexion_rechazada"
+            const val ERROR_BLOQUEO_HTTP = "bloqueo_http"
             const val ERROR_INDICE_HMAC_NO_OPERATIVO = "indice_hmac_no_operativo"
             const val ERROR_SIN_CANALES = "sin_canales"
             const val ERROR_ACTUALIZACION_FALLIDA = "actualizacion_fallida"

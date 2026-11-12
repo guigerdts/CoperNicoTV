@@ -331,7 +331,11 @@ class DescargadorHttpTest {
         fabricaClaves.init(keystorePrueba(), CLAVE_ALMACEN.toCharArray())
         val contexto = SSLContext.getInstance("TLS")
         contexto.init(fabricaClaves.keyManagers, null, null)
-        return contexto.serverSocketFactory.createServerSocket(0, 0, InetAddress.getLoopbackAddress())
+        // Backlog real: con cola 0, un SYN que llega antes de que la corrutina
+        // de accept() arranque es rechazado por el kernel y el cliente ve
+        // `conexion_rechazada`. El mismo backlog por defecto (50) usan los
+        // helpers de `ServerSocket` de esta clase.
+        return contexto.serverSocketFactory.createServerSocket(0, 50, InetAddress.getLoopbackAddress())
             as SSLServerSocket
     }
 

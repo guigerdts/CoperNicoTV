@@ -39,6 +39,8 @@ jobs:
           path: |
             core/build/reports/tests/
             app/build/reports/tests/
+            core/build/test-results/test/**/*.xml
+            app/build/test-results/testDebugUnitTest/**/*.xml
           if-no-files-found: ignore
 
   static-analysis:

@@ -198,6 +198,7 @@ class DescargadorHttpTest {
                 val destino = destinoTemporal()
 
                 val resultado = DescargadorHttp { true }.descargar(url, destino)
+                println("DIAG-TLS rechazo: url=$url resultado=$resultado")
 
                 assertEquals(ResultadoDescarga.Fallo("sin_conexion"), resultado)
                 assertFalse(destino.exists())
@@ -216,6 +217,7 @@ class DescargadorHttpTest {
                 val destino = destinoTemporal()
 
                 val resultado = DescargadorHttp { true }.descargar(url, destino)
+                println("DIAG-TLS confianza: url=$url resultado=$resultado")
 
                 assertEquals(
                     ResultadoDescarga.Ok(CUERPO_M3U.toByteArray(Charsets.UTF_8).size.toLong()),
@@ -272,16 +274,28 @@ class DescargadorHttpTest {
     /** Servidor HTTPS con el certificado del fixture; el cliente no lo confía. */
     private suspend fun conServidorTls(bloque: suspend (String) -> Unit) {
         val servidor = servidorTls()
+        println(
+            "DIAG-TLS servidor: puerto=${servidor.localPort} addr=${servidor.inetAddress} " +
+                "bound=${servidor.isBound} closed=${servidor.isClosed}",
+        )
         coroutineScope {
             val respuesta =
                 async(Dispatchers.IO) {
                     runCatching {
-                        servidor.use { it.accept().use { socket -> responder(socket, 200, CUERPO_M3U) } }
-                    }
+                        println("DIAG-TLS accept: esperando")
+                        servidor.use { s ->
+                            s.accept().use { socket ->
+                                println("DIAG-TLS accept: conexion aceptada de ${socket.inetAddress}")
+                                responder(socket, 200, CUERPO_M3U)
+                                println("DIAG-TLS accept: respondido")
+                            }
+                        }
+                    }.onFailure { println("DIAG-TLS accept: EXCEPCION ${it::class.java.name}: ${it.message}") }
                 }
             try {
                 // El host de la URL debe coincidir con el certificado del fixture
                 // (`CN=localhost`); con una IP la verificación de hostname fallaría.
+                println("DIAG-TLS pre-bloque: puerto=${servidor.localPort} closed=${servidor.isClosed}")
                 bloque("https://localhost:${servidor.localPort}/lista.m3u")
             } finally {
                 servidor.close()
@@ -302,6 +316,10 @@ class DescargadorHttpTest {
      */
     private suspend fun conServidorTlsDeConfianza(bloque: suspend (String) -> Unit) {
         val servidor = servidorTls()
+        println(
+            "DIAG-TLS-CONFIANZA servidor: puerto=${servidor.localPort} addr=${servidor.inetAddress} " +
+                "bound=${servidor.isBound} closed=${servidor.isClosed}",
+        )
         val fabricaConfianza = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
         fabricaConfianza.init(keystorePrueba())
         val contextoCliente = SSLContext.getInstance("TLS")
@@ -313,14 +331,23 @@ class DescargadorHttpTest {
                 val respuesta =
                     async(Dispatchers.IO) {
                         runCatching {
-                            servidor.use { it.accept().use { socket -> responder(socket, 200, CUERPO_M3U) } }
-                        }
+                            println("DIAG-TLS-CONFIANZA accept: esperando")
+                            servidor.use { s ->
+                                s.accept().use { socket ->
+                                    println("DIAG-TLS-CONFIANZA accept: conexion aceptada de ${socket.inetAddress}")
+                                    responder(socket, 200, CUERPO_M3U)
+                                    println("DIAG-TLS-CONFIANZA accept: respondido")
+                                }
+                            }
+                        }.onFailure { println("DIAG-TLS-CONFIANZA accept: EXCEPCION ${it::class.java.name}: ${it.message}") }
                     }
                 try {
                     // Igual que en [conServidorTls]: el host de la URL debe
                     // coincidir con el certificado del fixture.
+                    println("DIAG-TLS-CONFIANZA pre-bloque: puerto=${servidor.localPort} closed=${servidor.isClosed}")
                     bloque("https://localhost:${servidor.localPort}/lista.m3u")
                 } finally {
+                    println("DIAG-TLS-CONFIANZA post-bloque: puerto=${servidor.localPort} closed=${servidor.isClosed}")
                     servidor.close()
                     withTimeoutOrNull(TIEMPO_ESPERA_MS) { respuesta.await() }
                 }

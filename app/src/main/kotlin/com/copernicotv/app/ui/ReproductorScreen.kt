@@ -332,6 +332,14 @@ private fun SuperficieReproductor(
         }
         diagnosticoPrevio = diagnosticoAbierto
     }
+
+    // E7-T1: al abrir la pantalla reproductora, el foco vuelve a un solo nodo
+    // determinista. Sin esta petición, el D-pad entra sin foco y se pierde al
+    // cambiar de pantalla; se pide solo en la primera composición y no
+    // interfiere con la restauración del panel de diagnóstico.
+    LaunchedEffect(Unit) {
+        runCatching { enfoqueRaiz.requestFocus() }
+    }
     val acciones =
         accionesReproductor(
             revelar = revelar,
@@ -697,8 +705,6 @@ private fun BoxScope.BarraInferior(
         }
     }
 }
-
-/** Aviso persistente de preferencia guardada que el contenido no ofrece (S44d). */
 
 @Composable
 private fun FilaProgreso(

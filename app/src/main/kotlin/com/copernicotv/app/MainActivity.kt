@@ -26,6 +26,7 @@ import com.copernicotv.app.ui.GuiaScreen
 import com.copernicotv.app.ui.GuiaViewModel
 import com.copernicotv.app.ui.PerfilesUiState
 import com.copernicotv.app.ui.ReproductorScreen
+import com.copernicotv.app.ui.recordarEsTv
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -44,7 +45,7 @@ class MainActivity : ComponentActivity() {
         // proceso, así que una recreación de la Activity no la repite.
         inicializador.iniciar()
         setContent {
-            CoperNicoTheme {
+            CoperNicoTheme(esTv = recordarEsTv()) {
                 var pantalla by rememberSaveable { mutableStateOf(Pantalla.CATALOGO) }
                 var canalReproduciendo by rememberSaveable { mutableStateOf(-1L) }
                 when (pantalla) {

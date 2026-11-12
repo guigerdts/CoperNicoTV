@@ -169,15 +169,25 @@ jobs:
           arch: x86
           profile: tv_1080p
           disable-animations: true
-          script: >-
-            ./gradlew :app:connectedDebugAndroidTest
-            -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest
+          # El runner ejecuta cada línea del script en una shell separada: las
+          # variables no sobreviven entre líneas y por eso el bloque va en una
+          # sola línea física (`;` en vez de saltos), que preserva el código de
+          # salida real de Gradle aunque las capturas fallen en el pull.
+          script: |
+            ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.copernicotv.app.CanarioTvTest,com.copernicotv.app.ShellFocoTvTest,com.copernicotv.app.ReproductorTvTest,com.copernicotv.app.ReproductorPistasTvTest,com.copernicotv.app.ReproductorReintentosTvTest,com.copernicotv.app.ReproductorPreferenciasTvTest,com.copernicotv.app.ReproductorDiagnosticoTvTest,com.copernicotv.app.ReproductorZapeoTvTest,com.copernicotv.app.ReproductorProtocolosTvTest ; codigo=$? ; (adb shell ls /sdcard/Pictures/capturas-p2/ || true) ; rm -rf capturas-p2 ; (adb pull /sdcard/Pictures/capturas-p2 ./capturas-p2 || echo "Sin capturas E7-T1 en el emulador") ; (ls -la capturas-p2 || true) ; exit $codigo
       - name: Publicar reportes instrumentados de TV
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: reportes-instrumented-tv
           path: app/build/reports/androidTests/
+          if-no-files-found: ignore
+      - name: Publicar capturas P2 del shell de TV
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-p2-tv
+          path: capturas-p2/
           if-no-files-found: ignore
 
   p1-performance:

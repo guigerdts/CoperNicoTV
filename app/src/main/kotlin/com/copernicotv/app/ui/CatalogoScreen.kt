@@ -1733,6 +1733,11 @@ private fun DialogoAccionesCanal(
     onCerrar: () -> Unit,
 ) {
     val nombre = canal.nombre ?: stringResource(R.string.catalogo_sin_nombre)
+    // En TV el diálogo no toma foco por sí solo y la pantalla queda sin foco
+    // visible al cambiar de superficie; la primera acción (Reproducir) lo
+    // toma al componerse, con el mismo patrón del foco inicial del catálogo
+    // y del reproductor (E7-T1).
+    val enfoqueReproducir = remember { FocusRequester() }
     AlertDialog(
         onDismissRequest = onCerrar,
         title = { Text(stringResource(R.string.catalogo_acciones_canal, nombre)) },
@@ -1741,9 +1746,14 @@ private fun DialogoAccionesCanal(
                 modifier = Modifier.width(320.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
+                LaunchedEffect(Unit) { enfoqueReproducir.requestFocus() }
                 TextButton(
                     onClick = onReproducir,
-                    modifier = Modifier.fillMaxWidth().testTag(TAG_ACCION_REPRODUCIR),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .focusRequester(enfoqueReproducir)
+                            .testTag(TAG_ACCION_REPRODUCIR),
                 ) {
                     Text(stringResource(R.string.catalogo_reproducir))
                 }

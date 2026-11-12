@@ -1099,6 +1099,8 @@ continúa no soportado (L70). E6-T2 está **cerrada en el alcance A–D autoriza
 
 **Estado E7-T2** — implementación y cobertura automatizada completas; no se declara cerrada porque la revisión visual humana a 10 pies sigue pendiente. Entregado: tipografía de TV conforme a DC-11 (`TipografiaTv`, override solo en la rama TV de `CoperNicoTheme`, con la base declarada antes porque las propiedades top-level se inicializan en orden de declaración), área de foco de tarjeta de canal ≥ 56 dp y canario `CanarioFocoDpadTvTest` con recorrido D-pad puro Importar → canal-0 (límite 30 presiones, un solo foco en cada paso) y diagnóstico compacto de secuencia de foco (tags visitados, sobrevive al límite de tamaño del log de instrumentation). Dos hallazgos de D-pad corregidos en el catálogo: el buscador de una línea consume D-pad Abajo/Arriba y atrapaba el foco (intercepción `onPreviewKeyEvent` con `moveFocus`) y en el layout TV de dos paneles el Abajo desde el último control no cruza al panel derecho (`focusProperties { down }` en Nuevo Canal + `focusRequester` anclado a canal-0; en móvil retrato no cambia nada). Verificación dura: corrida `43063200085` en `c0b0f7c` — 5/5 jobs verdes (`instrumented-tv` con `CanarioFocoDpadTvTest` incluido, móvil, `static-analysis`, `jvm-tests`, `apk`). Capturas P2 reproducibles agregadas al artifact `capturas-p2-tv`: `e7t2-catalogo-canal0.png` y `e7t2-catalogo-regreso.png` (1920×1080).
 
+**Estado E7-T3** — implementación y cobertura automatizada completas; no se declara cerrada porque la revisión visual humana de la captura móvil sigue pendiente. Entregado: edge-to-edge con insets respetados en las pantallas raíz (`enableEdgeToEdge` en `MainActivity` + padding de insets en Catálogo, Fuentes y Guía), rama de catálogo por window size class (compacto: panel único con columna de controles acotada y scrollable; expansivo/TV: dos paneles ya existentes), back predictivo habilitado en el manifest (`android:enableOnBackInvokedCallback`) y medición DC-11 táctil móvil: filas clicables, chips y botón Nuevo canal con `heightIn(min = 48.dp)`, canario `MedicionTouchMovilTest` (importa fixture, mide canal-0/1, buscador, filtro-todos y nuevo-canal, separación canal-0↔canal-1) con captura P2 reproducible. Tres hallazgos de CI corregidos por causa: (1) el padding raíz y el tope de controles consumían el teclado vía `safeDrawing` — con el IME abierto el catálogo colapsaba y los chips quedaban superpuestos con la lista; el padding quedó por caras sin IME (`safeDrawing` Horizontal+Top y `navigationBars` Bottom encadenados — el operador `+` entre `WindowInsets` no existe en esta versión de Compose) y el tope descuenta solo `systemBars` (bajo edge-to-edge `screenHeightDp` ya excluye las barras: el doble descuento recortaba 14 px el último control); (2) la medición usaba `boundsInRoot`, que aplica el clipping del contenedor scrollable y medía la porción visible bajo el pliegue (112 px = 42,67 dp) en vez del target asignado; se mide `positionInRoot`+`size` (sin clipping) porque el control scrollea a la vista con su target completo. Mediciones registradas (densidad 2,625): canal-0/1 339×56 dp, buscador 363×64 dp, filtro-todos 70,5×48 dp, nuevo-canal 125×48 dp, separación canal-0↔canal-1 16,4 dp (≥ 8). Verificación dura: corrida `43128632588` en `5604ced` — 5/5 jobs verdes (`apk`, `static-analysis`, `instrumented-tv`, `jvm-tests`, `instrumented-mobile` con el canario de medición incluido). Captura P2 publicada como artifact `capturas-p2-movil` (`e7t3-catalogo-tactil-movil.png`, 1080×1920), verificada por descarga; en ella el borde inferior de «Nuevo canal» roza el pliegue del tope (los 14 px medidos) — observación para la revisión visual humana, que sigue pendiente.
+
 ## 9. Criterios de aceptación
 
 ### 9.1 Criterios globales
@@ -4785,3 +4787,43 @@ pies sigue pendiente: DC-11 y E7-T2 no se declaran cerrados. Lección de proceso
 `esperarHasta` de `AyudasReproductor.kt` en vez de reimplementar `waitUntil` (el import
 top-level de `waitUntil` no existe en esta versión de Compose test) y liberar RAM antes de
 cada commit o code review porque el warm GGA cuelga el servidor Termux.
+
+### L88 — E7-T3: adaptación móvil, insets edge-to-edge, DC-11 táctil y captura P2 (2026-11-12)
+
+E7-T3 implementado en `e7-t3-movil` sobre el tip de E7-T2 (`ce82609`). Entregado:
+edge-to-edge en `MainActivity` e insets respetados en las pantallas raíz (Catálogo, Fuentes,
+Guía) con `enableEdgeToEdge` + padding de insets; rama de catálogo por window size class
+(compacto: panel único con columna de controles acotada a `altoMaximoControles` y
+scrollable; expansivo/TV: dos paneles); back predictivo en el manifest
+(`android:enableOnBackInvokedCallback`); área táctil DC-11: filas clicables, chips y botón
+Nuevo canal a `heightIn(min = 48.dp)`; canario de medición `MedicionTouchMovilTest` con
+captura P2 reproducible. Hallazgos de CI corregidos uno por causa: (1) dependencia y paso
+del window size class al catálogo (`6e36de6`); (2) `TouchBoundsInRoot` no existe en compose
+ui 1.7 — `boundsInRoot` público (`8d50216`); (3) altura mínima 48 dp en chips y botón
+(`2140884`, `7ca8f83`); (4) el padding raíz y el tope de controles consumían el IME vía
+`safeDrawing`: con el teclado abierto el catálogo colapsaba y los chips quedaban bajo el
+pliegue superpuestos con la lista — el padding quedó en dos `windowInsetsPadding`
+encadenados con caras disjuntas (`safeDrawing` Horizontal+Top y `navigationBars` Bottom)
+porque ni el operador `+` entre `WindowInsets` ni su import
+`androidx.compose.foundation.layout.plus` existen en esta versión de Compose
+(`579bc16`, `5974e5e`, `37e7a9b`, `7345f75`), y el tope descuenta solo `systemBars`
+(`a3066bf`): bajo edge-to-edge `screenHeightDp` ya excluye las barras (683 dp de ventana
+decor-fitted sobre 731 de pantalla) y el doble descuento dejaba el tope en 479 dp,
+recortando 14 px del último control; (5) `boundsInRoot` aplica el clipping del contenedor
+scrollable: la medición midió 112 px (42,67 dp) de porción visible del botón bajo el
+pliegue en vez del target asignado de 126 px — la medición quedó con
+`positionInRoot`+`size` (sin clipping) porque el control scrollea a la vista con su target
+completo (`cfab6d3`). Diagnóstico con dumps de árbol temporales: el de filtros se revertió
+(`88f3c5b` → `5604ced`); el del mensaje de fallo de medición se conserva por ser solo
+informativo y seguir el patrón de `esperarCanales`. Verificación dura: corrida
+`43128632588` en `5604ced` — 5/5 jobs verdes. Mediciones DC-11 (densidad 2,625):
+canal-0/1 890×147 px = 339×56 dp; buscador 954×168 px = 363×64 dp; filtro-todos 185×126 px
+= 70,5×48 dp; nuevo-canal 328×126 px = 125×48 dp; separación canal-0↔canal-1 43 px =
+16,4 dp (≥ 8). Artifact `capturas-p2-movil` verificado por descarga (`e7t3-catalogo-tactil-movil.png`,
+1080×1920): el borde inferior de «Nuevo canal» roza el pliegue del tope (los 14 px
+medidos), observación para la revisión visual humana que sigue pendiente — E7-T3 no se
+declara cerrado. Lecciones: las validaciones locales (ktlint, detekt, `:core:test`) no
+compilan `:app/main`, así que conviene verificar a mano que todo operador/extensión de
+Compose existe en la versión del proyecto antes de pushear; y liberar RAM antes de cada
+commit/review porque el warm GGA devolvió salida ambigua 6/6 por flakiness del proveedor
+(el commit directo ejecuta el mismo gate como hook).

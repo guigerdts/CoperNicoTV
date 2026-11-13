@@ -73,6 +73,9 @@ data class ResultadoImportacion(
  * reporta y nunca se resuelve por posición.
  */
 object AgrupadorImportacion {
+    /** Frecuencia del avance opcional durante la canonización. */
+    private const val LOTE_AVANCE = 1000
+
     private data class Canonica(
         val ordinal: Int,
         val nombre: String?,
@@ -87,10 +90,19 @@ object AgrupadorImportacion {
         val atributosExtra: List<AtributoExtra>,
     )
 
-    /** Agrupa [declaraciones] en Canales y Apariencias. */
+    /**
+     * Agrupa [declaraciones] en Canales y Apariencias.
+     *
+     * [alAvance], si se aporta, recibe el total de declaraciones procesadas
+     * (canonizadas) hasta el momento y se invoca cada [LOTE_AVANCE] entradas;
+     * puede lanzar `CancellationException` para abortar de forma cooperativa.
+     * Los llamadores existentes no lo pasan y conservan el comportamiento
+     * previo.
+     */
     fun agrupar(
         declaraciones: List<DeclaracionCanal>,
         campoUrl: CampoUrl = CampoUrl.CANAL_URL_STREAM,
+        alAvance: ((declaracionesProcesadas: Int) -> Unit)? = null,
     ): ResultadoImportacion {
         val rechazadas = mutableListOf<DeclaracionRechazada>()
         val canonicas = mutableListOf<Canonica>()
@@ -123,6 +135,12 @@ object AgrupadorImportacion {
                         )
                 }
             }
+            if (alAvance != null && (ordinal + 1) % LOTE_AVANCE == 0) {
+                alAvance(ordinal + 1)
+            }
+        }
+        if (alAvance != null && declaraciones.size % LOTE_AVANCE != 0) {
+            alAvance(declaraciones.size)
         }
 
         val deduplicadas = deduplicarExactas(canonicas)

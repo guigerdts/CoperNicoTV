@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.util.Log
 import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
@@ -23,12 +24,16 @@ import com.copernicotv.core.identity.ResultadoCanonizacion
 import com.copernicotv.core.m3u.CanalImportadoM3U
 import com.copernicotv.core.m3u.CodecAtributosExtra
 import com.copernicotv.core.m3u.ImportadorM3U
+import com.copernicotv.core.m3u.LimitesParserM3U
+import com.copernicotv.core.m3u.ParserM3U
 import com.copernicotv.core.m3u.ResultadoImportacionM3U
+import com.copernicotv.core.m3u.ResultadoParserM3U
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.InputStream
 import java.net.ConnectException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
@@ -46,6 +51,8 @@ data class ResumenImportacion(
     val error: String? = null,
     /** Códigos de diagnóstico del parser, agregados y sin datos de la lista. */
     val diagnosticos: List<String> = emptyList(),
+    /** Diagnóstico técnico de la descarga y la persistencia, sin datos sensibles. */
+    val diagnostico: DiagnosticoImportacion? = null,
 )
 
 /**
@@ -138,10 +145,14 @@ class CatalogoRepositorio
          * La descarga y el parseo ocurren antes de abrir la transacción: un
          * timeout, un 4xx/5xx o una respuesta vacía devuelven un error tipado
          * sin tocar el catálogo ya persistido.
+         *
+         * [alFase] informa el progreso con fases reales; se invoca desde el
+         * hilo de E/S y nunca lleva datos de la lista ni de la ubicación.
          */
         suspend fun importarDesdeUrl(
             nombreFuente: String,
             url: String,
+            alFase: (FaseImportacion) -> Unit = {},
         ): ResumenImportacion =
             withContext(io) {
                 val canonica = canonicalizar(url)
@@ -154,11 +165,22 @@ class CatalogoRepositorio
                 val sello =
                     indice.selloHmac() as? SelloIndiceHmac.Disponible
                         ?: return@withContext ResumenImportacion(null, 0, 0, ERROR_INDICE_HMAC_NO_OPERATIVO)
-                when (val descarga = descargar(canonica.urlCanonica, sello)) {
-                    is Descarga.Ok -> persistir(nombreFuente, url, canonica, descarga.importado, sello)
+                when (val descarga = descargar(canonica.urlCanonica, alFase)) {
+                    is Descarga.Ok -> {
+                        alFase(FaseImportacion.PROCESANDO)
+                        val inicioProceso = System.currentTimeMillis()
+                        val importado = ImportadorM3U.importar(descarga.parseo, sello.clave, sello.generacion)
+                        val diagnostico =
+                            descarga.diagnostico.copy(
+                                entradasDetectadas = descarga.parseo.entradas.size,
+                                tiempoProcesamientoMs = System.currentTimeMillis() - inicioProceso,
+                            )
+                        persistir(nombreFuente, url, canonica, importado, sello, diagnostico, alFase)
+                    }
                     is Descarga.Fallo -> {
                         registrarFallo(nombreFuente, descarga.codigo)
-                        ResumenImportacion(null, 0, 0, descarga.codigo)
+                        logDiagnostico(descarga.diagnostico, descarga.codigo)
+                        ResumenImportacion(null, 0, 0, descarga.codigo, diagnostico = descarga.diagnostico)
                     }
                 }
             }
@@ -255,91 +277,162 @@ class CatalogoRepositorio
             canonica: ResultadoCanonizacion.Ok,
             importado: ResultadoImportacionM3U,
             sello: SelloIndiceHmac.Disponible,
+            diagnostico: DiagnosticoImportacion = DiagnosticoImportacion(),
+            alFase: (FaseImportacion) -> Unit = {},
         ): ResumenImportacion {
             val diagnosticos = importado.diagnosticos.map { it.codigo.codigo }
             if (importado.canales.isEmpty()) {
                 val error = importado.errores.firstOrNull()?.codigo?.codigo ?: ERROR_SIN_CANALES
                 registrarFallo(nombreFuente, error)
+                logDiagnostico(diagnostico.copy(motivo = error), error)
                 return ResumenImportacion(
                     null,
                     0,
                     importado.rechazadas.size,
                     error,
                     diagnosticos,
+                    diagnostico.copy(motivo = error),
                 )
             }
+            alFase(FaseImportacion.GUARDANDO)
+            val inicioGuardado = System.currentTimeMillis()
             val persistida =
                 try {
                     db.withTransaction {
                         val existente = listaExistente(nombreFuente)
-                        if (existente != null) {
-                            registrarIntento(existente.id, RESULTADO_SIN_CAMBIOS)
-                            existente
-                        } else {
-                            escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales, sello)
-                        }
+                        val ahora = Instant.now()
+                        val lista =
+                            if (existente != null) {
+                                registrarIntento(existente.id, RESULTADO_SIN_CAMBIOS)
+                                existente
+                            } else {
+                                escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales, sello)
+                            }
+                        // La Lista importada queda como única activa, también
+                        // cuando ya existía: reintentar o repetir la importación
+                        // debe mostrar su catálogo (E7-T7, S5/S12).
+                        db.listaDao().desactivarTodas()
+                        db.listaDao().activar(lista.id, ahora)
+                        lista
                     }
                 } catch (rechazo: ImportacionRechazada) {
                     registrarFallo(nombreFuente, rechazo.codigo)
+                    val codigo = rechazo.codigo
+                    logDiagnostico(diagnostico.copy(motivo = codigo), codigo)
                     return ResumenImportacion(
                         null,
                         0,
                         importado.rechazadas.size,
-                        rechazo.codigo,
+                        codigo,
                         diagnosticos,
+                        diagnostico.copy(motivo = codigo),
                     )
                 }
+            val final =
+                diagnostico.copy(
+                    canalesPersistidos = persistida.canales,
+                    tiempoGuardadoMs = System.currentTimeMillis() - inicioGuardado,
+                )
+            logDiagnostico(final, RESULTADO_COMPLETADA)
             return ResumenImportacion(
                 persistida.id,
                 persistida.canales,
                 importado.rechazadas.size,
                 null,
                 diagnosticos,
+                final,
             )
         }
 
         private fun canonicalizar(ubicacion: String): ResultadoCanonizacion.Ok? =
             CanonicalizadorUrl.canonizar(ubicacion, CampoUrl.LISTA_UBICACION) as? ResultadoCanonizacion.Ok
 
+        /**
+         * Descarga y parsea en streaming la Lista de [url].
+         *
+         * Reporta la fase CONECTANDO hasta obtener respuesta y DESCARGANDO
+         * mientras fluye el cuerpo: el parseo consume el flujo en caliente, así
+         * que la lectura de red domina esa fase. El diagnóstico recoge código
+         * HTTP, tipo de contenido, bytes y tiempos, sin datos de la lista.
+         */
         private fun descargar(
             url: String,
-            sello: SelloIndiceHmac.Disponible,
+            alFase: (FaseImportacion) -> Unit,
         ): Descarga {
             if (url.startsWith("http://", ignoreCase = true) && !verificaCleartext.permitido(URL(url).host)) {
-                return Descarga.Fallo(ERROR_BLOQUEO_HTTP)
+                return Descarga.Fallo(ERROR_BLOQUEO_HTTP, DiagnosticoImportacion(motivo = ERROR_BLOQUEO_HTTP))
             }
-            val conexion = URL(url).openConnection() as? HttpURLConnection ?: return Descarga.Fallo(ERROR_SIN_CONEXION)
+            val inicioDescarga = System.currentTimeMillis()
+            alFase(FaseImportacion.CONECTANDO)
+            val conexion =
+                URL(url).openConnection() as? HttpURLConnection
+                    ?: return Descarga.Fallo(ERROR_SIN_CONEXION, DiagnosticoImportacion(motivo = ERROR_SIN_CONEXION))
             conexion.connectTimeout = tiempos.conexionMs
             conexion.readTimeout = tiempos.lecturaMs
             conexion.requestMethod = "GET"
             return try {
-                when (conexion.responseCode) {
+                when (val codigo = conexion.responseCode) {
                     in 200..299 -> {
-                        val importado =
-                            conexion.inputStream.use { entrada ->
-                                ImportadorM3U.importar(
-                                    entrada = entrada,
-                                    claveHmac = sello.clave,
-                                    generacionHmac = sello.generacion,
-                                )
-                            }
-                        Descarga.Ok(importado)
+                        alFase(FaseImportacion.DESCARGANDO)
+                        val tipoContenido = conexion.contentType
+                        conexion.inputStream.use { entrada ->
+                            val contada = InputStreamContado(entrada)
+                            val parseo = ParserM3U.parsear(contada, LimitesParserM3U())
+                            Descarga.Ok(
+                                parseo,
+                                DiagnosticoImportacion(
+                                    codigoHttp = codigo,
+                                    tipoContenido = tipoContenido,
+                                    bytesDescargados = contada.contados,
+                                    tiempoDescargaMs = System.currentTimeMillis() - inicioDescarga,
+                                ),
+                            )
+                        }
                     }
-                    in 400..499 -> Descarga.Fallo(ERROR_HTTP_4XX)
-                    in 500..599 -> Descarga.Fallo(ERROR_HTTP_5XX)
-                    else -> Descarga.Fallo(ERROR_SIN_CONEXION)
+                    in 400..499 ->
+                        Descarga.Fallo(
+                            ERROR_HTTP_4XX,
+                            DiagnosticoImportacion(codigoHttp = codigo, motivo = ERROR_HTTP_4XX),
+                        )
+                    in 500..599 ->
+                        Descarga.Fallo(
+                            ERROR_HTTP_5XX,
+                            DiagnosticoImportacion(codigoHttp = codigo, motivo = ERROR_HTTP_5XX),
+                        )
+                    else ->
+                        Descarga.Fallo(
+                            ERROR_SIN_CONEXION,
+                            DiagnosticoImportacion(codigoHttp = codigo, motivo = ERROR_SIN_CONEXION),
+                        )
                 }
             } catch (error: SocketTimeoutException) {
-                Descarga.Fallo(ERROR_TIMEOUT)
+                Descarga.Fallo(
+                    ERROR_TIMEOUT,
+                    DiagnosticoImportacion(
+                        tiempoDescargaMs = System.currentTimeMillis() - inicioDescarga,
+                        motivo = ERROR_TIMEOUT,
+                    ),
+                )
             } catch (error: UnknownHostException) {
-                Descarga.Fallo(ERROR_DNS)
+                Descarga.Fallo(ERROR_DNS, DiagnosticoImportacion(motivo = ERROR_DNS))
             } catch (error: ConnectException) {
-                Descarga.Fallo(ERROR_CONEXION_RECHAZADA)
+                Descarga.Fallo(
+                    ERROR_CONEXION_RECHAZADA,
+                    DiagnosticoImportacion(motivo = ERROR_CONEXION_RECHAZADA),
+                )
             } catch (error: IOException) {
-                Descarga.Fallo(ERROR_SIN_CONEXION)
+                Descarga.Fallo(ERROR_SIN_CONEXION, DiagnosticoImportacion(motivo = ERROR_SIN_CONEXION))
             } finally {
                 conexion.disconnect()
             }
+        }
+
+        /** Registro de diagnóstico en Logcat, acotado y sin datos sensibles. */
+        private fun logDiagnostico(
+            diagnostico: DiagnosticoImportacion?,
+            resultado: String,
+        ) {
+            diagnostico?.let { Log.i(TAG_DIAGNOSTICO, it.aLogcat(resultado)) }
         }
 
         /** Lista ya persistida para [nombreFuente], si la Fuente existe con una Lista. */
@@ -520,15 +613,22 @@ class CatalogoRepositorio
 
         /** Resultado interno de una descarga HTTP. */
         private sealed interface Descarga {
-            data class Ok(val importado: ResultadoImportacionM3U) : Descarga
+            data class Ok(
+                val parseo: ResultadoParserM3U,
+                val diagnostico: DiagnosticoImportacion,
+            ) : Descarga
 
-            data class Fallo(val codigo: String) : Descarga
+            data class Fallo(
+                val codigo: String,
+                val diagnostico: DiagnosticoImportacion?,
+            ) : Descarga
         }
 
         private companion object {
             const val FIXTURE = "fixture-canario.m3u"
             const val NOMBRE_FUENTE = "Fixture canario E1"
             const val UBICACION_FIXTURE = "content://com.copernicotv.app.fixture/fixture-canario.m3u"
+            const val TAG_DIAGNOSTICO = "ImportacionDiagnostico"
 
             const val CAUSA_IMPORTACION = "importacion_inicial"
             const val VERSION_IMPORTACION = "m3u:v1"
@@ -569,12 +669,48 @@ internal fun nombreDeDocumento(
 private const val NOMBRE_DOCUMENTO_POR_DEFECTO = "Lista importada"
 
 /**
+ * Flujo que cuenta los bytes leídos, para el diagnóstico de descarga (E7-T7).
+ *
+ * No retiene el contenido: solo acumula el total observado por `read`.
+ */
+internal class InputStreamContado(
+    private val origen: InputStream,
+) : InputStream() {
+    var contados: Long = 0
+        private set
+
+    override fun read(): Int {
+        val leido = origen.read()
+        if (leido >= 0) contados++
+        return leido
+    }
+
+    override fun read(
+        destino: ByteArray,
+        desde: Int,
+        maximo: Int,
+    ): Int {
+        val leidos = origen.read(destino, desde, maximo)
+        if (leidos > 0) contados += leidos
+        return leidos
+    }
+
+    override fun close() {
+        origen.close()
+    }
+}
+
+/**
  * Tiempos de espera de la descarga HTTP de importación.
  *
  * Es un valor y no dos constantes para que la prueba del camino `timeout`
- * pueda ejercitarlo sin esperar los 30 s de producción.
+ * pueda ejercitarlo sin esperar los tiempos de producción.
+ *
+ * La lectura tolera 120 s porque los paneles Xtream/M3U Plus suelen generar
+ * todo el documento antes de empezar a enviarlo: con playlists grandes el
+ * primer byte puede tardar más de 30 s aunque el servidor esté sano (E7-T7).
  */
 data class TiemposHttp(
     val conexionMs: Int = 15_000,
-    val lecturaMs: Int = 30_000,
+    val lecturaMs: Int = 120_000,
 )

@@ -78,6 +78,19 @@ object ImportadorM3U {
         generacionHmac: Int = GENERACION_HMAC,
     ): ResultadoImportacionM3U = convertir(ParserM3U.parsear(texto, limites), claveHmac, generacionHmac)
 
+    /**
+     * Importa un resultado de parser ya obtenido.
+     *
+     * Permite al llamador separar la lectura en streaming del parseo (fase de
+     * descarga) de la conversión, la agrupación de identidad y el cálculo de
+     * HMAC (fase de procesamiento), para informar el progreso con fases reales.
+     */
+    fun importar(
+        parseo: ResultadoParserM3U,
+        claveHmac: SecretKey,
+        generacionHmac: Int = GENERACION_HMAC,
+    ): ResultadoImportacionM3U = convertir(parseo, claveHmac, generacionHmac)
+
     private fun convertir(
         parseo: ResultadoParserM3U,
         claveHmac: SecretKey,

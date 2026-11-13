@@ -34,6 +34,26 @@ class ImportadorM3UTest {
         assertEquals("Uno HD", canal.apariencias.single().tvgName)
     }
 
+    /** E7-T7: la sobrecarga por parseo previo produce el mismo resultado que el texto. */
+    @Test
+    fun `la sobrecarga con parseo previo equivale al camino por texto`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1 tvg-id=\"a\" group-title=\"G\",Canal A\n" +
+                "https://example.com/a.ts\n" +
+                "#EXTINF:-1,Canal B\n" +
+                "https://example.com/b.m3u8\n"
+        val porTexto = ImportadorM3U.importar(texto, clave)
+        val porParseo = ImportadorM3U.importar(ParserM3U.parsear(texto), clave)
+
+        assertEquals(porTexto.canales.size, porParseo.canales.size)
+        assertEquals(
+            porTexto.canales.map { Triple(it.nombre, it.urlOriginal, it.urlStreamHmac) },
+            porParseo.canales.map { Triple(it.nombre, it.urlOriginal, it.urlStreamHmac) },
+        )
+        assertEquals(porTexto.diagnosticos, porParseo.diagnosticos)
+    }
+
     @Test
     fun `una linea excedida descarta solo esa entrada`() {
         val larga = "x".repeat(200)

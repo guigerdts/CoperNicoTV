@@ -5,6 +5,7 @@ import com.copernicotv.core.identity.CodigoErrorUrl
 import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -131,4 +132,102 @@ class ImportadorM3UTest {
         assertNotNull(canal.logoHmac)
         assertTrue(canal.logoHmac.startsWith("hmac:v7:cv1:"))
     }
+
+    /** E7-T7: lectura por pasos equivale al camino por texto, diagnósticos incluidos. */
+    @Test
+    fun `leerDeclaraciones e importarDeclaraciones equivalen al camino por texto`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1 tvg-id=\"a\" group-title=\"G\",Canal A\n" +
+                "https://example.com/a.ts\n" +
+                "#EXTINF:-1,Canal B\n" +
+                "https://example.com/b.m3u8\n" +
+                "#EXTINF:-1,Rechazada\n" +
+                "no-es-una-url\n"
+        val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
+        val porPasos =
+            ImportadorM3U
+                .importarDeclaraciones(lectura.declaraciones, clave)
+                .copy(diagnosticos = lectura.diagnosticos)
+        val porTexto = ImportadorM3U.importar(texto, clave)
+
+        assertEquals(porTexto, porPasos)
+    }
+
+    @Test
+    fun `el avance reporta entradas emitidas y canales procesados`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1,Canal A\nhttps://example.com/a\n" +
+                "#EXTINF:-1,Canal B\nhttps://example.com/b\n" +
+                "#EXTINF:-1,Canal C\nhttps://example.com/c\n"
+        val avancesEntradas = mutableListOf<Int>()
+        val lectura =
+            ImportadorM3U.leerDeclaraciones(texto.byteInputStream()) { total ->
+                avancesEntradas += total
+            }
+        assertEquals(listOf(1, 2, 3), avancesEntradas)
+        assertEquals(3, lectura.entradas)
+
+        val avancesCanales = mutableListOf<Int>()
+        ImportadorM3U.importarDeclaraciones(lectura.declaraciones, clave) { total ->
+            avancesCanales += total
+        }
+        assertEquals(listOf(1, 2, 3), avancesCanales)
+    }
+
+    @Test
+    fun `el avance puede abortar la lectura de forma cooperativa`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1,Canal A\nhttps://example.com/a\n" +
+                "#EXTINF:-1,Canal B\nhttps://example.com/b\n"
+        val error =
+            assertFailsWith<CancelacionPrueba> {
+                ImportadorM3U.leerDeclaraciones(texto.byteInputStream()) { total ->
+                    if (total >= 1) throw CancelacionPrueba()
+                }
+            }
+        assertEquals("cancelada", error.message)
+    }
+
+    @Test
+    fun `el avance puede abortar el procesamiento de forma cooperativa`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1,Canal A\nhttps://example.com/a\n" +
+                "#EXTINF:-1,Canal B\nhttps://example.com/b\n"
+        val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
+        val error =
+            assertFailsWith<CancelacionPrueba> {
+                ImportadorM3U.importarDeclaraciones(lectura.declaraciones, clave) { total ->
+                    if (total >= 1) throw CancelacionPrueba()
+                }
+            }
+        assertEquals("cancelada", error.message)
+    }
+
+    @Test
+    fun `una lista extensa procesa completa con avance final`() {
+        val texto =
+            buildString {
+                append("#EXTM3U\n")
+                repeat(2000) { indice ->
+                    append("#EXTINF:-1 tvg-id=\"c$indice\" group-title=\"G\",Canal $indice\n")
+                    append("https://example.com/$indice.ts\n")
+                }
+            }
+        val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
+        assertEquals(2000, lectura.entradas)
+        var ultimoAvance = 0
+        val resultado =
+            ImportadorM3U.importarDeclaraciones(lectura.declaraciones, clave) { total ->
+                ultimoAvance = total
+            }
+        assertEquals(2000, ultimoAvance)
+        assertEquals(2000, resultado.canales.size)
+    }
+
+    /** Excepción de prueba para la cancelación cooperativa por avance. */
+    private class CancelacionPrueba : RuntimeException("cancelada")
 }

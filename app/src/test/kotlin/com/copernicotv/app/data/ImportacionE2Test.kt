@@ -7,6 +7,7 @@ import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -425,6 +427,111 @@ class ImportacionE2Test {
                 assertEquals(0, db.fuenteDao().todas().size)
             } finally {
                 servidor.close()
+            }
+        }
+    }
+
+    @Test
+    fun `la importacion por url publica avance observable y diagnostico con canales detectados`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                val fases = mutableListOf<String>()
+                val fotos = mutableListOf<AvanceVisible>()
+                val resumen =
+                    repositorio.importarDesdeUrl(
+                        "Fuente Avance",
+                        url,
+                        alFase = { fase -> fases += fase.codigo },
+                        alAvance = { foto -> fotos += foto },
+                    )
+
+                assertNull(resumen.error)
+                val diagnostico = checkNotNull(resumen.diagnostico)
+                assertEquals(2, diagnostico.entradasDetectadas)
+                assertEquals(2, diagnostico.canalesDetectados)
+                // El informe lleva el último avance con contadores (S21).
+                assertTrue(diagnostico.ultimoAvance.orEmpty().contains("canales="))
+                // Contrato del callback de avance: contadores y tiempo válidos,
+                // sin datos de la lista.
+                fotos.forEach { foto ->
+                    assertTrue(foto.msTranscurrido >= 0)
+                    assertTrue(foto.entradas >= 0 && foto.canales >= 0 && foto.preparando >= 0)
+                }
+                assertTrue(fases.contains("procesando_m3u"))
+                assertTrue(fases.contains("guardando"))
+            }
+        }
+    }
+
+    @Test
+    fun `el informe diagnosticos es multilinea y no filtra la ubicacion`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente Informe", url)
+
+                assertNull(resumen.error)
+                val informe = checkNotNull(resumen.diagnostico).aInforme("completada")
+                assertTrue(informe.contains("\n"))
+                assertTrue(informe.contains("resultado=completada"))
+                assertTrue(informe.contains("canales_detectados=2"))
+                assertTrue(informe.contains("entradas=2"))
+                assertFalse(informe.contains("127.0.0.1"))
+                assertFalse(informe.contains("example.invalid"))
+            }
+        }
+    }
+
+    @Test
+    fun `cancelar en plena importacion conserva el catalogo previo`() {
+        runBlocking {
+            repositorio.importar(TEXTO_E2, "Fuente E2", UBICACION)
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                // La cancelación es cooperativa y determinista: el callback de
+                // fase corre dentro de la coroutine de importación, así que
+                // lanzar la cancelación en PROCESANDO aborta antes de escribir.
+                val resultado =
+                    runCatching {
+                        repositorio.importarDesdeUrl(
+                            "Fuente Cancel",
+                            url,
+                            alFase = { fase ->
+                                if (fase == FaseImportacion.PROCESANDO) {
+                                    throw CancellationException("cancelada por el usuario")
+                                }
+                            },
+                        )
+                    }
+
+                assertTrue("esperaba cancelación", resultado.exceptionOrNull() is CancellationException)
+                assertEquals(0, db.fuenteDao().todas().count { it.nombre == "Fuente Cancel" })
+                // El catálogo previo queda intacto: la transacción no llegó a
+                // abrirse (S22).
+                assertEquals(1, db.canalDao().contar())
+            }
+        }
+    }
+
+    @Test
+    fun `una lista de miles de canales persiste completa por lotes`() {
+        val texto =
+            buildString {
+                append("#EXTM3U\n")
+                repeat(5000) { indice ->
+                    append("#EXTINF:-1 tvg-id=\"lote-$indice\" group-title=\"Lote ${indice % 7}\",Canal $indice\n")
+                    append("https://example.invalid/$indice.ts\n")
+                }
+            }
+        runBlocking {
+            conServidorConCuerpo(200, texto) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente Lote", url)
+
+                assertNull(resumen.error)
+                assertEquals(5000, resumen.canales)
+                val diagnostico = checkNotNull(resumen.diagnostico)
+                assertEquals(5000, diagnostico.canalesDetectados)
+                assertEquals(5000, db.canalDao().contar())
+                assertEquals(7, db.grupoDao().contar(db.listaDao().listar().first().id))
+                assertEquals(5000, db.aparienciaDao().contar(db.listaDao().listar().first().id))
             }
         }
     }

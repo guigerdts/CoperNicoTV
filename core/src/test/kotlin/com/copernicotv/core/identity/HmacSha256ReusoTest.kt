@@ -62,9 +62,10 @@ class HmacSha256ReusoTest {
         val esperado = hmacFresco(clave, entrada)
         val resultados =
             runBlocking {
-                // Dispatchers.Default corre en hilos de trabajo reales: cada
-                // async aterriza en un hilo distinto y prueba el reuso por
-                // hilo sin hilos manuales.
+                // Dispatchers.Default corre en hilos de trabajo reales: aunque
+                // no garantiza un hilo distinto por async, la igualdad del
+                // HMAC entre ejecuciones concurrentes prueba el aislamiento
+                // por hilo sin hilos manuales.
                 List(2) { async(Dispatchers.Default) { hmacSha256(clave, entrada) } }.awaitAll()
             }
         for (resultado in resultados) {

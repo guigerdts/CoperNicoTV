@@ -21,6 +21,11 @@ enum class EstadoReproductor {
  * `reintento` y `reintentosMaximos` solo tienen sentido en
  * [EstadoReproductor.REINTENTANDO]: indican el número de reintento en curso y
  * el total configurado por S20. Fuera de esa fase valen cero.
+ *
+ * Los campos de detalle del fallo (`codigoMotor`, `clasesCausa`, `estadoHttp`,
+ * `tipoMime`, `bytesRespuesta`, `msHastaFallo`, `intentosFallo` y
+ * `clasificacionTecnica`) solo se rellenan en [EstadoReproductor.ERROR] y
+ * contienen únicamente evidencia segura para mostrar (DetalleFallo.kt).
  */
 data class EstadoSesion(
     val estado: EstadoReproductor = EstadoReproductor.CARGANDO,
@@ -31,6 +36,14 @@ data class EstadoSesion(
     val codigoError: String? = null,
     val reintento: Int = 0,
     val reintentosMaximos: Int = 0,
+    val codigoMotor: String? = null,
+    val clasesCausa: List<String> = emptyList(),
+    val estadoHttp: Int? = null,
+    val tipoMime: String? = null,
+    val bytesRespuesta: Long = 0L,
+    val msHastaFallo: Long = 0L,
+    val intentosFallo: Int = 0,
+    val clasificacionTecnica: String? = null,
 )
 
 /**

@@ -15,6 +15,7 @@ import java.util.Locale
 data class DiagnosticoReproductor(
     val protocolo: ProtocoloStream? = null,
     val urlSaneada: String? = null,
+    val canalId: Long? = null,
     val fase: EstadoReproductor = EstadoReproductor.CARGANDO,
     val posicionMs: Long = 0L,
     val duracionMs: Long = 0L,
@@ -25,6 +26,14 @@ data class DiagnosticoReproductor(
     val ultimoError: String? = null,
     val reintento: Int = 0,
     val reintentosMaximos: Int = 0,
+    val codigoMotor: String? = null,
+    val claseExcepcion: String? = null,
+    val estadoHttp: Int? = null,
+    val tipoMime: String? = null,
+    val bytesRespuesta: Long = 0L,
+    val msHastaFallo: Long = 0L,
+    val intentosFallo: Int = 0,
+    val clasificacionTecnica: String? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -38,6 +47,7 @@ data class DiagnosticoReproductor(
  *
  * [ultimoError] conserva el último código visto aunque el motor ya haya
  * recuperado la reproducción; si es `null`, se usa el error actual.
+ * [canalId] identifica el canal sin exponer su URL (S57a).
  */
 fun construirDiagnostico(
     protocolo: ProtocoloStream?,
@@ -45,10 +55,12 @@ fun construirDiagnostico(
     estado: EstadoSesion,
     pistas: EstadoPistas,
     ultimoError: String? = null,
+    canalId: Long? = null,
 ): DiagnosticoReproductor =
     DiagnosticoReproductor(
         protocolo = protocolo,
         urlSaneada = sanearUrl(url),
+        canalId = canalId,
         fase = estado.estado,
         posicionMs = estado.posicionMs.coerceAtLeast(0L),
         duracionMs = estado.duracionMs.coerceAtLeast(0L),
@@ -59,6 +71,14 @@ fun construirDiagnostico(
         ultimoError = ultimoError ?: estado.codigoError,
         reintento = estado.reintento.coerceAtLeast(0),
         reintentosMaximos = estado.reintentosMaximos.coerceAtLeast(0),
+        codigoMotor = estado.codigoMotor,
+        claseExcepcion = estado.clasesCausa.lastOrNull(),
+        estadoHttp = estado.estadoHttp,
+        tipoMime = estado.tipoMime,
+        bytesRespuesta = estado.bytesRespuesta.coerceAtLeast(0L),
+        msHastaFallo = estado.msHastaFallo.coerceAtLeast(0L),
+        intentosFallo = estado.intentosFallo.coerceAtLeast(0),
+        clasificacionTecnica = estado.clasificacionTecnica,
     )
 
 /**
@@ -124,6 +144,21 @@ fun textoDiagnostico(diagnostico: DiagnosticoReproductor): String =
         appendLine("Subtítulos disponibles: ${resumenPistas(diagnostico.subtitulos)}")
         appendLine("Subtítulos seleccionados: ${textoSubtitulosSeleccionados(diagnostico)}")
         appendLine("Último error: ${diagnostico.ultimoError ?: SIN_ERROR}")
+        appendLine("Clasificación: ${diagnostico.clasificacionTecnica ?: SIN_DATO}")
+        appendLine("Identificador de canal: ${diagnostico.canalId?.toString() ?: SIN_DATO}")
+        appendLine("Código Media3: ${diagnostico.codigoMotor ?: SIN_DATO}")
+        appendLine("Código HTTP: ${diagnostico.estadoHttp?.toString() ?: SIN_DATO}")
+        appendLine("MIME: ${diagnostico.tipoMime ?: SIN_DATO}")
+        appendLine(
+            "Tamaño de respuesta: " +
+                if (diagnostico.bytesRespuesta > 0L) "${diagnostico.bytesRespuesta} bytes" else SIN_DATO,
+        )
+        appendLine("Excepción: ${diagnostico.claseExcepcion ?: SIN_DATO}")
+        appendLine("Intentos: ${diagnostico.intentosFallo}")
+        appendLine(
+            "Duración hasta el fallo: " +
+                if (diagnostico.msHastaFallo > 0L) formatearTiempo(diagnostico.msHastaFallo) else SIN_DATO,
+        )
         append("Reintentos: ${diagnostico.reintento}/${diagnostico.reintentosMaximos}")
     }
 

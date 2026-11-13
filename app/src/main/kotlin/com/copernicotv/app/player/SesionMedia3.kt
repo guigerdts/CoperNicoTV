@@ -86,15 +86,23 @@ class SesionMedia3(
     private var preferencias = preferenciasIniciales
     private var grupos: List<Tracks.Group> = emptyList()
     private var firmaGrupos = ""
+
+    /** Marca de apertura de la sesión: base de «duración hasta el fallo». */
+    private val inicioAperturaMs = android.os.SystemClock.elapsedRealtime()
     private val oyente =
         object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 if (liberada.get()) return
-                val estadoHttp = estadoHttpDe(error)
-                when (val decision = reintentos.alFallar(clasificarFallo(error.errorCode, estadoHttp))) {
+                val detalle = capturarDetalleFallo(error)
+                when (val decision = reintentos.alFallar(clasificarFallo(error.errorCode, detalle.estadoHttp))) {
                     is DecisionReintento.Reintentar -> programarReintento(decision)
                     DecisionReintento.Definitivo ->
-                        terminarConError(codigoDeError(error.errorCode, estadoHttp))
+                        terminarConError(
+                            codigo = codigoDeError(error.errorCode, detalle.estadoHttp),
+                            detalle = detalle,
+                            intentos = reintentos.realizados + 1,
+                            msHastaFallo = android.os.SystemClock.elapsedRealtime() - inicioAperturaMs,
+                        )
                     DecisionReintento.Ignorar -> Unit
                 }
             }
@@ -274,8 +282,13 @@ class SesionMedia3(
             }
     }
 
-    /** Cierra la recuperación con el error definitivo (S20). */
-    private fun terminarConError(codigo: String) {
+    /** Cierra la recuperación con el error definitivo (S20) y su detalle técnico. */
+    private fun terminarConError(
+        codigo: String,
+        detalle: DetalleFallo,
+        intentos: Int,
+        msHastaFallo: Long,
+    ) {
         trabajoReintento?.cancel()
         trabajoReintento = null
         _estado.value =
@@ -284,6 +297,14 @@ class SesionMedia3(
                 codigoError = codigo,
                 reintento = 0,
                 reintentosMaximos = 0,
+                codigoMotor = detalle.codigoMotor,
+                clasesCausa = detalle.clasesCausa,
+                estadoHttp = detalle.estadoHttp,
+                tipoMime = detalle.tipoMime,
+                bytesRespuesta = detalle.bytesRespuesta,
+                msHastaFallo = msHastaFallo.coerceAtLeast(0L),
+                intentosFallo = intentos.coerceAtLeast(1),
+                clasificacionTecnica = clasificacionTecnica(detalle),
             )
     }
 

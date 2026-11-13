@@ -404,6 +404,7 @@ class ReproductorViewModel
                     estado = estadoSesion,
                     pistas = pistas,
                     ultimoError = ultimoError,
+                    canalId = canalCargado,
                 )
         }
 

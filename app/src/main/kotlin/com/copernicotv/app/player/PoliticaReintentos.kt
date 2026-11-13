@@ -1,7 +1,6 @@
 package com.copernicotv.app.player
 
 import androidx.media3.common.PlaybackException
-import androidx.media3.datasource.HttpDataSource
 import kotlinx.coroutines.delay
 
 /** Esperas de S20: primer reintento a 1 s, segundo a 2 s y tercero a 4 s. */
@@ -121,17 +120,7 @@ fun clasificarFallo(
  * Extrae el estado HTTP de la cadena de causas del error.
  *
  * Devuelve solo el número: ni la URL ni el mensaje de Media3 salen de aquí
- * (S57a). La profundidad está acotada para no recorrer cadenas patológicas.
+ * (S57a). Delega en la captura de detalle (DetalleFallo.kt) para que exista un
+ * único recorrido de la cadena: mismo resultado, misma profundidad acotada.
  */
-fun estadoHttpDe(error: PlaybackException): Int? {
-    var causa: Throwable? = error.cause
-    var profundidad = 0
-    while (causa != null && profundidad < PROFUNDIDAD_MAXIMA_CAUSA) {
-        if (causa is HttpDataSource.InvalidResponseCodeException) return causa.responseCode
-        causa = causa.cause
-        profundidad += 1
-    }
-    return null
-}
-
-private const val PROFUNDIDAD_MAXIMA_CAUSA = 8
+fun estadoHttpDe(error: PlaybackException): Int? = capturarDetalleFallo(error).estadoHttp

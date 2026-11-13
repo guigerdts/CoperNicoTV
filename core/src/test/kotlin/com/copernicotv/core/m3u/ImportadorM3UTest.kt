@@ -1,7 +1,9 @@
 package com.copernicotv.core.m3u
 
 import com.copernicotv.core.identity.AtributoExtra
+import com.copernicotv.core.identity.AvanceEtapaImportacion
 import com.copernicotv.core.identity.CodigoErrorUrl
+import com.copernicotv.core.identity.EtapaImportacion
 import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -299,6 +301,84 @@ class ImportadorM3UTest {
     }
 
     @Test
+    fun `las etapas del pipeline se emiten en orden con sus campos`() {
+        val lectura = ImportadorM3U.leerDeclaraciones(fixtureM3UPlus().byteInputStream())
+        val etapas = mutableListOf<AvanceEtapaImportacion>()
+        ImportadorM3U.importarDeclaraciones(
+            lectura.declaraciones,
+            clave,
+            alEtapa = { etapa -> etapas += etapa },
+        )
+        assertEquals(
+            listOf(
+                EtapaImportacion.AGRUPACION_INICIADA,
+                EtapaImportacion.CONVERSION_IDENTIDADES,
+                EtapaImportacion.DERIVACION_CLAVES,
+                EtapaImportacion.VALIDACION_CATALOGO,
+                EtapaImportacion.AGRUPACION_COMPLETADA,
+                EtapaImportacion.SOBRES_HMAC,
+            ),
+            etapas.map { it.etapa },
+        )
+        val completada = etapas.last { it.etapa == EtapaImportacion.AGRUPACION_COMPLETADA }
+        assertEquals(5, completada.elementos)
+        assertEquals(5, completada.canalesValidos)
+        val sobres = etapas.last { it.etapa == EtapaImportacion.SOBRES_HMAC }
+        // Ops: 2 por canal con logo y 1 por canal sin logo (mismo criterio del resultado).
+        assertEquals(7, sobres.opsCriptograficas)
+        assertEquals(5, sobres.canalesValidos)
+        etapas.forEach { etapa ->
+            assertTrue(etapa.elementos >= 0)
+            assertTrue(etapa.msEtapa >= 0)
+            assertTrue(etapa.msDesdeUltimoAvance >= 0)
+        }
+    }
+
+    @Test
+    fun `el flujo sigue emitiendo avances tras completar la canonizacion`() {
+        // Regresión ronda 4 (S35): la segunda ventana muda era el tramo
+        // post-canonización de la agrupación (deduplicación, derivación de
+        // identidad y construcción de Canales). El flujo debe seguir emitiendo
+        // avances después del último lote de conversion_identidades.
+        val texto =
+            buildString {
+                append("#EXTM3U\n")
+                repeat(2000) { indice ->
+                    append("#EXTINF:-1 tvg-id=\"c$indice\" group-title=\"G\",Canal $indice\n")
+                    append("https://example.com/$indice.ts\n")
+                }
+            }
+        val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
+        val etapas = mutableListOf<AvanceEtapaImportacion>()
+        ImportadorM3U.importarDeclaraciones(
+            lectura.declaraciones,
+            clave,
+            alEtapa = { etapa -> etapas += etapa },
+        )
+        val indiceUltimaConversion = etapas.indexOfLast { it.etapa == EtapaImportacion.CONVERSION_IDENTIDADES }
+        val posteriores = etapas.drop(indiceUltimaConversion + 1)
+        assertEquals(EtapaImportacion.CONVERSION_IDENTIDADES, etapas[indiceUltimaConversion].etapa)
+        assertEquals(2000, etapas[indiceUltimaConversion].elementos)
+        val codigosPosteriores = posteriores.map { it.etapa }.toSet()
+        assertTrue(
+            EtapaImportacion.DERIVACION_CLAVES in codigosPosteriores,
+            "sin avances de derivacion_claves tras la canonización: $codigosPosteriores",
+        )
+        assertTrue(
+            EtapaImportacion.VALIDACION_CATALOGO in codigosPosteriores,
+            "sin avances de validacion_catalogo tras la canonización: $codigosPosteriores",
+        )
+        assertTrue(
+            EtapaImportacion.AGRUPACION_COMPLETADA in codigosPosteriores,
+            "sin agrupacion_completada tras la canonización: $codigosPosteriores",
+        )
+        assertTrue(
+            EtapaImportacion.SOBRES_HMAC in codigosPosteriores,
+            "sin avances de sobres_hmac tras la canonización: $codigosPosteriores",
+        )
+    }
+
+    @Test
     fun `la lista xtream de decenas de miles demuestra el reparto de etapas`() {
         val total = 146_729
         val repetidas = 1_000
@@ -326,23 +406,42 @@ class ImportadorM3UTest {
             }
 
         val avancesAgrupacion = mutableListOf<Int>()
+        val etapas = mutableListOf<AvanceEtapaImportacion>()
         val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
         assertEquals(total, lectura.entradas)
         assertEquals(total.toLong() * 2, lectura.lineasLeidas - 1)
         assertEquals(118_383, lectura.entradasTv)
         assertEquals(28_346, lectura.entradasVod)
         val resultado =
-            ImportadorM3U.importarDeclaraciones(lectura.declaraciones, clave, alAvanceAgrupacion = { acumulado ->
-                avancesAgrupacion += acumulado
-            })
+            ImportadorM3U.importarDeclaraciones(
+                lectura.declaraciones,
+                clave,
+                alAvanceAgrupacion = { acumulado ->
+                    avancesAgrupacion += acumulado
+                },
+                alEtapa = { etapa -> etapas += etapa },
+            )
         assertEquals(unicas, resultado.canales.size)
         assertEquals(total, avancesAgrupacion.last())
         // 36433 canales con logo × 2 ops + 109296 sin logo × 1 op.
         assertEquals(182_162, resultado.operacionesCriptograficas)
+        // Regresión ronda 4 (S35): el flujo sigue emitiendo avances después de
+        // la canonización, también con la lista completa.
+        val indiceUltimaConversion = etapas.indexOfLast { it.etapa == EtapaImportacion.CONVERSION_IDENTIDADES }
+        val posteriores = etapas.drop(indiceUltimaConversion + 1).map { it.etapa }.toSet()
+        assertTrue(EtapaImportacion.DERIVACION_CLAVES in posteriores)
+        assertTrue(EtapaImportacion.AGRUPACION_COMPLETADA in posteriores)
+
+        /** Último tiempo acumulado de cada etapa, para el reparto por tramo. */
+        fun ultimoMs(etapa: EtapaImportacion): Long = etapas.last { it.etapa == etapa }.msEtapa
         println(
             "MEDICION_ETAPAS entradas=$total unicos=${resultado.canales.size} " +
                 "agrupacion=${resultado.tiempoAgrupacionMs}ms hmac=${resultado.tiempoHmacMs}ms " +
-                "ops=${resultado.operacionesCriptograficas}",
+                "ops=${resultado.operacionesCriptograficas} " +
+                "conversion=${ultimoMs(EtapaImportacion.CONVERSION_IDENTIDADES)}ms " +
+                "derivacion=${ultimoMs(EtapaImportacion.DERIVACION_CLAVES)}ms " +
+                "validacion=${ultimoMs(EtapaImportacion.VALIDACION_CATALOGO)}ms " +
+                "sobres=${ultimoMs(EtapaImportacion.SOBRES_HMAC)}ms",
         )
     }
 

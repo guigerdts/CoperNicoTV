@@ -206,6 +206,13 @@ class CatalogoRepositorio
                                         descarga.lectura.declaraciones,
                                         sello.clave,
                                         sello.generacion,
+                                        // El tick de la agrupación (etapa más larga y
+                                        // antes muda, L13) reinicia el vigilante.
+                                        alAvanceAgrupacion = { agrupadas ->
+                                            contexto.ensureActive()
+                                            avance.verificar()
+                                            avance.ticAgrupacion(agrupadas)
+                                        },
                                     ) { procesados ->
                                         contexto.ensureActive()
                                         avance.verificar()
@@ -217,6 +224,21 @@ class CatalogoRepositorio
                                     canalesDetectados = importado.canales.size,
                                     tiempoProcesamientoMs = System.currentTimeMillis() - inicioProceso,
                                     ultimoAvance = avance.texto(),
+                                    lineasLeidas = descarga.lectura.lineasLeidas,
+                                    extinfEncontrados = descarga.lectura.extinfEncontrados,
+                                    urlsAsociadas = descarga.lectura.entradas,
+                                    entradasTv = descarga.lectura.entradasTv,
+                                    entradasVod = descarga.lectura.entradasVod,
+                                    entradasOtro = descarga.lectura.entradasOtro,
+                                    descartadosParser =
+                                        descarga.lectura.diagnosticos
+                                            .associate { it.codigo.codigo to it.conteoTotal },
+                                    rechazosCanonizacion =
+                                        importado.rechazadas.groupingBy { it.error.codigo.codigo }.eachCount(),
+                                    declaracionesCreadas = importado.declaracionesRecibidas,
+                                    operacionesCriptograficas = importado.operacionesCriptograficas,
+                                    tiempoAgrupacionMs = importado.tiempoAgrupacionMs,
+                                    tiempoHmacMs = importado.tiempoHmacMs,
                                 )
                             persistir(
                                 nombreFuente,

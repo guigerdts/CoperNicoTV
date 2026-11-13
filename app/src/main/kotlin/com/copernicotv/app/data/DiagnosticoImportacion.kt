@@ -33,6 +33,30 @@ data class DiagnosticoImportacion(
     val ultimoAvance: String? = null,
     val sinAvanceMs: Long? = null,
     val motivo: String? = null,
+    /** Líneas físicas leídas por el parser (S28). */
+    val lineasLeidas: Long? = null,
+    /** Bloques `#EXTINF` encontrados por el parser, incluidos sin URL (S28). */
+    val extinfEncontrados: Long? = null,
+    /** URLs asociadas a entradas emitidas (S28). */
+    val urlsAsociadas: Int? = null,
+    /** Entradas clasificadas como TV por la ruta de su URL (heurística, S28). */
+    val entradasTv: Int? = null,
+    /** Entradas clasificadas como VOD por la ruta de su URL (heurística, S28). */
+    val entradasVod: Int? = null,
+    /** Entradas sin marcador de ruta; nunca se descartan por esto (S28). */
+    val entradasOtro: Int? = null,
+    /** Descartes del parser por código de diagnóstico: `codigo=conteo` (S28). */
+    val descartadosParser: Map<String, Long>? = null,
+    /** Rechazos de canonización por motivo tipado: `motivo=conteo` (S28). */
+    val rechazosCanonizacion: Map<String, Int>? = null,
+    /** Declaraciones de identidad creadas antes de agrupar (S28). */
+    val declaracionesCreadas: Int? = null,
+    /** Operaciones HMAC ejecutadas con la clave de Keystore (S28). */
+    val operacionesCriptograficas: Int? = null,
+    /** Tiempo de la etapa de agrupación de identidad (S28). */
+    val tiempoAgrupacionMs: Long? = null,
+    /** Tiempo de la etapa de sobres HMAC por canal único (S28). */
+    val tiempoHmacMs: Long? = null,
 ) {
     /**
      * Línea única para Logcat. Cada campo es acotado y sanitizado: tipo de
@@ -51,19 +75,43 @@ data class DiagnosticoImportacion(
 
     /** Campos comunes de diagnóstico, acotados y sanitizados. */
     private fun aCampos(resultado: String): List<String> =
-        listOfNotNull(
-            "resultado=$resultado",
-            codigoHttp?.let { "codigo_http=$it" },
-            tipoContenido?.let { "tipo_contenido=$it" },
-            bytesDescargados?.let { "bytes=$it" },
-            entradasDetectadas?.let { "entradas=$it" },
-            canalesDetectados?.let { "canales_detectados=$it" },
-            canalesPersistidos?.let { "canales=$it" },
-            tiempoDescargaMs?.let { "tiempo_descarga_ms=$it" },
-            tiempoProcesamientoMs?.let { "tiempo_procesamiento_ms=$it" },
-            tiempoGuardadoMs?.let { "tiempo_guardado_ms=$it" },
-            ultimoAvance?.let { "ultimo_avance=$it" },
-            sinAvanceMs?.let { "sin_avance_ms=$it" },
-            motivo?.let { "motivo=$it" },
+        campos(resultado).mapNotNull { (clave, valor) ->
+            valor?.let { "$clave=$it" }
+        }
+
+    /** Pares `clave-valor` del diagnóstico; valor nulo = campo ausente (S28). */
+    private fun campos(resultado: String): List<Pair<String, Any?>> =
+        listOf(
+            "resultado" to resultado,
+            "codigo_http" to codigoHttp,
+            "tipo_contenido" to tipoContenido,
+            "bytes" to bytesDescargados,
+            "lineas" to lineasLeidas,
+            "extinf" to extinfEncontrados,
+            "urls" to urlsAsociadas,
+            "entradas" to entradasDetectadas,
+            "tv" to entradasTv,
+            "vod" to entradasVod,
+            "otro" to entradasOtro,
+            "descartes" to descartadosParser?.let { compactar(it) },
+            "rechazos" to rechazosCanonizacion?.let { compactar(it) },
+            "declaraciones" to declaracionesCreadas,
+            "canales_detectados" to canalesDetectados,
+            "canales" to canalesPersistidos,
+            "ops_cripto" to operacionesCriptograficas,
+            "tiempo_descarga_ms" to tiempoDescargaMs,
+            "tiempo_procesamiento_ms" to tiempoProcesamientoMs,
+            "tiempo_agrupacion_ms" to tiempoAgrupacionMs,
+            "tiempo_hmac_ms" to tiempoHmacMs,
+            "tiempo_guardado_ms" to tiempoGuardadoMs,
+            "ultimo_avance" to ultimoAvance,
+            "sin_avance_ms" to sinAvanceMs,
+            "motivo" to motivo,
         )
+
+    /** Compacta un mapa `clave=conteo` en una línea acotada de códigos, sin datos. */
+    private fun compactar(valores: Map<String, *>): String =
+        valores.entries.joinToString(",") { par ->
+            "${par.key}=${par.value}"
+        }
 }

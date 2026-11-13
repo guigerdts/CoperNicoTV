@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 data class AvanceVisible(
     val entradas: Int,
+    val agrupadas: Int = 0,
     val canales: Int,
     val preparando: Int,
     val bytes: Long,
@@ -42,6 +43,7 @@ internal class AvanceImportacion(
     private val reloj: () -> Long = System::currentTimeMillis,
 ) {
     private val entradas = AtomicLong(0)
+    private val agrupadas = AtomicLong(0)
     private val canales = AtomicLong(0)
     private val preparando = AtomicLong(0)
     private val ultimoAvanceMs = AtomicLong(SIN_AVANCE)
@@ -54,6 +56,18 @@ internal class AvanceImportacion(
     /** Registra el total de entradas emitidas por el parser. */
     fun ticEntrada(total: Int) {
         entradas.set(total.toLong())
+        tic()
+    }
+
+    /**
+     * Registra el total de declaraciones canonizadas por la agrupación.
+     *
+     * Es la etapa más larga de una importación grande (E7-T7 ronda 3, L13):
+     * sin este tick el vigilante abortaba durante la agrupación con
+     * `canales=0`.
+     */
+    fun ticAgrupacion(total: Int) {
+        agrupadas.set(total.toLong())
         tic()
     }
 
@@ -82,6 +96,7 @@ internal class AvanceImportacion(
     fun foto(): AvanceVisible =
         AvanceVisible(
             entradas = entradas.get().toInt(),
+            agrupadas = agrupadas.get().toInt(),
             canales = canales.get().toInt(),
             preparando = preparando.get().toInt(),
             bytes = bytesProveedor?.invoke() ?: 0L,
@@ -92,6 +107,7 @@ internal class AvanceImportacion(
     fun texto(): String =
         listOf(
             "entradas=${entradas.get()}",
+            "agrupadas=${agrupadas.get()}",
             "canales=${canales.get()}",
             "preparando=${preparando.get()}",
             "bytes=${bytesProveedor?.invoke() ?: 0L}",

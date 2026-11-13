@@ -560,8 +560,8 @@ class CatalogoViewModel
 
         /** Línea técnica de avance para la UI, sin datos de la lista. */
         private fun lineaAvance(avance: AvanceVisible): String =
-            "entradas=${avance.entradas} canales=${avance.canales} preparando=${avance.preparando} " +
-                "bytes=${avance.bytes} t=${avance.msTranscurrido / 1000}s"
+            "entradas=${avance.entradas} agrupadas=${avance.agrupadas} canales=${avance.canales} " +
+                "preparando=${avance.preparando} bytes=${avance.bytes} t=${avance.msTranscurrido / 1000}s"
 
         /**
          * Deja el diálogo de importación por URL como recién abierto.

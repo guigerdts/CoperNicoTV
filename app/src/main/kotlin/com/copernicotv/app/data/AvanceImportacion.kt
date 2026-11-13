@@ -44,7 +44,7 @@ internal class AvanceImportacion(
     private val entradas = AtomicLong(0)
     private val canales = AtomicLong(0)
     private val preparando = AtomicLong(0)
-    private val ultimoAvanceMs = AtomicLong(0)
+    private val ultimoAvanceMs = AtomicLong(SIN_AVANCE)
     private val inicioMs = reloj()
 
     /** Proveedor de bytes leídos; lo fija la descarga con su stream contado. */
@@ -72,7 +72,7 @@ internal class AvanceImportacion(
     /** Verifica que haya avance reciente; si no, aborta con el error tipado. */
     fun verificar() {
         val ultimo = ultimoAvanceMs.get()
-        if (ultimo > 0) {
+        if (ultimo != SIN_AVANCE) {
             val silencio = reloj() - ultimo
             if (silencio > umbralSinAvanceMs) throw ImportacionAvanceDetenido(silencio)
         }
@@ -108,5 +108,8 @@ internal class AvanceImportacion(
 
         /** Intervalo de publicación del avance a la UI. */
         const val INTERVALO_PUBLICACION_MS = 500L
+
+        /** Centinela de «ningún tick todavía», válido incluso con reloj en 0. */
+        private const val SIN_AVANCE = Long.MIN_VALUE
     }
 }

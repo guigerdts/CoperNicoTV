@@ -57,6 +57,18 @@ data class DiagnosticoImportacion(
     val tiempoAgrupacionMs: Long? = null,
     /** Tiempo de la etapa de sobres HMAC por canal único (S28). */
     val tiempoHmacMs: Long? = null,
+    /** Código de la última etapa emitida (E7-T7 ronda 4, S34). */
+    val etapaUltima: String? = null,
+    /** Elementos procesados acumulados en la última etapa (S34). */
+    val etapaElementos: Int? = null,
+    /** Tiempo acumulado de la última etapa, en ms (S34). */
+    val etapaMs: Long? = null,
+    /** Tiempo desde el avance anterior, en ms (S34). */
+    val etapaMsDesdeUltimo: Long? = null,
+    /** Operaciones criptográficas acumuladas del pipeline (S34). */
+    val etapaOpsCripto: Int? = null,
+    /** Canales válidos identificados hasta la última etapa (S34). */
+    val etapaCanalesValidos: Int? = null,
 ) {
     /**
      * Línea única para Logcat. Cada campo es acotado y sanitizado: tipo de
@@ -104,6 +116,12 @@ data class DiagnosticoImportacion(
             "tiempo_agrupacion_ms" to tiempoAgrupacionMs,
             "tiempo_hmac_ms" to tiempoHmacMs,
             "tiempo_guardado_ms" to tiempoGuardadoMs,
+            "etapa" to etapaUltima,
+            "etapa_elementos" to etapaElementos,
+            "etapa_ms" to etapaMs,
+            "etapa_gap_ms" to etapaMsDesdeUltimo,
+            "etapa_ops" to etapaOpsCripto,
+            "etapa_canales_validos" to etapaCanalesValidos,
             "ultimo_avance" to ultimoAvance,
             "sin_avance_ms" to sinAvanceMs,
             "motivo" to motivo,
@@ -115,3 +133,14 @@ data class DiagnosticoImportacion(
             "${par.key}=${par.value}"
         }
 }
+
+/** Copia el diagnóstico con los campos de la última etapa emitida (S34). */
+internal fun DiagnosticoImportacion.conEtapa(etapa: AvanceEtapaImportacion?): DiagnosticoImportacion =
+    copy(
+        etapaUltima = etapa?.etapa?.codigo,
+        etapaElementos = etapa?.elementos,
+        etapaMs = etapa?.msEtapa,
+        etapaMsDesdeUltimo = etapa?.msDesdeUltimoAvance,
+        etapaOpsCripto = etapa?.opsCriptograficas,
+        etapaCanalesValidos = etapa?.canalesValidos,
+    )

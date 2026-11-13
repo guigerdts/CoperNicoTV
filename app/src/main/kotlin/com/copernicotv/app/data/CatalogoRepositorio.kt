@@ -9,26 +9,23 @@ import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
-import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.app.data.db.entities.EstadoActualizacionEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.GrupoEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
+import com.copernicotv.core.identity.AvanceEtapaImportacion
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.CanonicalizadorUrl
 import com.copernicotv.core.identity.ClaseUrl
-import com.copernicotv.core.identity.ClaveCanal
+import com.copernicotv.core.identity.EtapaImportacion
 import com.copernicotv.core.identity.ResultadoCanonizacion
 import com.copernicotv.core.m3u.CanalImportadoM3U
-import com.copernicotv.core.m3u.CodecAtributosExtra
 import com.copernicotv.core.m3u.ImportadorM3U
 import com.copernicotv.core.m3u.LecturaM3U
 import com.copernicotv.core.m3u.LimitesParserM3U
 import com.copernicotv.core.m3u.ResultadoImportacionM3U
-import com.copernicotv.core.modelo.FilaCanal
-import com.copernicotv.core.modelo.InvariantesCanal
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -200,6 +197,7 @@ class CatalogoRepositorio
                         is Descarga.Ok -> {
                             faseVerificada(FaseImportacion.PROCESANDO)
                             val inicioProceso = System.currentTimeMillis()
+                            val alEtapa = alimentadorEtapas(avance) { contexto.ensureActive() }
                             val importado =
                                 ImportadorM3U
                                     .importarDeclaraciones(
@@ -208,18 +206,16 @@ class CatalogoRepositorio
                                         sello.generacion,
                                         // El tick de la agrupación (etapa más larga y
                                         // antes muda, L13) reinicia el vigilante.
-                                        alAvanceAgrupacion = { agrupadas ->
-                                            contexto.ensureActive()
-                                            avance.verificar()
-                                            avance.ticAgrupacion(agrupadas)
-                                        },
-                                    ) { procesados ->
-                                        contexto.ensureActive()
-                                        avance.verificar()
-                                        avance.ticCanal(procesados)
-                                    }.copy(diagnosticos = descarga.lectura.diagnosticos)
+                                        alAvanceAgrupacion =
+                                            alimentadorTick(avance, { contexto.ensureActive() }, avance::ticAgrupacion),
+                                        alAvance =
+                                            alimentadorTick(avance, { contexto.ensureActive() }, avance::ticCanal),
+                                        // Etapas del pipeline (S34): todo avance
+                                        // reinicia el vigilante y queda en el informe.
+                                        alEtapa = alEtapa,
+                                    ).copy(diagnosticos = descarga.lectura.diagnosticos)
                             val diagnostico =
-                                descarga.diagnostico.copy(
+                                descarga.diagnostico.conEtapa(avance.ultimaEtapa()).copy(
                                     entradasDetectadas = descarga.lectura.entradas,
                                     canalesDetectados = importado.canales.size,
                                     tiempoProcesamientoMs = System.currentTimeMillis() - inicioProceso,
@@ -249,6 +245,7 @@ class CatalogoRepositorio
                                 diagnostico,
                                 faseVerificada,
                                 avance,
+                                alEtapa,
                             )
                         }
                         is Descarga.Fallo -> {
@@ -368,6 +365,7 @@ class CatalogoRepositorio
             diagnostico: DiagnosticoImportacion = DiagnosticoImportacion(),
             alFase: (FaseImportacion) -> Unit = {},
             avance: AvanceImportacion? = null,
+            alEtapa: (AvanceEtapaImportacion) -> Unit = {},
         ): ResumenImportacion {
             val diagnosticos = importado.diagnosticos.map { it.codigo.codigo }
             if (importado.canales.isEmpty()) {
@@ -385,6 +383,8 @@ class CatalogoRepositorio
             }
             alFase(FaseImportacion.GUARDANDO)
             val inicioGuardado = System.currentTimeMillis()
+            val emisorCompletada =
+                EmisorEtapaPersistencia(alEtapa, EtapaImportacion.IMPORTACION_COMPLETADA, importado.operacionesCriptograficas)
             val persistida =
                 try {
                     db.withTransaction {
@@ -395,7 +395,16 @@ class CatalogoRepositorio
                                 registrarIntento(existente.id, RESULTADO_SIN_CAMBIOS)
                                 existente
                             } else {
-                                escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales, sello, avance)
+                                escribirCatalogo(
+                                    nombreFuente,
+                                    ubicacion,
+                                    canonica,
+                                    importado.canales,
+                                    sello,
+                                    avance,
+                                    alEtapa,
+                                    importado.operacionesCriptograficas,
+                                )
                             }
                         // La Lista importada queda como única activa, también
                         // cuando ya existía: reintentar o repetir la importación
@@ -417,8 +426,12 @@ class CatalogoRepositorio
                         diagnostico.copy(motivo = codigo),
                     )
                 }
+            emisorCompletada.emitir(
+                elementos = persistida.canales,
+                canalesValidos = importado.canales.count { it.claveDerivable },
+            )
             val final =
-                diagnostico.copy(
+                diagnostico.conEtapa(avance?.ultimaEtapa()).copy(
                     canalesPersistidos = persistida.canales,
                     tiempoGuardadoMs = System.currentTimeMillis() - inicioGuardado,
                 )
@@ -592,6 +605,8 @@ class CatalogoRepositorio
             canales: List<CanalImportadoM3U>,
             sello: SelloIndiceHmac.Disponible,
             avance: AvanceImportacion? = null,
+            alEtapa: (AvanceEtapaImportacion) -> Unit = {},
+            opsTotales: Int = 0,
         ): ListaPersistida {
             val ahora = Instant.now()
             val fuenteId =
@@ -642,85 +657,30 @@ class CatalogoRepositorio
                         inicio = ahora,
                     ),
                 )
+            val canalesValidos = canales.count { it.claveDerivable }
+            val emisorCanales = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_CANALES, opsTotales)
             val entidades =
-                prepararEntidadesCanales(canales, fuenteId, ahora, avance)
+                prepararEntidadesCanales(claves, canales, fuenteId, ahora, avance)
             val idsCanales = ArrayList<Long>(entidades.size)
             entidades.chunked(LOTE_INSERTAR).forEach { lote ->
                 idsCanales += db.canalDao().insertarTodos(lote)
                 avance?.ticPreparacion(entidades.size)
+                emisorCanales.emitir(elementos = idsCanales.size, canalesValidos = canalesValidos)
             }
+            val emisorGrupos = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_GRUPOS, opsTotales)
             val grupoIdPorNombre = prepararGrupos(canales, idLista)
+            emisorGrupos.emitir(elementos = grupoIdPorNombre.size, canalesValidos = canalesValidos)
+            val emisorApariencias = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_APARIENCIAS, opsTotales)
             val filasApariencias = prepararApariencias(canales, idLista, idsCanales, grupoIdPorNombre, ahora, avance)
+            var filasInsertadas = 0
             filasApariencias.chunked(LOTE_INSERTAR).forEach { lote ->
                 db.aparienciaDao().insertarTodas(lote)
+                filasInsertadas += lote.size
                 avance?.ticPreparacion(entidades.size)
+                emisorApariencias.emitir(elementos = filasInsertadas, canalesValidos = canalesValidos)
             }
             db.estadoActualizacionDao().finalizar(idEstado, Instant.now(), RESULTADO_COMPLETADA)
             return ListaPersistida(idLista, canales.size)
-        }
-
-        /**
-         * Prepara las entidades de `Canal` con validación previa de todas las
-         * filas (E7-T7, S22/S26).
-         *
-         * La misma semántica de rechazo de `CanalEscritor.insertar`: la
-         * primera violación de invariantes aborta con `CanalRechazado` y la
-         * transacción externa revierte. El cifrado de URL y logo (AES con
-         * clave de Keystore) es la etapa dominante, así que el avance se
-         * emite por canal.
-         */
-        private fun prepararEntidadesCanales(
-            canales: List<CanalImportadoM3U>,
-            fuenteId: Long,
-            ahora: Instant,
-            avance: AvanceImportacion?,
-        ): List<CanalEntity> {
-            val entidades = ArrayList<CanalEntity>(canales.size)
-            canales.forEachIndexed { indice, canal ->
-                val tvg = canal.tvgId
-                // La forma persistida de la clave de unicidad es la única fuente de
-                // verdad sobre si el tvg-id habilitó la clave (§6.3.2).
-                val tvgUnico = tvg != null && canal.claveUnicidad == ClaveCanal.PREFIJO_TVG + tvg
-                val entidad =
-                    CanalEntity(
-                        fuenteId = fuenteId,
-                        nombre = canal.nombre,
-                        urlStreamCifrada =
-                            CifradoAes.cifrar(
-                                claves.claveAes,
-                                CifradoAes.aad("Canal", "url_stream_cifrada"),
-                                canal.urlOriginal.toByteArray(Charsets.UTF_8),
-                            ),
-                        urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
-                        logoUrlCifrada = cifrarLogo(canal.logoOriginal),
-                        logoUrlHmac = canal.logoHmac?.toByteArray(Charsets.UTF_8),
-                        tvgId = canal.tvgId,
-                        claveCanonica = canal.claveCanonica,
-                        claveUnicidad = canal.claveUnicidad,
-                        claveDerivable = canal.claveDerivable,
-                        atributosExtra = CodecAtributosExtra.codificar(canal.atributosExtra),
-                        creadoEn = ahora,
-                        actualizadoEn = ahora,
-                    )
-                val violaciones =
-                    InvariantesCanal.validar(
-                        FilaCanal(
-                            nombre = entidad.nombre,
-                            estado = entidad.estado,
-                            claveDerivable = entidad.claveDerivable,
-                            claveCanonica = entidad.claveCanonica,
-                            claveUnicidad = entidad.claveUnicidad,
-                            tvgId = entidad.tvgId,
-                            urlStreamCifradaPresente = entidad.urlStreamCifrada.isNotEmpty(),
-                            urlStreamHmacPresente = entidad.urlStreamHmac.isNotEmpty(),
-                        ),
-                        tvgUnico,
-                    )
-                if (violaciones.isNotEmpty()) throw CanalRechazado(violaciones)
-                entidades += entidad
-                avance?.ticPreparacion(indice + 1)
-            }
-            return entidades
         }
 
         /** Grupos únicos de la importación, insertados por lotes una sola vez. */
@@ -777,15 +737,6 @@ class CatalogoRepositorio
             }
             return filas
         }
-
-        private fun cifrarLogo(logo: String?): ByteArray? =
-            logo?.let {
-                CifradoAes.cifrar(
-                    claves.claveAes,
-                    CifradoAes.aad("Canal", "logo_url_cifrada"),
-                    it.toByteArray(Charsets.UTF_8),
-                )
-            }
 
         /** Lista persistida y cantidad de Canales que la Fuente ya tiene. */
         private data class ListaPersistida(val id: Long, val canales: Int)

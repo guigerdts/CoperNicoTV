@@ -1,6 +1,8 @@
 package com.copernicotv.app.data
 
+import com.copernicotv.core.identity.AvanceEtapaImportacion
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Foto de avance visible de una importación por URL (E7-T7).
@@ -47,6 +49,7 @@ internal class AvanceImportacion(
     private val canales = AtomicLong(0)
     private val preparando = AtomicLong(0)
     private val ultimoAvanceMs = AtomicLong(SIN_AVANCE)
+    private val etapa = AtomicReference<AvanceEtapaImportacion?>(null)
     private val inicioMs = reloj()
 
     /** Proveedor de bytes leídos; lo fija la descarga con su stream contado. */
@@ -83,6 +86,19 @@ internal class AvanceImportacion(
         tic()
     }
 
+    /**
+     * Registra el avance de una etapa del pipeline (E7-T7 ronda 4, S34) y
+     * reinicia el vigilante: todas las operaciones largas alimentan al
+     * watchdog, no solo el parser y la agrupación.
+     */
+    fun ticEtapa(avanceEtapa: AvanceEtapaImportacion) {
+        etapa.set(avanceEtapa)
+        tic()
+    }
+
+    /** Última etapa emitida, para el informe copiable (S34). */
+    fun ultimaEtapa(): AvanceEtapaImportacion? = etapa.get()
+
     /** Verifica que haya avance reciente; si no, aborta con el error tipado. */
     fun verificar() {
         val ultimo = ultimoAvanceMs.get()
@@ -105,14 +121,26 @@ internal class AvanceImportacion(
 
     /** Línea técnica resumida, acotada y sin datos de la lista. */
     fun texto(): String =
-        listOf(
+        listOfNotNull(
             "entradas=${entradas.get()}",
             "agrupadas=${agrupadas.get()}",
             "canales=${canales.get()}",
             "preparando=${preparando.get()}",
             "bytes=${bytesProveedor?.invoke() ?: 0L}",
             "t=${reloj() - inicioMs}ms",
+            textoEtapa(),
         ).joinToString(" ")
+
+    /** Fragmento de la última etapa, o nulo si todavía no hay etapas (S34). */
+    private fun textoEtapa(): String? =
+        etapa.get()?.let { avanceEtapa ->
+            "etapa=${avanceEtapa.etapa.codigo}" +
+                " etapa_elementos=${avanceEtapa.elementos}" +
+                " etapa_ms=${avanceEtapa.msEtapa}" +
+                " etapa_gap_ms=${avanceEtapa.msDesdeUltimoAvance}" +
+                " etapa_ops=${avanceEtapa.opsCriptograficas}" +
+                " etapa_canales_validos=${avanceEtapa.canalesValidos}"
+        }
 
     private fun tic() {
         ultimoAvanceMs.set(reloj())

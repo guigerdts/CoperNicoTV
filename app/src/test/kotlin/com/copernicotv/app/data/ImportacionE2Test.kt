@@ -372,7 +372,8 @@ class ImportacionE2Test {
         runBlocking {
             val fases = mutableListOf<String>()
             conServidorConCuerpo(200, TEXTO_E2) { url ->
-                val resumen = repositorio.importarDesdeUrl("Fuente URL", url) { fase -> fases.add(fase.codigo) }
+                val resumen =
+                    repositorio.importarDesdeUrl("Fuente URL", url, alFase = { fase -> fases.add(fase.codigo) })
 
                 assertNull(resumen.error)
             }

@@ -652,6 +652,67 @@ class ImportacionE2Test {
         }
     }
 
+    /** E7-T7 ronda 3: el avance visible distingue la etapa de agrupación. */
+    @Test
+    fun `el avance visible reporta entradas agrupadas y canales`() {
+        runBlocking {
+            var ultimo: AvanceVisible? = null
+            conServidorConCuerpo(200, TEXTO_XTREAM_R3) { url ->
+                repositorio.importarDesdeUrl(
+                    "Fuente Xtream R3",
+                    url,
+                    alAvance = { avance -> ultimo = avance },
+                )
+            }
+
+            val final = requireNotNull(ultimo)
+            // El tick final de la agrupación llega con el total de declaraciones.
+            assertEquals(5, final.entradas)
+            assertEquals(5, final.agrupadas)
+            assertEquals(5, final.canales)
+        }
+    }
+
+    /** E7-T7 ronda 3: el diagnóstico clasifica TV/VOD/OTRO y cuantifica etapas. */
+    @Test
+    fun `el diagnostico de la ronda 3 clasifica y cuantifica etapas`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_XTREAM_R3) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente Xtream R3", url)
+
+                assertNull(resumen.error)
+                assertEquals(5, resumen.canales)
+                val d = requireNotNull(resumen.diagnostico)
+                assertEquals(5, d.entradasDetectadas)
+                assertEquals(11L, d.lineasLeidas)
+                assertEquals(5L, d.extinfEncontrados)
+                assertEquals(5, d.urlsAsociadas)
+                assertEquals(5, d.declaracionesCreadas)
+                // Heurística de ruta: 2 live, 1 movie + 1 series, 1 sin marcador.
+                assertEquals(2, d.entradasTv)
+                assertEquals(2, d.entradasVod)
+                assertEquals(1, d.entradasOtro)
+                // Ops: 2 por canal con logo (stream + logo) y 1 por canal sin logo.
+                assertEquals(7, d.operacionesCriptograficas)
+                assertNotNull(d.tiempoAgrupacionMs)
+                assertNotNull(d.tiempoHmacMs)
+                // El informe copiable lleva los campos nuevos y nunca URLs.
+                val informe = d.aInforme("completada")
+                assertTrue(informe.contains("lineas=11"))
+                assertTrue(informe.contains("extinf=5"))
+                assertTrue(informe.contains("urls=5"))
+                assertTrue(informe.contains("tv=2"))
+                assertTrue(informe.contains("vod=2"))
+                assertTrue(informe.contains("otro=1"))
+                assertTrue(informe.contains("declaraciones=5"))
+                assertTrue(informe.contains("ops_cripto=7"))
+                assertTrue(informe.contains("tiempo_agrupacion_ms="))
+                assertTrue(informe.contains("tiempo_hmac_ms="))
+                assertTrue(!informe.contains("http://") && !informe.contains("example.invalid"))
+            }
+        }
+    }
+
     private companion object {
         const val LOGO = "https://example.invalid/logo.png"
         const val UBICACION = "https://example.invalid/e2.m3u"
@@ -673,6 +734,22 @@ class ImportacionE2Test {
             #EXTM3U
             #EXTINF:-1 tvg-id="e2-1" tvg-name="E2 Uno" group-title="Noticias" tvg-logo="$LOGO" custom="x",E2 Uno
             https://example.invalid/uno.m3u8
+            """.trimIndent()
+
+        /** E7-T7 ronda 3: Xtream M3U Plus con rutas live/movie/series y metadatos incompletos. */
+        val TEXTO_XTREAM_R3 =
+            """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="tv-1" tvg-logo="https://example.invalid/tv1.png" group-title="Noticias",TV Uno
+            http://example.invalid/live/demo/demo/1001.ts
+            #EXTINF:-1 tvg-id="tv-2" group-title="Deportes",TV Dos
+            http://example.invalid/live/demo/demo/1002.m3u8
+            #EXTINF:-1 tvg-id="pel-1" tvg-logo="https://example.invalid/pel1.png" group-title="Peliculas",Pelicula Uno
+            http://example.invalid/movie/demo/demo/2001.mp4
+            #EXTINF:-1 tvg-id="ser-1" group-title="Series",Serie S01E01
+            http://example.invalid/series/demo/demo/3001/300101.mp4
+            #EXTINF:-1,Sin Metadatos
+            http://example.invalid/otro/demo/4001.ts
             """.trimIndent()
     }
 }

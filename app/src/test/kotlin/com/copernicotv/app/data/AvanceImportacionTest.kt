@@ -72,4 +72,37 @@ class AvanceImportacionTest {
         assertTrue(texto.contains("bytes=4096"))
         assertTrue(texto.contains("t=2000ms"))
     }
+
+    /** E7-T7 ronda 3: el tick de agrupación reinicia la ventana de silencio. */
+    @Test
+    fun `el tick de agrupacion reinicia la ventana de silencio`() {
+        var ahora = 0L
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        avance.ticEntrada(146_729)
+        ahora = 150L
+        avance.ticAgrupacion(1_000)
+        ahora = 200L
+
+        avance.verificar()
+
+        // Sin excepción: durante la agrupación (etapa antes muda, L13) el
+        // vigilante ya no dispara `avance_detenido`.
+    }
+
+    /** E7-T7 ronda 3: el contador de agrupadas queda visible en foto y texto. */
+    @Test
+    fun `la foto y el texto reportan las declaraciones agrupadas`() {
+        var ahora = 0L
+        val avance = AvanceImportacion(reloj = { ahora })
+        avance.ticEntrada(5)
+        avance.ticAgrupacion(5)
+        ahora = 1_500L
+
+        val foto = avance.foto()
+        val texto = avance.texto()
+
+        assertEquals(5, foto.agrupadas)
+        assertTrue(texto.contains("agrupadas=5"))
+        assertTrue(texto.contains("entradas=5"))
+    }
 }

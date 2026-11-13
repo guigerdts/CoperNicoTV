@@ -63,12 +63,29 @@ fun hmacSha256(
  *
  * En Android la clave HMAC vive en Keystore y no es exportable; este overload
  * permite firmar sin extraer material de clave.
+ *
+ * Reuso acotado (E7-T7, L20): la instancia `Mac` se guarda por hilo y se
+ * reinicializa solo cuando la clave cambia (`equals` compara material en
+ * `SecretKeySpec` y la instancia de Keystore es estable). Cada `doFinal`
+ * reinicia el MAC internamente, así que cada operación es independiente; una
+ * importación de ~146k elementos deja de pagar `Mac.getInstance` + `init`
+ * ~473k veces. La llave por hilo nunca cruza el límite del hilo y no debilita
+ * el cifrado ni reutiliza material exportable.
  */
 fun hmacSha256(
     clave: SecretKey,
     entrada: ByteArray,
 ): ByteArray {
-    val mac = Mac.getInstance("HmacSHA256")
-    mac.init(clave)
+    val mac = macPorHilo.get()
+    if (mac == null || claveMacPorHilo.get() != clave) {
+        val nueva = Mac.getInstance("HmacSHA256")
+        nueva.init(clave)
+        macPorHilo.set(nueva)
+        claveMacPorHilo.set(clave)
+        return nueva.doFinal(entrada)
+    }
     return mac.doFinal(entrada)
 }
+
+private val macPorHilo = ThreadLocal<Mac?>()
+private val claveMacPorHilo = ThreadLocal<SecretKey?>()

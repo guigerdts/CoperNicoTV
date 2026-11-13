@@ -45,6 +45,16 @@ object CifradoAes {
     private const val MINIMO_SOBRE = 1 + LONGITUD_IV + LONGITUD_TAG_BYTES
 
     private val aleatorio = SecureRandom()
+    private val cipherPorHilo = ThreadLocal<Cipher?>()
+
+    private fun cipherActual(): Cipher {
+        var cipher = cipherPorHilo.get()
+        if (cipher == null) {
+            cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            cipherPorHilo.set(cipher)
+        }
+        return cipher
+    }
 
     /** Cifra [original] con [clave] y el AAD indicado. */
     fun cifrar(
@@ -53,7 +63,10 @@ object CifradoAes {
         original: ByteArray,
     ): ByteArray {
         val iv = ByteArray(LONGITUD_IV).also(aleatorio::nextBytes)
-        val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+        // GCM exige un `init` por operación (IV nuevo cada vez); lo que se
+        // reusa es la instancia, evitando `Cipher.getInstance` + búsqueda de
+        // provider por valor (E7-T7, L20). No debilita el cifrado.
+        val cipher = cipherActual()
         cipher.init(Cipher.ENCRYPT_MODE, clave, GCMParameterSpec(LONGITUD_TAG_BITS, iv))
         cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
         return byteArrayOf(VERSION) + iv + cipher.doFinal(original)
@@ -71,7 +84,7 @@ object CifradoAes {
         val iv = sobre.copyOfRange(1, 1 + LONGITUD_IV)
         val cifrado = sobre.copyOfRange(1 + LONGITUD_IV, sobre.size)
         return try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+            val cipher = cipherActual()
             cipher.init(Cipher.DECRYPT_MODE, clave, GCMParameterSpec(LONGITUD_TAG_BITS, iv))
             cipher.updateAAD(aad.toByteArray(Charsets.UTF_8))
             ResultadoDescifrado.Ok(cipher.doFinal(cifrado))

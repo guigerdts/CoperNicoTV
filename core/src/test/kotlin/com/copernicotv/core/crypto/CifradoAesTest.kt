@@ -89,4 +89,42 @@ class CifradoAesTest {
     fun `aad se compone de tabla y columna`() {
         assertEquals("Canal.url_stream_cifrada", aad)
     }
+
+    @Test
+    fun `reuso de instancia mantiene el round trip tras muchas operaciones`() {
+        // Regresión del reuso por hilo (E7-T7, L20): cifrar/descifrar repetidos
+        // con la misma instancia de Cipher debe seguir round-tripeando.
+        repeat(8) { indice ->
+            val entrada = ("entrada-$indice").toByteArray()
+            val sobre = CifradoAes.cifrar(clave, aad, entrada)
+            val resultado = CifradoAes.descifrar(clave, aad, sobre)
+            assertTrue(resultado is ResultadoDescifrado.Ok)
+            assertContentEquals(entrada, resultado.bytes)
+        }
+    }
+
+    @Test
+    fun `reuso de instancia mantiene el iv nuevo por operacion`() {
+        val sobres = (0 until 4).map { CifradoAes.cifrar(clave, aad, original) }
+        assertEquals(sobres.map { it.toList() }.size, sobres.map { it.toList() }.distinct().size)
+    }
+
+    @Test
+    fun `reuso de instancia mantiene la deteccion de aad incorrecto`() {
+        val sobre = CifradoAes.cifrar(clave, aad, original)
+        assertEquals(
+            ResultadoDescifrado.Fallo(MotivoCifrado.FALLO_AUTENTICACION),
+            CifradoAes.descifrar(clave, CifradoAes.aad("Canal", "logo_url_cifrada"), sobre),
+        )
+    }
+
+    @Test
+    fun `reuso de instancia mantiene el rechazo de ciphertext alterado`() {
+        val sobre = CifradoAes.cifrar(clave, aad, original)
+        sobre[sobre.lastIndex] = (sobre.last().toInt() xor 0x01).toByte()
+        assertEquals(
+            ResultadoDescifrado.Fallo(MotivoCifrado.FALLO_AUTENTICACION),
+            CifradoAes.descifrar(clave, aad, sobre),
+        )
+    }
 }

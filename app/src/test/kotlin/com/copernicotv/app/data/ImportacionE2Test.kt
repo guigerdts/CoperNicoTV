@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
@@ -262,6 +263,140 @@ class ImportacionE2Test {
         }
     }
 
+    /** E7-T7: el diagnóstico expone los campos técnicos sin datos sensibles. */
+    @Test
+    fun `el diagnostico registra codigo http bytes entradas canales y tiempos`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_E2) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente URL", url)
+
+                assertNull(resumen.error)
+                assertEquals(1, resumen.canales)
+                val d = requireNotNull(resumen.diagnostico)
+                assertEquals(200, d.codigoHttp)
+                assertNotNull(d.tipoContenido)
+                assertTrue("esperaba bytes contados", (d.bytesDescargados ?: 0) > 0)
+                assertEquals(1, d.entradasDetectadas)
+                assertEquals(1, d.canalesPersistidos)
+                assertNotNull(d.tiempoDescargaMs)
+                assertNotNull(d.tiempoProcesamientoMs)
+                assertNotNull(d.tiempoGuardadoMs)
+                // La línea de Logcat nunca lleva la URL ni credenciales.
+                val linea = d.aLogcat("completada")
+                assertTrue(!linea.contains("127.0.0.1") && !linea.contains("lista.m3u"))
+            }
+        }
+    }
+
+    /** E7-T7: 200 con HTML (panel rechaza credenciales) produce error tipado con tipo de contenido. */
+    @Test
+    fun `una respuesta html produce error tipado con diagnostico de contenido`() {
+        runBlocking {
+            conServidorConCuerpo(200, "<html><body>Acceso denegado</body></html>", "text/html; charset=utf-8") { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente E2", url)
+
+                assertEquals("m3u_sin_cabecera", resumen.error)
+                assertEquals(0, db.fuenteDao().todas().size)
+                val d = requireNotNull(resumen.diagnostico)
+                assertEquals(200, d.codigoHttp)
+                assertEquals("text/html; charset=utf-8", d.tipoContenido)
+                assertEquals("m3u_sin_cabecera", d.motivo)
+            }
+        }
+    }
+
+    /** E7-T7: un 401 cae en la clase http_4xx y expone el código exacto. */
+    @Test
+    fun `un 401 devuelve error tipado con codigo http en el diagnostico`() {
+        runBlocking {
+            conServidor(401) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente E2", url)
+
+                assertEquals("http_4xx", resumen.error)
+                assertEquals(401, resumen.diagnostico?.codigoHttp)
+                assertEquals(0, db.fuenteDao().todas().size)
+            }
+        }
+    }
+
+    /** E7-T7: la Lista importada queda como única activa, también repetida. */
+    @Test
+    fun `la importacion activa exclusivamente la lista importada`() {
+        runBlocking {
+            val primera = repositorio.importar(TEXTO_E2, "Fuente E2", UBICACION)
+            assertEquals(1, primera.canales)
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente Xtream", url)
+
+                assertEquals(2, resumen.canales)
+                val activas = db.listaDao().listar().filter { it.estado == "activa" }
+                assertEquals(1, activas.size)
+                val fuente = requireNotNull(db.fuenteDao().porNombre("Fuente Xtream"))
+                val lista = db.listaDao().porFuente(fuente.id).single()
+                assertEquals(lista.id, activas.single().id)
+                // El catálogo visible responde a la lista recién importada.
+                val visibles = repositorio.canalesDeListaActiva().first()
+                assertEquals(2, visibles.mapNotNull { it }.size)
+            }
+        }
+    }
+
+    /** E7-T7: repetir la importación de una Fuente existente selecciona su Lista. */
+    @Test
+    fun `la importacion repetida de una fuente existente selecciona su lista`() {
+        runBlocking {
+            val primera = repositorio.importar(TEXTO_E2, "Fuente E2", UBICACION)
+            assertEquals(1, primera.canales)
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                repositorio.importarDesdeUrl("Fuente Xtream", url)
+            }
+            conServidorConCuerpo(200, TEXTO_E2) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente E2", url)
+
+                assertNull(resumen.error)
+                val activas = db.listaDao().listar().filter { it.estado == "activa" }
+                assertEquals(1, activas.size)
+                val fuente = requireNotNull(db.fuenteDao().porNombre("Fuente E2"))
+                val lista = db.listaDao().porFuente(fuente.id).single()
+                assertEquals(lista.id, activas.single().id)
+                assertEquals("sin_cambios", db.estadoActualizacionDao().ultimoDeLista(lista.id)?.resultado)
+            }
+        }
+    }
+
+    /** E7-T7: las fases llegan en el orden contractual. */
+    @Test
+    fun `la fase avanza por el orden esperado`() {
+        runBlocking {
+            val fases = mutableListOf<String>()
+            conServidorConCuerpo(200, TEXTO_E2) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente URL", url) { fase -> fases.add(fase.codigo) }
+
+                assertNull(resumen.error)
+            }
+            assertEquals(
+                listOf("conectando", "descargando", "procesando_m3u", "guardando"),
+                fases,
+            )
+        }
+    }
+
+    /** E7-T7: EXTINF con URLs TS y M3U8 y nombres acentuados se importa completo. */
+    @Test
+    fun `un m3u xtream con urls ts y m3u8 y acentos se importa`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente Xtream", url)
+
+                assertNull(resumen.error)
+                assertEquals(2, resumen.canales)
+                val fuente = requireNotNull(db.fuenteDao().porNombre("Fuente Xtream"))
+                val nombres = db.canalDao().porFuente(fuente.id).map { it.nombre }
+                assertTrue("Información Deportiva" in nombres)
+            }
+        }
+    }
+
     /**
      * E7-T7: si la política de red bloquea el texto claro, el fallo es
      * `bloqueo_http` y no se abre conexión (el servidor de prueba no es
@@ -326,6 +461,7 @@ class ImportacionE2Test {
     private suspend fun conServidorConCuerpo(
         codigo: Int,
         cuerpo: String,
+        tipoContenido: String = "audio/x-mpegurl; charset=utf-8",
         bloque: suspend (String) -> Unit,
     ) {
         val servidor = ServerSocket(0)
@@ -333,7 +469,7 @@ class ImportacionE2Test {
             val respuesta =
                 async(Dispatchers.IO) {
                     servidor.use {
-                        it.accept().use { socket -> responderConCuerpo(socket, codigo, cuerpo) }
+                        it.accept().use { socket -> responderConCuerpo(socket, codigo, cuerpo, tipoContenido) }
                     }
                 }
             try {
@@ -387,6 +523,7 @@ class ImportacionE2Test {
         socket: Socket,
         codigo: Int,
         cuerpo: String,
+        tipoContenido: String,
     ) {
         socket.soTimeout = TIEMPO_ESPERA_MS.toInt()
         val lector = socket.getInputStream().bufferedReader(Charsets.ISO_8859_1)
@@ -397,7 +534,7 @@ class ImportacionE2Test {
         val bytes = cuerpo.toByteArray(Charsets.UTF_8)
         val cabecera =
             "HTTP/1.1 $codigo Prueba\r\n" +
-                "Content-Type: audio/x-mpegurl; charset=utf-8\r\n" +
+                "Content-Type: $tipoContenido\r\n" +
                 "Content-Length: ${bytes.size}\r\n" +
                 "Connection: close\r\n\r\n"
         socket.getOutputStream().apply {
@@ -412,6 +549,16 @@ class ImportacionE2Test {
         const val UBICACION = "https://example.invalid/e2.m3u"
         const val TIEMPO_ESPERA_MS = 5_000L
         const val TIEMPO_MUDO_MS = 2_000L
+
+        /** E7-T7: playlist Xtream con URLs TS, M3U8 y nombres acentuados. */
+        val TEXTO_XTREAM =
+            """
+            #EXTM3U
+            #EXTINF:-1 tvg-id="dep-1" group-title="Deportes",Información Deportiva
+            http://example.invalid/stream.ts
+            #EXTINF:0 group-title="General",Canal General
+            http://example.invalid/general.m3u8
+            """.trimIndent()
 
         val TEXTO_E2 =
             """

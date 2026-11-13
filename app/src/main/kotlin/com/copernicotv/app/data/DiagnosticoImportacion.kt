@@ -1,5 +1,7 @@
 package com.copernicotv.app.data
 
+import com.copernicotv.core.identity.AvanceEtapaImportacion
+
 /**
  * Fases visibles de una importación por URL (E7-T7).
  *

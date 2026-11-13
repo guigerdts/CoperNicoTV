@@ -4,12 +4,14 @@ import com.copernicotv.core.crypto.HmacUrl
 import com.copernicotv.core.identity.AgrupadorImportacion
 import com.copernicotv.core.identity.AparienciaDeclarada
 import com.copernicotv.core.identity.AtributoExtra
+import com.copernicotv.core.identity.AvanceEtapaImportacion
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.CanalDeclarado
 import com.copernicotv.core.identity.ClaseUrl
 import com.copernicotv.core.identity.ColisionCanonica
 import com.copernicotv.core.identity.DeclaracionCanal
 import com.copernicotv.core.identity.DeclaracionRechazada
+import com.copernicotv.core.identity.EtapaImportacion
 import java.io.InputStream
 import java.util.Locale
 import javax.crypto.SecretKey
@@ -130,6 +132,9 @@ object ImportadorM3U {
     /** Nanosegundos por milisegundo para los tiempos de etapa (S28). */
     private const val NANOS_POR_MS = 1_000_000L
 
+    /** Frecuencia de emisión de la etapa [EtapaImportacion.SOBRES_HMAC] (S34). */
+    private const val LOTE_ETAPA = 1000
+
     /**
      * Importa un flujo sin cerrarlo; el llamador conserva su propiedad.
      *
@@ -220,6 +225,11 @@ object ImportadorM3U {
      * etapa de agrupación, que en listas de decenas de miles de entradas es la
      * más larga y era la ventana muda del vigilante de avance (L13).
      *
+     * [alEtapa], si se aporta, emite [AvanceEtapaImportacion] con etapa
+     * [EtapaImportacion.SOBRES_HMAC] por lote de [LOTE_ETAPA]: porta los
+     * elementos procesados, el tiempo de etapa, las operaciones
+     * criptográficas acumuladas y los canales válidos identificados.
+     *
      * [alAvance] recibe el total de canales procesados hasta el momento y se
      * invoca por canal; puede lanzar `CancellationException` para abortar de
      * forma cooperativa. El bucle de HMAC con clave de Keystore es la etapa
@@ -233,18 +243,44 @@ object ImportadorM3U {
         claveHmac: SecretKey,
         generacionHmac: Int = GENERACION_HMAC,
         alAvanceAgrupacion: ((declaracionesAgrupadas: Int) -> Unit)? = null,
+        alEtapa: ((AvanceEtapaImportacion) -> Unit)? = null,
         alAvance: ((canalesProcesados: Int) -> Unit)? = null,
     ): ResultadoImportacionM3U {
         val inicioAgrupacion = System.nanoTime()
-        val agrupado = AgrupadorImportacion.agrupar(declaraciones, CampoUrl.CANAL_URL_STREAM, alAvanceAgrupacion)
+        val agrupado =
+            AgrupadorImportacion.agrupar(
+                declaraciones,
+                CampoUrl.CANAL_URL_STREAM,
+                alAvanceAgrupacion,
+                alEtapa,
+            )
         val tiempoAgrupacionMs = (System.nanoTime() - inicioAgrupacion) / NANOS_POR_MS
         val inicioHmac = System.nanoTime()
+        val emisorSobres = EmisorSobresHmac(alEtapa, inicioHmac)
         val canales = ArrayList<CanalImportadoM3U>(agrupado.canales.size)
         var operacionesCriptograficas = 0
+        var canalesValidos = 0
+        var ultimaEmision = 0
         for ((indice, canal) in agrupado.canales.withIndex()) {
             canales += convertirCanal(canal, claveHmac, generacionHmac)
             operacionesCriptograficas += if (canal.logoCanonica == null) 1 else 2
+            if (canal.claveDerivable) canalesValidos += 1
             if (alAvance != null) alAvance(indice + 1)
+            if ((indice + 1) % LOTE_ETAPA == 0) {
+                emisorSobres.emitir(
+                    elementos = indice + 1,
+                    opsCriptograficas = operacionesCriptograficas,
+                    canalesValidos = canalesValidos,
+                )
+                ultimaEmision = indice + 1
+            }
+        }
+        if (ultimaEmision < canales.size) {
+            emisorSobres.emitir(
+                elementos = canales.size,
+                opsCriptograficas = operacionesCriptograficas,
+                canalesValidos = canalesValidos,
+            )
         }
         val tiempoHmacMs = (System.nanoTime() - inicioHmac) / NANOS_POR_MS
         return ResultadoImportacionM3U(
@@ -278,6 +314,39 @@ object ImportadorM3U {
             logoOriginal = entrada.logo,
             atributosExtra = entrada.atributosExtra.map { AtributoExtra(it.clave, it.valor) },
         )
+
+    /**
+     * Emisor de la etapa [EtapaImportacion.SOBRES_HMAC]: eventos por lote con
+     * el tiempo acumulado de la etapa y el tiempo desde el último avance de
+     * esta etapa; las ops criptográficas y los canales válidos llegan del
+     * bucle. Sin callback no hace nada.
+     */
+    private class EmisorSobresHmac(
+        private val alEtapa: ((AvanceEtapaImportacion) -> Unit)?,
+        private val inicioNs: Long,
+    ) {
+        private var ultimoEventoNs = inicioNs
+
+        fun emitir(
+            elementos: Int,
+            opsCriptograficas: Int,
+            canalesValidos: Int,
+        ) {
+            if (alEtapa == null) return
+            val ahoraNs = System.nanoTime()
+            alEtapa(
+                AvanceEtapaImportacion(
+                    etapa = EtapaImportacion.SOBRES_HMAC,
+                    elementos = elementos,
+                    msEtapa = (ahoraNs - inicioNs) / NANOS_POR_MS,
+                    msDesdeUltimoAvance = (ahoraNs - ultimoEventoNs) / NANOS_POR_MS,
+                    opsCriptograficas = opsCriptograficas,
+                    canalesValidos = canalesValidos,
+                ),
+            )
+            ultimoEventoNs = ahoraNs
+        }
+    }
 
     private fun convertirCanal(
         canal: CanalDeclarado,

@@ -76,6 +76,9 @@ object AgrupadorImportacion {
     /** Frecuencia del avance opcional durante la canonización. */
     private const val LOTE_AVANCE = 1000
 
+    /** Nanosegundos por milisegundo para los tiempos de etapa (S34). */
+    private const val NANOS_POR_MS = 1_000_000L
+
     private data class Canonica(
         val ordinal: Int,
         val nombre: String?,
@@ -98,12 +101,21 @@ object AgrupadorImportacion {
      * puede lanzar `CancellationException` para abortar de forma cooperativa.
      * Los llamadores existentes no lo pasan y conservan el comportamiento
      * previo.
+     *
+     * [alEtapa], si se aporta, emite [AvanceEtapaImportacion] por etapa y por
+     * lote en TODO el tramo, incluido el post-canonización (deduplicación,
+     * derivación de identidad y construcción de Canales), que con listas
+     * grandes es la mitad más larga de la agrupación y era la segunda ventana
+     * muda del vigilante (E7-T7 ronda 4, L17).
      */
     fun agrupar(
         declaraciones: List<DeclaracionCanal>,
         campoUrl: CampoUrl = CampoUrl.CANAL_URL_STREAM,
         alAvance: ((declaracionesProcesadas: Int) -> Unit)? = null,
+        alEtapa: ((AvanceEtapaImportacion) -> Unit)? = null,
     ): ResultadoImportacion {
+        val emisor = EmisorEtapas(alEtapa)
+        emisor.emitir(EtapaImportacion.AGRUPACION_INICIADA, elementos = 0, canalesValidos = 0)
         val rechazadas = mutableListOf<DeclaracionRechazada>()
         val canonicas = mutableListOf<Canonica>()
 
@@ -138,17 +150,19 @@ object AgrupadorImportacion {
             if (alAvance != null && (ordinal + 1) % LOTE_AVANCE == 0) {
                 alAvance(ordinal + 1)
             }
+            emisor.lote(EtapaImportacion.CONVERSION_IDENTIDADES, ordinal + 1)
         }
         if (alAvance != null && declaraciones.size % LOTE_AVANCE != 0) {
             alAvance(declaraciones.size)
         }
+        emisor.emitir(EtapaImportacion.CONVERSION_IDENTIDADES, declaraciones.size, canalesValidos = 0)
 
         val deduplicadas = deduplicarExactas(canonicas)
         val conteoTvg = deduplicadas.mapNotNull { it.first.tvgPersistido }.groupingBy { it }.eachCount()
 
         val grupos = linkedMapOf<String, MutableList<Pair<Canonica, Int>>>()
         var sinIdentidad = 0
-        for (declaracionPar in deduplicadas) {
+        for ((indice, declaracionPar) in deduplicadas.withIndex()) {
             val declaracion = declaracionPar.first
             val tvgUnico = declaracion.tvgPersistido?.let { conteoTvg[it] == 1 } ?: false
             val identidad =
@@ -165,10 +179,23 @@ object AgrupadorImportacion {
             } else {
                 grupos.getOrPut(clave) { mutableListOf() }.add(declaracionPar)
             }
+            emisor.lote(EtapaImportacion.DERIVACION_CLAVES, indice + 1)
         }
+        emisor.emitir(EtapaImportacion.DERIVACION_CLAVES, deduplicadas.size, canalesValidos = 0)
 
-        val canales = grupos.values.map { grupo -> construirCanal(grupo, conteoTvg) }
+        var validosConstruidos = 0
+        val canales =
+            grupos.values.mapIndexed { indice, grupo ->
+                val canal = construirCanal(grupo, conteoTvg)
+                if (canal.claveDerivable) {
+                    validosConstruidos += 1
+                }
+                emisor.lote(EtapaImportacion.VALIDACION_CATALOGO, indice + 1, canalesValidos = validosConstruidos)
+                canal
+            }
+        emisor.emitir(EtapaImportacion.VALIDACION_CATALOGO, canales.size, canalesValidos = validosConstruidos)
         val colisiones = detectarColisiones(canales)
+        emisor.emitir(EtapaImportacion.AGRUPACION_COMPLETADA, canales.size, canalesValidos = validosConstruidos)
         val repeticiones = deduplicadas.sumOf { it.second } - deduplicadas.size
         return ResultadoImportacion(
             canales = canales,
@@ -176,6 +203,51 @@ object AgrupadorImportacion {
             colisiones = colisiones,
             repeticionesInformativas = repeticiones,
         )
+    }
+
+    /**
+     * Emisor interno de avances por etapa: agrupa los lotes en [LOTE_AVANCE],
+     * mide el tiempo acumulado de la etapa y el tiempo desde el último avance
+     * emitido, y solo despacha al callback cuando corresponde.
+     */
+    private class EmisorEtapas(
+        private val alEtapa: ((AvanceEtapaImportacion) -> Unit)?,
+    ) {
+        private val inicioEtapaNs = mutableMapOf<EtapaImportacion, Long>()
+        private var ultimoEventoNs = System.nanoTime()
+
+        /** Marca un lote de [elementos] procesados en [etapa]. */
+        fun lote(
+            etapa: EtapaImportacion,
+            elementos: Int,
+            canalesValidos: Int = 0,
+        ) {
+            if (alEtapa != null && elementos % LOTE_AVANCE == 0) {
+                emitir(etapa, elementos, canalesValidos)
+            }
+        }
+
+        /** Emite un evento de [etapa] sin filtro de lote. */
+        fun emitir(
+            etapa: EtapaImportacion,
+            elementos: Int,
+            canalesValidos: Int,
+        ) {
+            if (alEtapa == null) return
+            val ahoraNs = System.nanoTime()
+            val inicio = inicioEtapaNs.getOrPut(etapa) { ahoraNs }
+            alEtapa(
+                AvanceEtapaImportacion(
+                    etapa = etapa,
+                    elementos = elementos,
+                    msEtapa = (ahoraNs - inicio) / NANOS_POR_MS,
+                    msDesdeUltimoAvance = (ahoraNs - ultimoEventoNs) / NANOS_POR_MS,
+                    opsCriptograficas = 0,
+                    canalesValidos = canalesValidos,
+                ),
+            )
+            ultimoEventoNs = ahoraNs
+        }
     }
 
     private fun deduplicarExactas(canonicas: List<Canonica>): List<Pair<Canonica, Int>> {

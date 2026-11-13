@@ -1,6 +1,9 @@
 package com.copernicotv.app.data
 
+import com.copernicotv.core.identity.AvanceEtapaImportacion
+import com.copernicotv.core.identity.EtapaImportacion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -87,6 +90,72 @@ class AvanceImportacionTest {
 
         // Sin excepción: durante la agrupación (etapa antes muda, L13) el
         // vigilante ya no dispara `avance_detenido`.
+    }
+
+    /** E7-T7 ronda 4 (S34): los avances por etapa alimentan al vigilante. */
+    @Test
+    fun `ticEtapa reinicia la ventana de silencio y queda como ultima etapa`() {
+        var ahora = 0L
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        avance.ticEntrada(146_747)
+        ahora = 150L
+        val evento =
+            AvanceEtapaImportacion(
+                etapa = EtapaImportacion.DERIVACION_CLAVES,
+                elementos = 73_000,
+                msEtapa = 40_000,
+                msDesdeUltimoAvance = 700,
+                opsCriptograficas = 0,
+                canalesValidos = 0,
+            )
+        avance.ticEtapa(evento)
+        ahora = 200L
+
+        avance.verificar()
+        assertEquals(evento, avance.ultimaEtapa())
+
+        // Sin excepción: el avance de etapa reinicia el silencio durante el
+        // tramo post-canonización (segunda ventana muda, L17).
+    }
+
+    @Test
+    fun `el texto incluye los campos de la ultima etapa`() {
+        var ahora = 0L
+        val avance = AvanceImportacion(reloj = { ahora })
+        avance.ticEtapa(
+            AvanceEtapaImportacion(
+                etapa = EtapaImportacion.SOBRES_HMAC,
+                elementos = 1_000,
+                msEtapa = 2_500,
+                msDesdeUltimoAvance = 20,
+                opsCriptograficas = 1_262,
+                canalesValidos = 1_000,
+            ),
+        )
+        ahora = 3_000L
+
+        val texto = avance.texto()
+
+        assertTrue(texto.contains("etapa=sobres_hmac"))
+        assertTrue(texto.contains("etapa_elementos=1000"))
+        assertTrue(texto.contains("etapa_ms=2500"))
+        assertTrue(texto.contains("etapa_gap_ms=20"))
+        assertTrue(texto.contains("etapa_ops=1262"))
+        assertTrue(texto.contains("etapa_canales_validos=1000"))
+    }
+
+    @Test
+    fun `sin etapas el texto no incluye campos de etapa`() {
+        var ahora = 0L
+        val avance = AvanceImportacion(reloj = { ahora })
+        avance.ticEntrada(3)
+        ahora = 10L
+
+        val texto = avance.texto()
+
+        assertTrue(texto.contains("entradas=3"))
+        assertTrue(!texto.contains("etapa="))
+        assertNull(avance.ultimaEtapa())
     }
 
     /** E7-T7 ronda 3: el contador de agrupadas queda visible en foto y texto. */

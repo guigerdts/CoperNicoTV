@@ -321,6 +321,33 @@ class ImportacionE2Test {
         }
     }
 
+    /** E7-T7 ronda 4 (S34): el informe expone la etapa final del pipeline. */
+    @Test
+    fun `las etapas del pipeline llegan a importacion_completada y quedan en el informe`() {
+        runBlocking {
+            conServidorConCuerpo(200, TEXTO_XTREAM) { url ->
+                val resumen = repositorio.importarDesdeUrl("Fuente Etapas", url)
+
+                assertNull(resumen.error)
+                assertEquals(2, resumen.canales)
+                val d = requireNotNull(resumen.diagnostico)
+                // IMPORTACION_COMPLETADA se emite tras la transacción de
+                // persistencia, así que es la etapa determinista del informe.
+                assertEquals("importacion_completada", d.etapaUltima)
+                assertEquals(2, d.etapaElementos)
+                assertEquals(2, d.etapaCanalesValidos)
+                assertEquals(2, d.etapaOpsCripto)
+                assertNotNull(d.etapaMs)
+                assertNotNull(d.etapaMsDesdeUltimo)
+                val informe = d.aInforme("completada")
+                assertTrue(informe.contains("etapa=importacion_completada"))
+                assertTrue(informe.contains("etapa_elementos=2"))
+                assertTrue(informe.contains("etapa_canales_validos=2"))
+                assertTrue(d.ultimoAvance.orEmpty().contains("etapa="))
+            }
+        }
+    }
+
     /** E7-T7: la Lista importada queda como única activa, también repetida. */
     @Test
     fun `la importacion activa exclusivamente la lista importada`() {

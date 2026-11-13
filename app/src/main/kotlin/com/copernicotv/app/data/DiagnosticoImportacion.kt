@@ -50,7 +50,7 @@ data class DiagnosticoImportacion(
     fun aInforme(resultado: String): String = aCampos(resultado).joinToString("\n")
 
     /** Campos comunes de diagnóstico, acotados y sanitizados. */
-    private fun aCampos(resultado: String): String =
+    private fun aCampos(resultado: String): List<String> =
         listOfNotNull(
             "resultado=$resultado",
             codigoHttp?.let { "codigo_http=$it" },
@@ -65,5 +65,5 @@ data class DiagnosticoImportacion(
             ultimoAvance?.let { "ultimo_avance=$it" },
             sinAvanceMs?.let { "sin_avance_ms=$it" },
             motivo?.let { "motivo=$it" },
-        ).joinToString(" ")
+        )
 }

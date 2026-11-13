@@ -183,6 +183,7 @@ private fun PantallaCatalogo(
                 onAbrirDocumento = { selector.launch(arrayOf("*/*")) },
                 onImportarUrl = viewModel::importarDesdeUrl,
                 onImportarUrlReiniciar = viewModel::reiniciarImportacionUrl,
+                onImportarUrlCancelar = viewModel::cancelarImportacionUrl,
                 onActualizar = viewModel::actualizarListaActiva,
                 onTexto = viewModel::actualizarTexto,
                 onGrupo = viewModel::seleccionarGrupo,

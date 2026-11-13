@@ -24,13 +24,18 @@ import com.copernicotv.core.identity.ResultadoCanonizacion
 import com.copernicotv.core.m3u.CanalImportadoM3U
 import com.copernicotv.core.m3u.CodecAtributosExtra
 import com.copernicotv.core.m3u.ImportadorM3U
+import com.copernicotv.core.m3u.LecturaM3U
 import com.copernicotv.core.m3u.LimitesParserM3U
-import com.copernicotv.core.m3u.ParserM3U
 import com.copernicotv.core.m3u.ResultadoImportacionM3U
-import com.copernicotv.core.m3u.ResultadoParserM3U
+import com.copernicotv.core.modelo.FilaCanal
+import com.copernicotv.core.modelo.InvariantesCanal
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
@@ -83,8 +88,6 @@ class CatalogoRepositorio
         private val verificaCleartext: VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida),
     ) {
         private val io = Dispatchers.IO
-        private val escritorApariencias = AparienciaEscritor(db)
-        private val escritorCanales = CanalEscritor(db)
 
         fun canalesDeLista(listaId: Long): Flow<List<String?>> = db.aparienciaDao().nombresDeLista(listaId)
 
@@ -146,13 +149,20 @@ class CatalogoRepositorio
          * timeout, un 4xx/5xx o una respuesta vacía devuelven un error tipado
          * sin tocar el catálogo ya persistido.
          *
-         * [alFase] informa el progreso con fases reales; se invoca desde el
-         * hilo de E/S y nunca lleva datos de la lista ni de la ubicación.
+         * [alFase] informa el progreso con fases reales; [alAvance] publica
+         * una foto de avance cada 500 ms (entradas, canales, bytes, tiempo).
+         * Ambos se invocan desde el hilo de E/S y nunca llevan datos de la
+         * lista ni de la ubicación (E7-T7, S21).
+         *
+         * La cancelación es cooperativa: cancelar el `Job` del llamador hace
+         * que el siguiente tick lance `CancellationException` y aborte la
+         * lectura o el procesamiento sin tocar el catálogo previo (S22).
          */
         suspend fun importarDesdeUrl(
             nombreFuente: String,
             url: String,
             alFase: (FaseImportacion) -> Unit = {},
+            alAvance: (AvanceVisible) -> Unit = {},
         ): ResumenImportacion =
             withContext(io) {
                 val canonica = canonicalizar(url)
@@ -165,23 +175,79 @@ class CatalogoRepositorio
                 val sello =
                     indice.selloHmac() as? SelloIndiceHmac.Disponible
                         ?: return@withContext ResumenImportacion(null, 0, 0, ERROR_INDICE_HMAC_NO_OPERATIVO)
-                when (val descarga = descargar(canonica.urlCanonica, alFase)) {
-                    is Descarga.Ok -> {
-                        alFase(FaseImportacion.PROCESANDO)
-                        val inicioProceso = System.currentTimeMillis()
-                        val importado = ImportadorM3U.importar(descarga.parseo, sello.clave, sello.generacion)
-                        val diagnostico =
-                            descarga.diagnostico.copy(
-                                entradasDetectadas = descarga.parseo.entradas.size,
-                                tiempoProcesamientoMs = System.currentTimeMillis() - inicioProceso,
+                val avance = AvanceImportacion()
+                // El Job activo aquí es el que el usuario cancela: los ticks
+                // cooperativos lo consultan para abortar parseo y procesamiento
+                // (el trabajo es bloqueante, sin puntos de suspensión).
+                val contexto = currentCoroutineContext()
+                // Cada transición de fase es un punto de chequeo del vigilante
+                // de avance: si pasó el umbral sin progreso, aborta tipado.
+                val faseVerificada: (FaseImportacion) -> Unit = { fase ->
+                    contexto.ensureActive()
+                    avance.verificar()
+                    alFase(fase)
+                }
+                val publicador =
+                    launch {
+                        while (true) {
+                            delay(AvanceImportacion.INTERVALO_PUBLICACION_MS)
+                            alAvance(avance.foto())
+                        }
+                    }
+                val activo = { contexto.ensureActive() }
+                try {
+                    when (val descarga = descargar(canonica.urlCanonica, faseVerificada, avance, activo)) {
+                        is Descarga.Ok -> {
+                            faseVerificada(FaseImportacion.PROCESANDO)
+                            val inicioProceso = System.currentTimeMillis()
+                            val importado =
+                                ImportadorM3U
+                                    .importarDeclaraciones(
+                                        descarga.lectura.declaraciones,
+                                        sello.clave,
+                                        sello.generacion,
+                                    ) { procesados ->
+                                        contexto.ensureActive()
+                                        avance.verificar()
+                                        avance.ticCanal(procesados)
+                                    }.copy(diagnosticos = descarga.lectura.diagnosticos)
+                            val diagnostico =
+                                descarga.diagnostico.copy(
+                                    entradasDetectadas = descarga.lectura.entradas,
+                                    canalesDetectados = importado.canales.size,
+                                    tiempoProcesamientoMs = System.currentTimeMillis() - inicioProceso,
+                                    ultimoAvance = avance.texto(),
+                                )
+                            persistir(
+                                nombreFuente,
+                                url,
+                                canonica,
+                                importado,
+                                sello,
+                                diagnostico,
+                                faseVerificada,
+                                avance,
                             )
-                        persistir(nombreFuente, url, canonica, importado, sello, diagnostico, alFase)
+                        }
+                        is Descarga.Fallo -> {
+                            registrarFallo(nombreFuente, descarga.codigo)
+                            logDiagnostico(descarga.diagnostico, descarga.codigo)
+                            ResumenImportacion(null, 0, 0, descarga.codigo, diagnostico = descarga.diagnostico)
+                        }
                     }
-                    is Descarga.Fallo -> {
-                        registrarFallo(nombreFuente, descarga.codigo)
-                        logDiagnostico(descarga.diagnostico, descarga.codigo)
-                        ResumenImportacion(null, 0, 0, descarga.codigo, diagnostico = descarga.diagnostico)
-                    }
+                } catch (detencion: ImportacionAvanceDetenido) {
+                    val codigo = ERROR_AVANCE_DETENIDO
+                    registrarFallo(nombreFuente, codigo)
+                    val diagnostico =
+                        DiagnosticoImportacion(
+                            ultimoAvance = avance.texto(),
+                            sinAvanceMs = detencion.msSinAvance,
+                            motivo = codigo,
+                        )
+                    logDiagnostico(diagnostico, codigo)
+                    ResumenImportacion(null, 0, 0, codigo, diagnostico = diagnostico)
+                } finally {
+                    publicador.cancel()
                 }
             }
 
@@ -279,6 +345,7 @@ class CatalogoRepositorio
             sello: SelloIndiceHmac.Disponible,
             diagnostico: DiagnosticoImportacion = DiagnosticoImportacion(),
             alFase: (FaseImportacion) -> Unit = {},
+            avance: AvanceImportacion? = null,
         ): ResumenImportacion {
             val diagnosticos = importado.diagnosticos.map { it.codigo.codigo }
             if (importado.canales.isEmpty()) {
@@ -306,7 +373,7 @@ class CatalogoRepositorio
                                 registrarIntento(existente.id, RESULTADO_SIN_CAMBIOS)
                                 existente
                             } else {
-                                escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales, sello)
+                                escribirCatalogo(nombreFuente, ubicacion, canonica, importado.canales, sello, avance)
                             }
                         // La Lista importada queda como única activa, también
                         // cuando ya existía: reintentar o repetir la importación
@@ -354,10 +421,19 @@ class CatalogoRepositorio
          * mientras fluye el cuerpo: el parseo consume el flujo en caliente, así
          * que la lectura de red domina esa fase. El diagnóstico recoge código
          * HTTP, tipo de contenido, bytes y tiempos, sin datos de la lista.
+         *
+         * E7-T7: la lectura no retiene las entradas del parser; cada una se
+         * convierte a declaración de identidad al completarse y el avance se
+         * publica por entrada (S21/S22). El chequeo de detención NO corre en
+         * los ticks de entrada: en red lenta pero viva el que manda es el
+         * timeout de lectura, y abortar antes sería descartar servidores
+         * legítimamente lentos.
          */
         private fun descargar(
             url: String,
             alFase: (FaseImportacion) -> Unit,
+            avance: AvanceImportacion,
+            activo: () -> Unit,
         ): Descarga {
             if (url.startsWith("http://", ignoreCase = true) && !verificaCleartext.permitido(URL(url).host)) {
                 return Descarga.Fallo(ERROR_BLOQUEO_HTTP, DiagnosticoImportacion(motivo = ERROR_BLOQUEO_HTTP))
@@ -377,9 +453,17 @@ class CatalogoRepositorio
                         val tipoContenido = conexion.contentType
                         conexion.inputStream.use { entrada ->
                             val contada = InputStreamContado(entrada)
-                            val parseo = ParserM3U.parsear(contada, LimitesParserM3U())
+                            avance.bytesProveedor = { contada.contados }
+                            val lectura =
+                                ImportadorM3U.leerDeclaraciones(
+                                    contada,
+                                    LimitesParserM3U(),
+                                ) { total ->
+                                    activo()
+                                    avance.ticEntrada(total)
+                                }
                             Descarga.Ok(
-                                parseo,
+                                lectura,
                                 DiagnosticoImportacion(
                                     codigoHttp = codigo,
                                     tipoContenido = tipoContenido,
@@ -485,6 +569,7 @@ class CatalogoRepositorio
             canonica: ResultadoCanonizacion.Ok,
             canales: List<CanalImportadoM3U>,
             sello: SelloIndiceHmac.Disponible,
+            avance: AvanceImportacion? = null,
         ): ListaPersistida {
             val ahora = Instant.now()
             val fuenteId =
@@ -535,61 +620,140 @@ class CatalogoRepositorio
                         inicio = ahora,
                     ),
                 )
-            var orden = 0
-            for (canal in canales) {
+            val entidades =
+                prepararEntidadesCanales(canales, fuenteId, ahora, avance)
+            val idsCanales = ArrayList<Long>(entidades.size)
+            entidades.chunked(LOTE_INSERTAR).forEach { lote ->
+                idsCanales += db.canalDao().insertarTodos(lote)
+                avance?.ticPreparacion(entidades.size)
+            }
+            val grupoIdPorNombre = prepararGrupos(canales, idLista)
+            val filasApariencias = prepararApariencias(canales, idLista, idsCanales, grupoIdPorNombre, ahora, avance)
+            filasApariencias.chunked(LOTE_INSERTAR).forEach { lote ->
+                db.aparienciaDao().insertarTodas(lote)
+                avance?.ticPreparacion(entidades.size)
+            }
+            db.estadoActualizacionDao().finalizar(idEstado, Instant.now(), RESULTADO_COMPLETADA)
+            return ListaPersistida(idLista, canales.size)
+        }
+
+        /**
+         * Prepara las entidades de `Canal` con validación previa de todas las
+         * filas (E7-T7, S22/S26).
+         *
+         * La misma semántica de rechazo de `CanalEscritor.insertar`: la
+         * primera violación de invariantes aborta con `CanalRechazado` y la
+         * transacción externa revierte. El cifrado de URL y logo (AES con
+         * clave de Keystore) es la etapa dominante, así que el avance se
+         * emite por canal.
+         */
+        private fun prepararEntidadesCanales(
+            canales: List<CanalImportadoM3U>,
+            fuenteId: Long,
+            ahora: Instant,
+            avance: AvanceImportacion?,
+        ): List<CanalEntity> {
+            val entidades = ArrayList<CanalEntity>(canales.size)
+            canales.forEachIndexed { indice, canal ->
                 val tvg = canal.tvgId
                 // La forma persistida de la clave de unicidad es la única fuente de
                 // verdad sobre si el tvg-id habilitó la clave (§6.3.2).
                 val tvgUnico = tvg != null && canal.claveUnicidad == ClaveCanal.PREFIJO_TVG + tvg
-                val canalId =
-                    escritorCanales.insertar(
-                        CanalEntity(
-                            fuenteId = fuenteId,
-                            nombre = canal.nombre,
-                            urlStreamCifrada =
-                                CifradoAes.cifrar(
-                                    claves.claveAes,
-                                    CifradoAes.aad("Canal", "url_stream_cifrada"),
-                                    canal.urlOriginal.toByteArray(Charsets.UTF_8),
-                                ),
-                            urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
-                            logoUrlCifrada = cifrarLogo(canal.logoOriginal),
-                            logoUrlHmac = canal.logoHmac?.toByteArray(Charsets.UTF_8),
-                            tvgId = canal.tvgId,
-                            claveCanonica = canal.claveCanonica,
-                            claveUnicidad = canal.claveUnicidad,
-                            claveDerivable = canal.claveDerivable,
-                            atributosExtra = CodecAtributosExtra.codificar(canal.atributosExtra),
+                val entidad =
+                    CanalEntity(
+                        fuenteId = fuenteId,
+                        nombre = canal.nombre,
+                        urlStreamCifrada =
+                            CifradoAes.cifrar(
+                                claves.claveAes,
+                                CifradoAes.aad("Canal", "url_stream_cifrada"),
+                                canal.urlOriginal.toByteArray(Charsets.UTF_8),
+                            ),
+                        urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
+                        logoUrlCifrada = cifrarLogo(canal.logoOriginal),
+                        logoUrlHmac = canal.logoHmac?.toByteArray(Charsets.UTF_8),
+                        tvgId = canal.tvgId,
+                        claveCanonica = canal.claveCanonica,
+                        claveUnicidad = canal.claveUnicidad,
+                        claveDerivable = canal.claveDerivable,
+                        atributosExtra = CodecAtributosExtra.codificar(canal.atributosExtra),
+                        creadoEn = ahora,
+                        actualizadoEn = ahora,
+                    )
+                val violaciones =
+                    InvariantesCanal.validar(
+                        FilaCanal(
+                            nombre = entidad.nombre,
+                            estado = entidad.estado,
+                            claveDerivable = entidad.claveDerivable,
+                            claveCanonica = entidad.claveCanonica,
+                            claveUnicidad = entidad.claveUnicidad,
+                            tvgId = entidad.tvgId,
+                            urlStreamCifradaPresente = entidad.urlStreamCifrada.isNotEmpty(),
+                            urlStreamHmacPresente = entidad.urlStreamHmac.isNotEmpty(),
+                        ),
+                        tvgUnico,
+                    )
+                if (violaciones.isNotEmpty()) throw CanalRechazado(violaciones)
+                entidades += entidad
+                avance?.ticPreparacion(indice + 1)
+            }
+            return entidades
+        }
+
+        /** Grupos únicos de la importación, insertados por lotes una sola vez. */
+        private suspend fun prepararGrupos(
+            canales: List<CanalImportadoM3U>,
+            idLista: Long,
+        ): Map<String, Long> {
+            val nombres = LinkedHashSet<String>()
+            canales.forEach { canal ->
+                canal.apariencias.forEach { apariencia -> apariencia.groupTitle?.let { nombres.add(it) } }
+            }
+            val ids =
+                db.grupoDao().insertarTodos(nombres.map { nombre -> GrupoEntity(listaId = idLista, nombre = nombre) })
+            return nombres.zip(ids).toMap()
+        }
+
+        /**
+         * Filas de `Apariencia` listas para inserción por lotes.
+         *
+         * La Lista se crea en esta misma transacción, así que no existen filas
+         * previas ni pendientes de migración para sus tuplas: el upsert por
+         * fila de `AparienciaEscritor` sería siempre una inserción con las
+         * repeticiones tal como llegan y sin conflicto. Se conserva el `orden`
+         * secuencial idéntico al camino anterior (E7-T7, S26).
+         */
+        private fun prepararApariencias(
+            canales: List<CanalImportadoM3U>,
+            idLista: Long,
+            idsCanales: List<Long>,
+            grupoIdPorNombre: Map<String, Long>,
+            ahora: Instant,
+            avance: AvanceImportacion?,
+        ): List<AparienciaEntity> {
+            val filas = ArrayList<AparienciaEntity>()
+            var orden = 0
+            canales.forEachIndexed { indice, canal ->
+                val canalId = idsCanales[indice]
+                canal.apariencias.forEach { apariencia ->
+                    filas +=
+                        AparienciaEntity(
+                            listaId = idLista,
+                            canalId = canalId,
+                            grupoId = apariencia.groupTitle?.let { grupoIdPorNombre[it] },
+                            orden = orden++,
+                            groupTitle = apariencia.groupTitle,
+                            tvgName = apariencia.tvgName,
+                            clavePresentacion = apariencia.clavePresentacion,
+                            repeticiones = apariencia.repeticiones,
                             creadoEn = ahora,
                             actualizadoEn = ahora,
-                        ),
-                        tvgIdUnicoEnFuente = tvgUnico,
-                    )
-                for (apariencia in canal.apariencias) {
-                    val grupoId = apariencia.groupTitle?.let { insertarGrupo(idLista, it) }
-                    val escritura =
-                        escritorApariencias.upsert(
-                            AparienciaEntity(
-                                listaId = idLista,
-                                canalId = canalId,
-                                grupoId = grupoId,
-                                orden = orden++,
-                                groupTitle = apariencia.groupTitle,
-                                tvgName = apariencia.tvgName,
-                                clavePresentacion = apariencia.clavePresentacion,
-                                repeticiones = apariencia.repeticiones,
-                                creadoEn = ahora,
-                                actualizadoEn = ahora,
-                            ),
-                            ahora,
                         )
-                    if (escritura is ResultadoUpsertApariencia.Rechazada) {
-                        throw ImportacionRechazada(escritura.codigo)
-                    }
                 }
+                avance?.ticPreparacion(orden)
             }
-            db.estadoActualizacionDao().finalizar(idEstado, Instant.now(), RESULTADO_COMPLETADA)
-            return ListaPersistida(idLista, canales.size)
+            return filas
         }
 
         private fun cifrarLogo(logo: String?): ByteArray? =
@@ -601,20 +765,13 @@ class CatalogoRepositorio
                 )
             }
 
-        private suspend fun insertarGrupo(
-            listaId: Long,
-            nombre: String,
-        ): Long =
-            db.grupoDao().porNombre(listaId, nombre)?.id
-                ?: db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = nombre))
-
         /** Lista persistida y cantidad de Canales que la Fuente ya tiene. */
         private data class ListaPersistida(val id: Long, val canales: Int)
 
         /** Resultado interno de una descarga HTTP. */
         private sealed interface Descarga {
             data class Ok(
-                val parseo: ResultadoParserM3U,
+                val lectura: LecturaM3U,
                 val diagnostico: DiagnosticoImportacion,
             ) : Descarga
 
@@ -648,6 +805,10 @@ class CatalogoRepositorio
             const val ERROR_BLOQUEO_HTTP = "bloqueo_http"
             const val ERROR_HTTP_5XX = "http_5xx"
             const val ERROR_SIN_CANALES = "sin_canales"
+            const val ERROR_AVANCE_DETENIDO = "avance_detenido"
+
+            /** Tamaño de los lotes de inserción por filas (E7-T7, S22). */
+            const val LOTE_INSERTAR = 2000
         }
     }
 

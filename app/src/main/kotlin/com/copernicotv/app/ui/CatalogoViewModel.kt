@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import com.copernicotv.app.data.AvanceVisible
 import com.copernicotv.app.data.BusquedaCatalogoRepositorio
 import com.copernicotv.app.data.CanalBusqueda
 import com.copernicotv.app.data.CatalogoCrudRepositorio
@@ -55,12 +56,15 @@ import javax.inject.Inject
 /**
  * Estado visible del diálogo de importación por URL (E7-T7).
  *
- * `fase` lleva el código de la fase en curso; `canales` aparece solo al
- * completar la persistencia; `error` con su causa solo cuando falló. Mientras
- * hay importación activa el diálogo no se cierra y los campos no se pierden.
+ * `fase` lleva el código de la fase en curso; `avance` es la línea técnica de
+ * progreso (entradas, canales, bytes y tiempo) que se publica cada 500 ms;
+ * `canales` aparece solo al completar la persistencia; `error` con su causa
+ * solo cuando falló. Mientras hay importación activa el diálogo no se cierra
+ * y los campos no se pierden.
  */
 data class ImportacionUrlUi(
     val fase: String? = null,
+    val avance: String? = null,
     val canales: Int? = null,
     val error: String? = null,
     val diagnostico: DiagnosticoImportacion? = null,
@@ -110,6 +114,9 @@ class CatalogoViewModel
         private val _estado = MutableStateFlow(CatalogoUiState())
         val estado: StateFlow<CatalogoUiState> = _estado.asStateFlow()
         private var observacion: Job? = null
+
+        /** Trabajo en curso de la importación por URL; lo cancela el usuario. */
+        private var trabajoImportacionUrl: Job? = null
 
         private val _criterios = MutableStateFlow(CriteriosBusqueda())
         val criterios: StateFlow<CriteriosBusqueda> = _criterios.asStateFlow()
@@ -472,56 +479,89 @@ class CatalogoViewModel
                     mensaje = null,
                     importacionUrl = ImportacionUrlUi(fase = FaseImportacion.CONECTANDO.codigo),
                 )
-            viewModelScope.launch {
-                val resumen =
-                    try {
-                        repositorio.importarDesdeUrl(nombre, ubicacion) { fase ->
-                            _estado.update { actual ->
-                                actual.copy(
-                                    importacionUrl = actual.importacionUrl?.copy(fase = fase.codigo),
+            trabajoImportacionUrl =
+                viewModelScope.launch {
+                    val resumen =
+                        try {
+                            repositorio.importarDesdeUrl(
+                                nombre,
+                                ubicacion,
+                                alFase = { fase ->
+                                    _estado.update { actual ->
+                                        actual.copy(
+                                            importacionUrl = actual.importacionUrl?.copy(fase = fase.codigo),
+                                        )
+                                    }
+                                },
+                                alAvance = { visible ->
+                                    val linea = lineaAvance(visible)
+                                    _estado.update { actual ->
+                                        actual.copy(
+                                            importacionUrl = actual.importacionUrl?.copy(avance = linea),
+                                        )
+                                    }
+                                },
+                            )
+                        } catch (cancelacion: CancellationException) {
+                            throw cancelacion
+                        } catch (fallo: Exception) {
+                            // El código de UI no distingue causas a propósito: es
+                            // texto seguro y estable. El detalle técnico va al log
+                            // sin mensajes de excepción, para no filtrar la URL de
+                            // la Lista ni credenciales (S57a).
+                            Log.e(TAG, "Importación fallida\n${detalleTecnico(fallo)}")
+                            _estado.value =
+                                _estado.value.copy(
+                                    importando = false,
+                                    mensaje = CODIGO_FALLO,
+                                    importacionUrl = ImportacionUrlUi(error = CODIGO_FALLO),
                                 )
-                            }
+                            return@launch
                         }
-                    } catch (cancelacion: CancellationException) {
-                        throw cancelacion
-                    } catch (fallo: Exception) {
-                        // El código de UI no distingue causas a propósito: es
-                        // texto seguro y estable. El detalle técnico va al log
-                        // sin mensajes de excepción, para no filtrar la URL de
-                        // la Lista ni credenciales (S57a).
-                        Log.e(TAG, "Importación fallida\n${detalleTecnico(fallo)}")
+                    val listaId = resumen.listaId
+                    if (listaId == null) {
                         _estado.value =
                             _estado.value.copy(
                                 importando = false,
-                                mensaje = CODIGO_FALLO,
-                                importacionUrl = ImportacionUrlUi(error = CODIGO_FALLO),
+                                mensaje = resumen.error ?: CODIGO_SIN_LISTA,
+                                importacionUrl =
+                                    ImportacionUrlUi(
+                                        error = resumen.error ?: CODIGO_SIN_LISTA,
+                                        diagnostico = resumen.diagnostico,
+                                    ),
                             )
                         return@launch
                     }
-                val listaId = resumen.listaId
-                if (listaId == null) {
                     _estado.value =
                         _estado.value.copy(
                             importando = false,
-                            mensaje = resumen.error ?: CODIGO_SIN_LISTA,
-                            importacionUrl =
-                                ImportacionUrlUi(
-                                    error = resumen.error ?: CODIGO_SIN_LISTA,
-                                    diagnostico = resumen.diagnostico,
-                                ),
+                            listaId = listaId,
+                            mensaje = null,
+                            importacionUrl = ImportacionUrlUi(canales = resumen.canales),
                         )
-                    return@launch
+                    observarCatalogo()
                 }
-                _estado.value =
-                    _estado.value.copy(
-                        importando = false,
-                        listaId = listaId,
-                        mensaje = null,
-                        importacionUrl = ImportacionUrlUi(canales = resumen.canales),
-                    )
-                observarCatalogo()
-            }
         }
+
+        /**
+         * Cancela la importación por URL en curso (E7-T7, S22).
+         *
+         * Cancelar el `Job` detiene el parseo y el procesamiento en el
+         * siguiente punto de avance cooperativo: la transacción Room no llegó
+         * a abrirse o revierte al suspenderse, así que el catálogo previo
+         * queda intacto. También deja el diálogo como recién abierto.
+         */
+        fun cancelarImportacionUrl() {
+            trabajoImportacionUrl?.cancel()
+            trabajoImportacionUrl = null
+            _estado.value =
+                _estado.value.copy(importando = false, mensaje = null, importacionUrl = null)
+        }
+
+        /** Línea técnica de avance para la UI, sin datos de la lista. */
+        private fun lineaAvance(avance: AvanceVisible): String =
+            "entradas=${avance.entradas} canales=${avance.canales} preparando=${avance.preparando} " +
+                "bytes=${avance.bytes} t=${avance.msTranscurrido / 1000}s"
 
         /**
          * Deja el diálogo de importación por URL como recién abierto.

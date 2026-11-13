@@ -14,8 +14,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.copernicotv.app.R
 import com.copernicotv.app.data.DiagnosticoImportacion
@@ -34,6 +36,7 @@ internal fun DialogoImportarUrl(
     importando: Boolean,
     onGuardar: (String, String) -> Unit,
     onCancelar: () -> Unit,
+    onCancelarImportacion: () -> Unit,
 ) {
     var nombre by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
@@ -85,9 +88,16 @@ internal fun DialogoImportarUrl(
             }
         },
         dismissButton = {
+            // Cancelar siempre está disponible: en curso cancela la
+            // importación de forma segura; después cierra el diálogo.
             TextButton(
-                onClick = onCancelar,
-                enabled = !enCurso,
+                onClick = {
+                    if (enCurso) {
+                        onCancelarImportacion()
+                    } else {
+                        onCancelar()
+                    }
+                },
                 modifier = Modifier.testTag(TAG_DIALOGO_CANCELAR),
             ) {
                 Text(stringResource(R.string.catalogo_cancelar))
@@ -101,18 +111,30 @@ internal fun DialogoImportarUrl(
 private fun EstadoImportacionUrl(estado: ImportacionUrlUi) {
     when {
         estado.fase != null -> {
-            Text(
-                text = stringResource(textoDeFase(estado.fase)),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag(TAG_IMPORTAR_URL_FASE),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(textoDeFase(estado.fase)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.testTag(TAG_IMPORTAR_URL_FASE),
+                )
+                estado.avance?.let { linea ->
+                    Text(
+                        text = linea,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag(TAG_IMPORTAR_URL_AVANCE),
+                    )
+                }
+            }
         }
         estado.canales != null -> {
-            Text(
-                text = stringResource(R.string.catalogo_importar_completada, estado.canales),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.testTag(TAG_IMPORTAR_URL_EXITO),
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.catalogo_importar_completada, estado.canales),
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.testTag(TAG_IMPORTAR_URL_EXITO),
+                )
+                BotonInforme(estado, "completada")
+            }
         }
         estado.error != null -> {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -131,7 +153,30 @@ private fun EstadoImportacionUrl(estado: ImportacionUrlUi) {
                     text = stringResource(R.string.catalogo_importar_reintentar),
                     style = MaterialTheme.typography.bodySmall,
                 )
+                BotonInforme(estado, estado.error)
             }
+        }
+    }
+}
+
+/**
+ * Botón «Copiar informe» (E7-T7, S21): pone el informe diagnóstico seguro en
+ * el portapapeles del dispositivo, sin ADB y sin datos sensibles.
+ */
+@Composable
+private fun BotonInforme(
+    estado: ImportacionUrlUi,
+    resultado: String,
+) {
+    val portapapeles = LocalClipboardManager.current
+    estado.diagnostico?.let { diagnostico ->
+        TextButton(
+            onClick = {
+                portapapeles.setText(AnnotatedString(diagnostico.aInforme(resultado)))
+            },
+            modifier = Modifier.testTag(TAG_IMPORTAR_URL_INFORME),
+        ) {
+            Text(stringResource(R.string.catalogo_importar_informe))
         }
     }
 }

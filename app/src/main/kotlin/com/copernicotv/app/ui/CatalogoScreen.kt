@@ -96,6 +96,12 @@ const val TAG_IMPORTAR_URL = "importar-url"
 /** Fase visible dentro del diálogo de importación por URL (E7-T7). */
 const val TAG_IMPORTAR_URL_FASE = "importar-url-fase"
 
+/** Línea técnica de avance visible durante la importación (E7-T7). */
+const val TAG_IMPORTAR_URL_AVANCE = "importar-url-avance"
+
+/** Botón «Copiar informe» del diálogo de importación por URL (E7-T7). */
+const val TAG_IMPORTAR_URL_INFORME = "importar-url-informe"
+
 /** Error con causa dentro del diálogo de importación por URL (E7-T7). */
 const val TAG_IMPORTAR_URL_ERROR = "importar-url-error"
 
@@ -329,6 +335,7 @@ data class CatalogoAcciones(
     val onAbrirDocumento: () -> Unit,
     val onImportarUrl: (String, String) -> Unit,
     val onImportarUrlReiniciar: () -> Unit,
+    val onImportarUrlCancelar: () -> Unit,
     val onActualizar: () -> Unit,
     val onTexto: (String) -> Unit,
     val onGrupo: (Long?) -> Unit,
@@ -950,6 +957,7 @@ private fun DialogoCatalogoActivo(
                 importando = importando,
                 onGuardar = { nombre, url -> acciones.onImportarUrl(nombre, url) },
                 onCancelar = { onDialogo(null) },
+                onCancelarImportacion = acciones.onImportarUrlCancelar,
             )
         DialogoCatalogo.NuevoCanal ->
             DialogoCanal(

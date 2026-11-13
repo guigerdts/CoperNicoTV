@@ -97,6 +97,10 @@ data class EntradaM3U(
 data class ResultadoParserM3U(
     val entradas: List<EntradaM3U>,
     val diagnosticos: List<DiagnosticoM3U>,
+    /** Líneas físicas procesadas, incluidas vacías o descartadas (E7-T7 ronda 3, S28). */
+    val lineasLeidas: Long = 0,
+    /** Bloques `#EXTINF` encontrados, incluidos los sin URL o de línea excedida (S28). */
+    val extinfEncontrados: Long = 0,
 ) {
     fun diagnostico(codigo: CodigoM3U): DiagnosticoM3U? = diagnosticos.firstOrNull { it.codigo == codigo }
 

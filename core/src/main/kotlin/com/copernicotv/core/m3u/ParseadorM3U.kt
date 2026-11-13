@@ -22,6 +22,7 @@ internal class ParseadorM3U(
     private var cabeceraEvaluada = false
     private var numeroLinea = 0L
     private var ordinal = 0L
+    private var extinfEncontrados = 0L
 
     fun parsear(entrada: InputStream): ResultadoParserM3U {
         val lector = LectorLineas.crear(entrada, limites.maxLongitudLinea)
@@ -32,7 +33,12 @@ internal class ParseadorM3U(
             procesar(leida)
         }
         cerrarPendiente()
-        return ResultadoParserM3U(entradas.toList(), diagnosticos.resultado())
+        return ResultadoParserM3U(
+            entradas = entradas.toList(),
+            diagnosticos = diagnosticos.resultado(),
+            lineasLeidas = numeroLinea,
+            extinfEncontrados = extinfEncontrados,
+        )
     }
 
     private fun procesar(leida: LineaLeida) {
@@ -46,6 +52,7 @@ internal class ParseadorM3U(
     private fun descartarPorLineaExcedida(prefijo: String) {
         diagnosticos.registrar(CodigoM3U.LINEA_EXCEDIDA, UbicacionM3U(numeroLinea, pendiente?.ordinal))
         if (pendiente != null || prefijo.startsWith(EXTINF, ignoreCase = true)) {
+            if (pendiente == null) extinfEncontrados++
             pendiente = null
             descartada = true
         }
@@ -80,6 +87,7 @@ internal class ParseadorM3U(
         cerrarPendiente()
         descartada = false
         ordinal++
+        extinfEncontrados++
         pendiente = interpretarExtinf(texto)
     }
 

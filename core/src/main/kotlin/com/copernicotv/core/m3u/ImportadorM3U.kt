@@ -11,6 +11,7 @@ import com.copernicotv.core.identity.ColisionCanonica
 import com.copernicotv.core.identity.DeclaracionCanal
 import com.copernicotv.core.identity.DeclaracionRechazada
 import java.io.InputStream
+import java.util.Locale
 import javax.crypto.SecretKey
 
 /** Canal listo para persistir, con URL y logo cifrables y sus HMAC. */
@@ -35,10 +36,50 @@ data class ResultadoImportacionM3U(
     val colisiones: List<ColisionCanonica>,
     val diagnosticos: List<DiagnosticoM3U>,
     val repeticionesInformativas: Int,
+    /** Declaraciones de identidad recibidas antes de agrupar (S28). */
+    val declaracionesRecibidas: Int = 0,
+    /** Tiempo de la agrupación de identidad (canonización, dedup, derivar) (S28). */
+    val tiempoAgrupacionMs: Long = 0,
+    /** Tiempo del bucle de sobres HMAC por canal único (S28). */
+    val tiempoHmacMs: Long = 0,
+    /** Operaciones HMAC ejecutadas: 1 por canal único + 1 por canal con logo (S28). */
+    val operacionesCriptograficas: Int = 0,
 ) {
     /** Diagnósticos de severidad error; no impiden persistir el catálogo recuperado. */
     val errores: List<DiagnosticoM3U>
         get() = diagnosticos.filter { it.severidad == SeveridadM3U.ERROR }
+}
+
+/**
+ * Clasificación informativa de una entrada según su ruta (solo diagnóstico).
+ *
+ * Heurística del formato Xtream M3U Plus: la ruta del stream lleva `/live/`
+ * para TV en directo y `/movie/` o `/series/` para VOD (película o episodio).
+ * Solo clasifica para el informe (S28): nunca filtra ni descarta entradas
+ * (S30) y todo lo no reconocido queda en `OTRO`.
+ */
+internal enum class TipoEntradaM3U {
+    TV,
+    VOD,
+    OTRO,
+}
+
+/** Clasifica una URL de entrada por su ruta; solo informativo, nunca excluye. */
+internal fun clasificarEntrada(url: String?): TipoEntradaM3U {
+    if (url.isNullOrBlank()) return TipoEntradaM3U.OTRO
+    val doblesBarra = url.indexOf("//")
+    if (doblesBarra < 0) return TipoEntradaM3U.OTRO
+    val inicioRuta = url.indexOf('/', doblesBarra + 2)
+    if (inicioRuta < 0) return TipoEntradaM3U.OTRO
+    var finRuta = url.length
+    url.indexOf('?', inicioRuta).let { if (it in inicioRuta until finRuta) finRuta = it }
+    url.indexOf('#', inicioRuta).let { if (it in inicioRuta until finRuta) finRuta = it }
+    val ruta = url.substring(inicioRuta, finRuta).lowercase(Locale.ROOT)
+    return when {
+        ruta.contains("/live/") -> TipoEntradaM3U.TV
+        ruta.contains("/movie/") || ruta.contains("/series/") -> TipoEntradaM3U.VOD
+        else -> TipoEntradaM3U.OTRO
+    }
 }
 
 /**
@@ -49,12 +90,26 @@ data class ResultadoImportacionM3U(
  * entradas del parser, solo las declaraciones de identidad. En listas con
  * VOD/series (decenas de miles de entradas) esto evita mantener dos copias del
  * catálogo en memoria durante la importación.
+ *
+ * Los contadores de clasificación (S28) son solo informativos: TV/VOD/OTRO
+ * según la heurística de [clasificarEntrada]; la suma de los tres es
+ * [entradas].
  */
 data class LecturaM3U(
     val declaraciones: List<DeclaracionCanal>,
     val diagnosticos: List<DiagnosticoM3U>,
     /** Entradas emitidas por el parser, incluidas las rechazadas después. */
     val entradas: Int,
+    /** Líneas físicas leídas por el parser, incluidas vacías o descartadas. */
+    val lineasLeidas: Long = 0,
+    /** Bloques `#EXTINF` encontrados, incluidos los sin URL o con línea excedida. */
+    val extinfEncontrados: Long = 0,
+    /** Entradas clasificadas como TV en directo por la ruta de su URL. */
+    val entradasTv: Int = 0,
+    /** Entradas clasificadas como VOD (película o serie) por la ruta de su URL. */
+    val entradasVod: Int = 0,
+    /** Entradas sin marcador de ruta reconocido; nunca se descartan por esto. */
+    val entradasOtro: Int = 0,
 )
 
 /**
@@ -71,6 +126,9 @@ object ImportadorM3U {
 
     /** Generación HMAC inicial: `v1`. */
     const val GENERACION_HMAC: Int = 1
+
+    /** Nanosegundos por milisegundo para los tiempos de etapa (S28). */
+    private const val NANOS_POR_MS = 1_000_000L
 
     /**
      * Importa un flujo sin cerrarlo; el llamador conserva su propiedad.
@@ -127,18 +185,40 @@ object ImportadorM3U {
     ): LecturaM3U {
         val declaraciones = ArrayList<DeclaracionCanal>()
         var emitidas = 0
+        var entradasTv = 0
+        var entradasVod = 0
+        var entradasOtro = 0
         val parseo =
             ParserM3U.parsear(entrada, limites) { entradaM3u ->
                 declaraciones += declaracion(entradaM3u)
+                when (clasificarEntrada(entradaM3u.url)) {
+                    TipoEntradaM3U.TV -> entradasTv++
+                    TipoEntradaM3U.VOD -> entradasVod++
+                    TipoEntradaM3U.OTRO -> entradasOtro++
+                }
                 emitidas++
                 alAvance?.invoke(emitidas)
             }
-        return LecturaM3U(declaraciones, parseo.diagnosticos, emitidas)
+        return LecturaM3U(
+            declaraciones = declaraciones,
+            diagnosticos = parseo.diagnosticos,
+            entradas = emitidas,
+            lineasLeidas = parseo.lineasLeidas,
+            extinfEncontrados = parseo.extinfEncontrados,
+            entradasTv = entradasTv,
+            entradasVod = entradasVod,
+            entradasOtro = entradasOtro,
+        )
     }
 
     /**
      * Procesa declaraciones ya leídas: agrupación de identidad y cálculo de
      * sobres HMAC.
+     *
+     * [alAvanceAgrupacion] recibe el total de declaraciones canonizadas por
+     * [AgrupadorImportacion.agrupar] y se invoca por lote: hace visible la
+     * etapa de agrupación, que en listas de decenas de miles de entradas es la
+     * más larga y era la ventana muda del vigilante de avance (L13).
      *
      * [alAvance] recibe el total de canales procesados hasta el momento y se
      * invoca por canal; puede lanzar `CancellationException` para abortar de
@@ -152,20 +232,31 @@ object ImportadorM3U {
         declaraciones: List<DeclaracionCanal>,
         claveHmac: SecretKey,
         generacionHmac: Int = GENERACION_HMAC,
+        alAvanceAgrupacion: ((declaracionesAgrupadas: Int) -> Unit)? = null,
         alAvance: ((canalesProcesados: Int) -> Unit)? = null,
     ): ResultadoImportacionM3U {
-        val agrupado = AgrupadorImportacion.agrupar(declaraciones, CampoUrl.CANAL_URL_STREAM)
+        val inicioAgrupacion = System.nanoTime()
+        val agrupado = AgrupadorImportacion.agrupar(declaraciones, CampoUrl.CANAL_URL_STREAM, alAvanceAgrupacion)
+        val tiempoAgrupacionMs = (System.nanoTime() - inicioAgrupacion) / NANOS_POR_MS
+        val inicioHmac = System.nanoTime()
         val canales = ArrayList<CanalImportadoM3U>(agrupado.canales.size)
+        var operacionesCriptograficas = 0
         for ((indice, canal) in agrupado.canales.withIndex()) {
             canales += convertirCanal(canal, claveHmac, generacionHmac)
+            operacionesCriptograficas += if (canal.logoCanonica == null) 1 else 2
             if (alAvance != null) alAvance(indice + 1)
         }
+        val tiempoHmacMs = (System.nanoTime() - inicioHmac) / NANOS_POR_MS
         return ResultadoImportacionM3U(
             canales = canales,
             rechazadas = agrupado.rechazadas,
             colisiones = agrupado.colisiones,
             diagnosticos = emptyList(),
             repeticionesInformativas = agrupado.repeticionesInformativas,
+            declaracionesRecibidas = declaraciones.size,
+            tiempoAgrupacionMs = tiempoAgrupacionMs,
+            tiempoHmacMs = tiempoHmacMs,
+            operacionesCriptograficas = operacionesCriptograficas,
         )
     }
 

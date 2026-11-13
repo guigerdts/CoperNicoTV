@@ -12,6 +12,14 @@
     <string name="catalogo_url_lista">URL de la lista (http/https)</string>
     <string name="catalogo_vacio">Todavía no hay canales en esta lista.</string>
     <string name="catalogo_error">No se pudo importar: %1$s</string>
+    <string name="catalogo_importar_fase_conectando">Conectando…</string>
+    <string name="catalogo_importar_fase_descargando">Descargando lista…</string>
+    <string name="catalogo_importar_fase_procesando">Procesando M3U…</string>
+    <string name="catalogo_importar_fase_guardando">Guardando canales…</string>
+    <string name="catalogo_importar_completada">Importación completada: %1$d canales</string>
+    <string name="catalogo_importar_diagnostico">Detalle: %1$s</string>
+    <string name="catalogo_importar_reintentar">Puede reintentar con los datos ya introducidos.</string>
+    <string name="catalogo_cerrar">Cerrar</string>
     <string name="catalogo_buscar">Buscar por nombre</string>
     <string name="catalogo_limpiar">Limpiar</string>
     <string name="catalogo_todos">Todos</string>

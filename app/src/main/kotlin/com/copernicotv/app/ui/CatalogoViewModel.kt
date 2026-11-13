@@ -13,6 +13,8 @@ import com.copernicotv.app.data.ColeccionCanalResumen
 import com.copernicotv.app.data.ColeccionRepositorio
 import com.copernicotv.app.data.ColeccionResumen
 import com.copernicotv.app.data.CriteriosBusqueda
+import com.copernicotv.app.data.DiagnosticoImportacion
+import com.copernicotv.app.data.FaseImportacion
 import com.copernicotv.app.data.GrupoOpcion
 import com.copernicotv.app.data.HistorialRepositorio
 import com.copernicotv.app.data.HistorialResumen
@@ -51,6 +53,20 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
+ * Estado visible del diálogo de importación por URL (E7-T7).
+ *
+ * `fase` lleva el código de la fase en curso; `canales` aparece solo al
+ * completar la persistencia; `error` con su causa solo cuando falló. Mientras
+ * hay importación activa el diálogo no se cierra y los campos no se pierden.
+ */
+data class ImportacionUrlUi(
+    val fase: String? = null,
+    val canales: Int? = null,
+    val error: String? = null,
+    val diagnostico: DiagnosticoImportacion? = null,
+)
+
+/**
  * Estado observable de la pantalla de catálogo.
  *
  * `mensaje` lleva un código tipado, no texto: la capa de UI decide cómo se
@@ -64,6 +80,7 @@ data class CatalogoUiState(
     val mensaje: String? = null,
     val mensajeAccion: String? = null,
     val actualizacion: ResumenActualizacion? = null,
+    val importacionUrl: ImportacionUrlUi? = null,
 )
 
 /**
@@ -435,6 +452,11 @@ class CatalogoViewModel
          * El nombre lo escribe el usuario: no se deriva de la URL para no
          * persistir en claro el host ni credenciales en la columna `Fuente.nombre`
          * (S57a). La URL se descarga y valida en el repositorio antes de escribir.
+         *
+         * El diálogo no se cierra: la fase en curso, el error con su causa y el
+         * número de canales se exponen en [CatalogoUiState.importacionUrl].
+         * En fallo el estado conserva la importación para reintentar sin
+         * volver a escribir nombre ni URL (E7-T7).
          */
         fun importarDesdeUrl(
             nombreFuente: String,
@@ -443,7 +465,75 @@ class CatalogoViewModel
             val nombre = nombreFuente.trim()
             val ubicacion = url.trim()
             if (nombre.isEmpty() || ubicacion.isEmpty()) return
-            importar { repositorio.importarDesdeUrl(nombre, ubicacion) }
+            if (_estado.value.importando) return
+            _estado.value =
+                _estado.value.copy(
+                    importando = true,
+                    mensaje = null,
+                    importacionUrl = ImportacionUrlUi(fase = FaseImportacion.CONECTANDO.codigo),
+                )
+            viewModelScope.launch {
+                val resumen =
+                    try {
+                        repositorio.importarDesdeUrl(nombre, ubicacion) { fase ->
+                            _estado.update { actual ->
+                                actual.copy(
+                                    importacionUrl = actual.importacionUrl?.copy(fase = fase.codigo),
+                                )
+                            }
+                        }
+                    } catch (cancelacion: CancellationException) {
+                        throw cancelacion
+                    } catch (fallo: Exception) {
+                        // El código de UI no distingue causas a propósito: es
+                        // texto seguro y estable. El detalle técnico va al log
+                        // sin mensajes de excepción, para no filtrar la URL de
+                        // la Lista ni credenciales (S57a).
+                        Log.e(TAG, "Importación fallida\n${detalleTecnico(fallo)}")
+                        _estado.value =
+                            _estado.value.copy(
+                                importando = false,
+                                mensaje = CODIGO_FALLO,
+                                importacionUrl = ImportacionUrlUi(error = CODIGO_FALLO),
+                            )
+                        return@launch
+                    }
+                val listaId = resumen.listaId
+                if (listaId == null) {
+                    _estado.value =
+                        _estado.value.copy(
+                            importando = false,
+                            mensaje = resumen.error ?: CODIGO_SIN_LISTA,
+                            importacionUrl =
+                                ImportacionUrlUi(
+                                    error = resumen.error ?: CODIGO_SIN_LISTA,
+                                    diagnostico = resumen.diagnostico,
+                                ),
+                        )
+                    return@launch
+                }
+                _estado.value =
+                    _estado.value.copy(
+                        importando = false,
+                        listaId = listaId,
+                        mensaje = null,
+                        importacionUrl = ImportacionUrlUi(canales = resumen.canales),
+                    )
+                observarCatalogo()
+            }
+        }
+
+        /**
+         * Deja el diálogo de importación por URL como recién abierto.
+         *
+         * Se llama al reabrir el diálogo: borra el resultado anterior sin
+         * tocar una importación en curso.
+         */
+        fun reiniciarImportacionUrl() {
+            if (_estado.value.importando) return
+            _estado.update { actual ->
+                if (actual.importacionUrl == null) actual else actual.copy(importacionUrl = null)
+            }
         }
 
         private fun importar(bloque: suspend () -> ResumenImportacion) {
@@ -451,20 +541,23 @@ class CatalogoViewModel
             _estado.value = _estado.value.copy(importando = true, mensaje = null)
             viewModelScope.launch {
                 val resumen =
-                    runCatching { bloque() }
-                        .getOrElse { fallo ->
-                            // El código de UI no distingue causas a propósito: es
-                            // texto seguro y estable. El detalle técnico va al log
-                            // sin mensajes de excepción, para no filtrar la URL de
-                            // la Lista ni credenciales (S57a).
-                            Log.e(TAG, "Importación fallida\n${detalleTecnico(fallo)}")
-                            _estado.value =
-                                _estado.value.copy(
-                                    importando = false,
-                                    mensaje = CODIGO_FALLO,
-                                )
-                            return@launch
-                        }
+                    try {
+                        bloque()
+                    } catch (cancelacion: CancellationException) {
+                        throw cancelacion
+                    } catch (fallo: Exception) {
+                        // El código de UI no distingue causas a propósito: es
+                        // texto seguro y estable. El detalle técnico va al log
+                        // sin mensajes de excepción, para no filtrar la URL de
+                        // la Lista ni credenciales (S57a).
+                        Log.e(TAG, "Importación fallida\n${detalleTecnico(fallo)}")
+                        _estado.value =
+                            _estado.value.copy(
+                                importando = false,
+                                mensaje = CODIGO_FALLO,
+                            )
+                        return@launch
+                    }
                 val listaId = resumen.listaId
                 if (listaId == null) {
                     _estado.value =

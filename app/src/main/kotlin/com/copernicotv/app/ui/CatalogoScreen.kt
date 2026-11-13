@@ -93,6 +93,15 @@ const val TAG_ABRIR_DOCUMENTO = "abrir-documento"
 /** Etiqueta del disparador de alta de Fuente por URL. */
 const val TAG_IMPORTAR_URL = "importar-url"
 
+/** Fase visible dentro del diálogo de importación por URL (E7-T7). */
+const val TAG_IMPORTAR_URL_FASE = "importar-url-fase"
+
+/** Error con causa dentro del diálogo de importación por URL (E7-T7). */
+const val TAG_IMPORTAR_URL_ERROR = "importar-url-error"
+
+/** Éxito con número de canales del diálogo de importación por URL (E7-T7). */
+const val TAG_IMPORTAR_URL_EXITO = "importar-url-exito"
+
 /** Etiqueta del disparador de Actualización manual de la Lista activa. */
 const val TAG_ACTUALIZAR = "actualizar-lista"
 
@@ -319,6 +328,7 @@ data class CatalogoAcciones(
     val onImportar: () -> Unit,
     val onAbrirDocumento: () -> Unit,
     val onImportarUrl: (String, String) -> Unit,
+    val onImportarUrlReiniciar: () -> Unit,
     val onActualizar: () -> Unit,
     val onTexto: (String) -> Unit,
     val onGrupo: (Long?) -> Unit,
@@ -506,6 +516,8 @@ fun CatalogoScreen(
         listas = listas,
         coleccionesUi = coleccionesUi,
         perfilesUi = perfilesUi,
+        importacionUrl = estado.importacionUrl,
+        importando = estado.importando,
         onDialogo = { dialogo = it },
     )
 }
@@ -732,7 +744,12 @@ private fun AccionesImportacion(
         Text(stringResource(R.string.catalogo_abrir_documento))
     }
     Button(
-        onClick = { onDialogo(DialogoCatalogo.ImportarUrl) },
+        onClick = {
+            // Reabrir el diálogo tras un resultado anterior lo deja recién
+            // abierto; una importación en curso no se reinicia (E7-T7).
+            acciones.onImportarUrlReiniciar()
+            onDialogo(DialogoCatalogo.ImportarUrl)
+        },
         enabled = habilitado,
         modifier = Modifier.testTag(TAG_IMPORTAR_URL),
     ) {
@@ -845,6 +862,8 @@ private fun DialogoCatalogoActivo(
     listas: List<ListaResumen>,
     coleccionesUi: ColeccionesUiState,
     perfilesUi: PerfilesUiState,
+    importacionUrl: ImportacionUrlUi?,
+    importando: Boolean,
     onDialogo: (DialogoCatalogo?) -> Unit,
 ) {
     when (val actual = dialogo) {
@@ -927,10 +946,9 @@ private fun DialogoCatalogoActivo(
             )
         DialogoCatalogo.ImportarUrl ->
             DialogoImportarUrl(
-                onGuardar = { nombre, url ->
-                    acciones.onImportarUrl(nombre, url)
-                    onDialogo(null)
-                },
+                importacion = importacionUrl,
+                importando = importando,
+                onGuardar = { nombre, url -> acciones.onImportarUrl(nombre, url) },
                 onCancelar = { onDialogo(null) },
             )
         DialogoCatalogo.NuevoCanal ->
@@ -1734,54 +1752,6 @@ private fun DialogoTexto(
             TextButton(
                 onClick = { onGuardar(valor) },
                 enabled = valor.isNotBlank(),
-                modifier = Modifier.testTag(TAG_DIALOGO_GUARDAR),
-            ) {
-                Text(stringResource(R.string.catalogo_guardar))
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onCancelar,
-                modifier = Modifier.testTag(TAG_DIALOGO_CANCELAR),
-            ) {
-                Text(stringResource(R.string.catalogo_cancelar))
-            }
-        },
-    )
-}
-
-@Composable
-private fun DialogoImportarUrl(
-    onGuardar: (String, String) -> Unit,
-    onCancelar: () -> Unit,
-) {
-    var nombre by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onCancelar,
-        title = { Text(stringResource(R.string.catalogo_importar_url)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = nombre,
-                    onValueChange = { nombre = it },
-                    label = { Text(stringResource(R.string.catalogo_nombre_fuente)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag(TAG_DIALOGO_NOMBRE),
-                )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    label = { Text(stringResource(R.string.catalogo_url_lista)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag(TAG_DIALOGO_URL),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onGuardar(nombre.trim(), url.trim()) },
-                enabled = nombre.isNotBlank() && url.isNotBlank(),
                 modifier = Modifier.testTag(TAG_DIALOGO_GUARDAR),
             ) {
                 Text(stringResource(R.string.catalogo_guardar))

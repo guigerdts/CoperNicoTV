@@ -652,24 +652,26 @@ class ImportacionE2Test {
         }
     }
 
-    /** E7-T7 ronda 3: el avance visible distingue la etapa de agrupación. */
+    /**
+     * E7-T7 ronda 3: la línea de avance final distingue la etapa de agrupación.
+     *
+     * `alAvance` solo publica fotos periódicas (publicador con intervalo), así
+     * que una importación veloz puede no publicar ninguna: el contrato
+     * determinista es `ultimoAvance` del diagnóstico, capturado tras el
+     * procesamiento.
+     */
     @Test
-    fun `el avance visible reporta entradas agrupadas y canales`() {
+    fun `la linea de avance final reporta la etapa de agrupacion`() {
         runBlocking {
-            var ultimo: AvanceVisible? = null
             conServidorConCuerpo(200, TEXTO_XTREAM_R3) { url ->
-                repositorio.importarDesdeUrl(
-                    "Fuente Xtream R3",
-                    url,
-                    alAvance = { avance -> ultimo = avance },
-                )
-            }
+                val resumen = repositorio.importarDesdeUrl("Fuente Xtream R3", url)
 
-            val final = requireNotNull(ultimo)
-            // El tick final de la agrupación llega con el total de declaraciones.
-            assertEquals(5, final.entradas)
-            assertEquals(5, final.agrupadas)
-            assertEquals(5, final.canales)
+                assertNull(resumen.error)
+                val d = requireNotNull(resumen.diagnostico)
+                val linea = requireNotNull(d.ultimoAvance)
+                assertTrue("esperaba agrupadas=5 en $linea", linea.contains("agrupadas=5"))
+                assertTrue(linea.contains("entradas=5"))
+            }
         }
     }
 

@@ -151,7 +151,15 @@ class ImportadorM3UTest {
                 .copy(diagnosticos = lectura.diagnosticos)
         val porTexto = ImportadorM3U.importar(texto, clave)
 
-        assertEquals(porTexto, porPasos)
+        // Los tiempos por etapa (S28) son mediciones de la corrida: se comparan
+        // los campos semánticos, no el objeto completo.
+        assertEquals(porTexto.canales, porPasos.canales)
+        assertEquals(porTexto.rechazadas, porPasos.rechazadas)
+        assertEquals(porTexto.colisiones, porPasos.colisiones)
+        assertEquals(porTexto.diagnosticos, porPasos.diagnosticos)
+        assertEquals(porTexto.repeticionesInformativas, porPasos.repeticionesInformativas)
+        assertEquals(porTexto.declaracionesRecibidas, porPasos.declaracionesRecibidas)
+        assertEquals(porTexto.operacionesCriptograficas, porPasos.operacionesCriptograficas)
     }
 
     @Test
@@ -226,6 +234,116 @@ class ImportadorM3UTest {
             }
         assertEquals(2000, ultimoAvance)
         assertEquals(2000, resultado.canales.size)
+    }
+
+    /** Fixture Xtream M3U Plus (S31): TS, M3U8, tvg-id+logo, group-title, VOD, serie, metadatos incompletos y atributos extra. */
+    private fun fixtureM3UPlus(): String =
+        """
+        #EXTM3U
+        #EXTINF:-1 tvg-id="tv1" tvg-name="TV Uno" tvg-logo="https://example.com/tv1.png" group-title="Noticias" custom="x",TV Uno
+        https://panel.example:8080/live/demo/demo/1001.ts
+        #EXTINF:-1 tvg-id="tv2" group-title="Deportes",TV Dos
+        https://panel.example:8080/live/demo/demo/1002.m3u8
+        #EXTINF:-1 tvg-id="pel1" tvg-logo="https://example.com/pel1.png" group-title="Peliculas",Pelicula Uno
+        https://panel.example:8080/movie/demo/demo/2001.mp4
+        #EXTINF:-1 tvg-id="ser1" group-title="Series",Serie Uno S01E01
+        https://panel.example:8080/series/demo/demo/3001/300101.mp4
+        #EXTINF:-1,Sin Metadatos
+        https://panel.example:8080/otro/demo/4001.ts
+        """.trimIndent()
+
+    @Test
+    fun `el parser clasifica TV VOD y cuenta lineas y bloques EXTINF`() {
+        val lectura = ImportadorM3U.leerDeclaraciones(fixtureM3UPlus().byteInputStream())
+        assertEquals(5, lectura.entradas)
+        assertEquals(5, lectura.declaraciones.size)
+        assertEquals(11, lectura.lineasLeidas)
+        assertEquals(5, lectura.extinfEncontrados)
+        assertEquals(2, lectura.entradasTv)
+        assertEquals(2, lectura.entradasVod)
+        assertEquals(1, lectura.entradasOtro)
+    }
+
+    @Test
+    fun `un EXTINF sin URL cuenta en extinf pero no emite entrada`() {
+        val texto =
+            "#EXTM3U\n" +
+                "#EXTINF:-1,Huerfano\n" +
+                "#EXTINF:-1,Valido\n" +
+                "https://panel.example:8080/live/demo/demo/1.ts\n"
+        val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
+        assertEquals(1, lectura.entradas)
+        assertEquals(2, lectura.extinfEncontrados)
+        assertEquals(
+            1,
+            lectura.diagnosticos.first { it.codigo == CodigoM3U.EXTINF_SIN_URL }.conteoTotal,
+        )
+    }
+
+    @Test
+    fun `la agrupacion reporta avance por lote y el resultado registra tiempos y ops`() {
+        val lectura = ImportadorM3U.leerDeclaraciones(fixtureM3UPlus().byteInputStream())
+        val avancesAgrupacion = mutableListOf<Int>()
+        val resultado =
+            ImportadorM3U.importarDeclaraciones(lectura.declaraciones, clave, alAvanceAgrupacion = { total ->
+                avancesAgrupacion += total
+            })
+        // LOTE_AVANCE=1000: una lista de 5 declaraciones emite solo el tick final.
+        assertEquals(listOf(5), avancesAgrupacion)
+        assertEquals(5, resultado.declaracionesRecibidas)
+        assertEquals(5, resultado.canales.size)
+        // Ops: 2 por canal con logo (stream + logo) y 1 por canal sin logo.
+        assertEquals(7, resultado.operacionesCriptograficas)
+        assertTrue(resultado.tiempoAgrupacionMs >= 0)
+        assertTrue(resultado.tiempoHmacMs >= 0)
+    }
+
+    @Test
+    fun `la lista xtream de decenas de miles demuestra el reparto de etapas`() {
+        val total = 146_729
+        val repetidas = 1_000
+        val unicas = total - repetidas
+
+        /** Bloque Xtream M3U Plus de la entrada `i`; idéntico para repetirla. */
+        fun bloque(i: Int): String {
+            val tipo =
+                when {
+                    i < 117_383 -> "live"
+                    i < 139_392 -> "movie"
+                    else -> "series"
+                }
+            val extension = if (tipo == "live") "ts" else "mp4"
+            val logo = if (i % 4 == 0) " tvg-logo=\"https://panel.example/logos/$i.png\"" else ""
+            return "#EXTINF:-1 tvg-id=\"c$i\" tvg-name=\"Canal $i\"$logo group-title=\"G${i % 50}\",Canal $i\n" +
+                "https://panel.example:8080/$tipo/demo/demo/$i.$extension\n"
+        }
+
+        val texto =
+            buildString {
+                append("#EXTM3U\n")
+                for (i in 0 until unicas) append(bloque(i))
+                for (i in 0 until repetidas) append(bloque(i))
+            }
+
+        val avancesAgrupacion = mutableListOf<Int>()
+        val lectura = ImportadorM3U.leerDeclaraciones(texto.byteInputStream())
+        assertEquals(total, lectura.entradas)
+        assertEquals(total.toLong() * 2, lectura.lineasLeidas - 1)
+        assertEquals(118_383, lectura.entradasTv)
+        assertEquals(28_346, lectura.entradasVod)
+        val resultado =
+            ImportadorM3U.importarDeclaraciones(lectura.declaraciones, clave, alAvanceAgrupacion = { acumulado ->
+                avancesAgrupacion += acumulado
+            })
+        assertEquals(unicas, resultado.canales.size)
+        assertEquals(total, avancesAgrupacion.last())
+        // 36433 canales con logo × 2 ops + 109296 sin logo × 1 op.
+        assertEquals(182_162, resultado.operacionesCriptograficas)
+        println(
+            "MEDICION_ETAPAS entradas=$total unicos=${resultado.canales.size} " +
+                "agrupacion=${resultado.tiempoAgrupacionMs}ms hmac=${resultado.tiempoHmacMs}ms " +
+                "ops=${resultado.operacionesCriptograficas}",
+        )
     }
 
     /** Excepción de prueba para la cancelación cooperativa por avance. */

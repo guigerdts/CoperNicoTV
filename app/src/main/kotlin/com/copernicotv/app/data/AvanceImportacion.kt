@@ -1,5 +1,6 @@
 package com.copernicotv.app.data
 
+import android.os.SystemClock
 import com.copernicotv.core.identity.AvanceEtapaImportacion
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -39,16 +40,27 @@ class ImportacionAvanceDetenido(
  * servidor (sin bytes todavía) queda cubierto por el timeout de lectura, no
  * por el vigilante. El chequeo corre en el flujo de la importación, en los
  * puntos de tick y de transición de fase: sin hilos ni corrutinas extra.
+ *
+ * Vigilancia de doble reloj (E7-T7 ronda 6, S43): el silencio se mide en wall
+ * ([reloj]) y en uptime ([relojUptime]); solo se aborta cuando AMBOS relojes
+ * muestran el mismo silencio prolongado. Un sueño del dispositivo pausa el
+ * uptime mientras el wall avanza (Android suspende el hilo y `uptimeMillis`
+ * no cuenta el sueño profundo): ese silencio es del SO, no del importador, y
+ * no debe abortar la importación — la evidencia física de la ronda 6 abortó
+ * con 934,8 s de wall sin actividad y uptime pausado. Un cuelgue real del
+ * pipeline avanza ambos relojes y aborta igual que antes. El umbral no cambia.
  */
 internal class AvanceImportacion(
     private val umbralSinAvanceMs: Long = UMBRAL_SIN_AVANCE_MS,
     private val reloj: () -> Long = System::currentTimeMillis,
+    private val relojUptime: () -> Long = SystemClock::uptimeMillis,
 ) {
     private val entradas = AtomicLong(0)
     private val agrupadas = AtomicLong(0)
     private val canales = AtomicLong(0)
     private val preparando = AtomicLong(0)
     private val ultimoAvanceMs = AtomicLong(SIN_AVANCE)
+    private val ultimoAvanceUptimeMs = AtomicLong(SIN_AVANCE)
     private val etapa = AtomicReference<AvanceEtapaImportacion?>(null)
     private val inicioMs = reloj()
 
@@ -99,13 +111,20 @@ internal class AvanceImportacion(
     /** Última etapa emitida, para el informe copiable (S34). */
     fun ultimaEtapa(): AvanceEtapaImportacion? = etapa.get()
 
-    /** Verifica que haya avance reciente; si no, aborta con el error tipado. */
+    /**
+     * Verifica que haya avance reciente en AMBOS relojes; si no, aborta con
+     * el error tipado (ronda 6, S43). [ImportacionAvanceDetenido.msSinAvance]
+     * reporta el silencio de wall, como siempre.
+     */
     fun verificar() {
         val ultimo = ultimoAvanceMs.get()
-        if (ultimo != SIN_AVANCE) {
-            val silencio = reloj() - ultimo
-            if (silencio > umbralSinAvanceMs) throw ImportacionAvanceDetenido(silencio)
-        }
+        if (ultimo == SIN_AVANCE) return
+        val silencio = reloj() - ultimo
+        if (silencio <= umbralSinAvanceMs) return
+        val ultimoUptime = ultimoAvanceUptimeMs.get()
+        if (ultimoUptime == SIN_AVANCE) return
+        val silencioUptime = relojUptime() - ultimoUptime
+        if (silencioUptime > umbralSinAvanceMs) throw ImportacionAvanceDetenido(silencio)
     }
 
     /** Foto del avance para la UI y el informe. */
@@ -144,6 +163,7 @@ internal class AvanceImportacion(
 
     private fun tic() {
         ultimoAvanceMs.set(reloj())
+        ultimoAvanceUptimeMs.set(relojUptime())
     }
 
     companion object {

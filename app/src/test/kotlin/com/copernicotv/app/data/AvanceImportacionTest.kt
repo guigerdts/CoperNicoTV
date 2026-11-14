@@ -15,7 +15,7 @@ class AvanceImportacionTest {
     @Test
     fun `sin primer avance no detiene nunca`() {
         var ahora = 0L
-        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora }, relojUptime = { ahora })
 
         ahora = 60_000L
         avance.verificar()
@@ -27,7 +27,7 @@ class AvanceImportacionTest {
     @Test
     fun `pasado el umbral sin avance lanza el error tipado con el silencio observado`() {
         var ahora = 0L
-        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(1)
 
         ahora = 301L
@@ -40,7 +40,7 @@ class AvanceImportacionTest {
     @Test
     fun `un nuevo avance reinicia la ventana de silencio`() {
         var ahora = 0L
-        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(1)
         ahora = 150L
         avance.ticCanal(1)
@@ -54,7 +54,7 @@ class AvanceImportacionTest {
     @Test
     fun `la foto y el texto reportan contadores sin datos de la lista`() {
         var ahora = 0L
-        val avance = AvanceImportacion(reloj = { ahora })
+        val avance = AvanceImportacion(reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(12)
         avance.ticCanal(7)
         avance.ticPreparacion(5)
@@ -80,7 +80,7 @@ class AvanceImportacionTest {
     @Test
     fun `el tick de agrupacion reinicia la ventana de silencio`() {
         var ahora = 0L
-        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(146_729)
         ahora = 150L
         avance.ticAgrupacion(1_000)
@@ -96,7 +96,7 @@ class AvanceImportacionTest {
     @Test
     fun `ticEtapa reinicia la ventana de silencio y queda como ultima etapa`() {
         var ahora = 0L
-        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora })
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(146_747)
         ahora = 150L
         val evento =
@@ -121,7 +121,7 @@ class AvanceImportacionTest {
     @Test
     fun `el texto incluye los campos de la ultima etapa`() {
         var ahora = 0L
-        val avance = AvanceImportacion(reloj = { ahora })
+        val avance = AvanceImportacion(reloj = { ahora }, relojUptime = { ahora })
         avance.ticEtapa(
             AvanceEtapaImportacion(
                 etapa = EtapaImportacion.SOBRES_HMAC,
@@ -147,7 +147,7 @@ class AvanceImportacionTest {
     @Test
     fun `sin etapas el texto no incluye campos de etapa`() {
         var ahora = 0L
-        val avance = AvanceImportacion(reloj = { ahora })
+        val avance = AvanceImportacion(reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(3)
         ahora = 10L
 
@@ -162,7 +162,7 @@ class AvanceImportacionTest {
     @Test
     fun `la foto y el texto reportan las declaraciones agrupadas`() {
         var ahora = 0L
-        val avance = AvanceImportacion(reloj = { ahora })
+        val avance = AvanceImportacion(reloj = { ahora }, relojUptime = { ahora })
         avance.ticEntrada(5)
         avance.ticAgrupacion(5)
         ahora = 1_500L
@@ -173,5 +173,69 @@ class AvanceImportacionTest {
         assertEquals(5, foto.agrupadas)
         assertTrue(texto.contains("agrupadas=5"))
         assertTrue(texto.contains("entradas=5"))
+    }
+
+    /**
+     * E7-T7 ronda 6 (S43): la suspensión del proceso NO dispara el vigilante.
+     *
+     * Evidencia física de la ronda 6: 934,8 s de wall sin actividad con el
+     * uptime pausado (pantalla apagada / congelación del hilo): el wall
+     * aparenta un silencio enorme pero el dispositivo no durmió en uptime.
+     * Con AMBOS relojes exigidos, ese patrón ya no aborta la importación.
+     */
+    @Test
+    fun `una suspension del proceso con uptime pausado no dispara el vigilante`() {
+        var wall = 0L
+        var uptime = 0L
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { wall }, relojUptime = { uptime })
+        avance.ticEntrada(111_854)
+
+        // El hilo quedó suspendido ~15,6 min de wall; el uptime apenas avanzó.
+        wall = 935_000L
+        uptime = 5L
+
+        avance.verificar()
+
+        // Sin excepción: el silencio es del SO (suspensión), no del importador.
+    }
+
+    /**
+     * E7-T7 ronda 6 (S43): un cuelgue real SÍ aborta. Ambos relojes avanzan
+     * juntos (el pipeline está vivo pero sin ticks): el comportamiento
+     * previo del vigilante se preserva.
+     */
+    @Test
+    fun `un cuelgue real con ambos relojes avanzando aborta`() {
+        var wall = 0L
+        var uptime = 0L
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { wall }, relojUptime = { uptime })
+        avance.ticEntrada(1)
+
+        wall = 301_000L
+        uptime = 301_000L
+        val detenido = runCatching { avance.verificar() }.exceptionOrNull()
+
+        assertTrue("esperaba ImportacionAvanceDetenido", detenido is ImportacionAvanceDetenido)
+        assertEquals(301_000L, (detenido as ImportacionAvanceDetenido).msSinAvance)
+    }
+
+    /**
+     * E7-T7 ronda 6 (S43): caso mixto, wall avanzó más allá del umbral pero
+     * el uptime cruzó el umbral poco después: el silencio uptime manda y no
+     * aborta (un despertar parcial del dispositivo no mata la importación).
+     */
+    @Test
+    fun `silencio wall por encima del umbral con uptime por debajo no aborta`() {
+        var wall = 0L
+        var uptime = 0L
+        val avance = AvanceImportacion(umbralSinAvanceMs = 100, reloj = { wall }, relojUptime = { uptime })
+        avance.ticCanal(1)
+
+        wall = 500L
+        uptime = 95L
+
+        avance.verificar()
+
+        // Sin excepción: solo el wall superó el umbral.
     }
 }

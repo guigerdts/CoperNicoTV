@@ -96,8 +96,11 @@ class ImportacionMigracionTest {
                     "https://example.invalid/uno.m3u8",
                     descifrarUrlCanal(requireNotNull(canal.urlStreamCifrada)),
                 )
-                // Reanudación: la reimportación completa la migración.
-                val reanudada = repositorio.importarDesdeUrl("Fuente Interrumpida", url)
+            }
+            // Reanudación: la reimportación completa la migración (servidor nuevo:
+            // el de arriba cierra su única conexión, como cualquier servidor real).
+            conServidorConCuerpo(200, TEXTO_XTREAM) { urlReanudacion ->
+                val reanudada = repositorio.importarDesdeUrl("Fuente Interrumpida", urlReanudacion)
                 assertNull(reanudada.error)
                 assertEquals(2, db.canalDao().contar())
             }
@@ -171,7 +174,7 @@ class ImportacionMigracionTest {
                 assertNotNull("esperaba ops_keystore", d.operacionesKeystore)
                 assertEquals(total, db.canalDao().contar())
                 // Readback barato: el primer canal se descifra por despacho.
-                db.query(SimpleSQLiteQuery("SELECT url_stream_cifrada FROM Canal LIMIT 1")).use { cursor ->
+                db.query(SimpleSQLiteQuery("SELECT urlStreamCifrada FROM Canal LIMIT 1")).use { cursor ->
                     assertTrue(cursor.moveToFirst())
                     val sobre = requireNotNull(cursor.getBlob(0))
                     assertEquals(CifradoAes.VERSION_DATOS, sobre[0])

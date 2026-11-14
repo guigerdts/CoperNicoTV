@@ -188,7 +188,8 @@ class RepositorioCacheTest {
             assertFalse(crudo.toString(Charsets.ISO_8859_1).contains("PRIMERO"))
             assertFalse(fila.urlCifrada.contentEquals(URL_M3U.toByteArray()))
             assertEquals(
-                CifradoAes.VERSION.toInt(),
+                "el sobre de la URL de la copia es 0x02 con la clave de datos de la sesion",
+                CifradoAes.VERSION_DATOS.toInt(),
                 fila.urlCifrada[0].toInt(),
             )
         }

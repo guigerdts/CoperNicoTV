@@ -4,6 +4,7 @@ import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -69,10 +70,12 @@ class ClavesDatosTest {
         reinicio.clave()
         assertEquals("desproteger es UNA op", 1, reinicio.metricas.operacionesKeystore.get())
         val sobre = requireNotNull(almacen.sobre)
-        assertEquals(
+        val desprotegida = CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobre)
+        assertTrue("esperaba Ok, fue $desprotegida", desprotegida is ResultadoDescifrado.Ok)
+        assertArrayEquals(
             "la clave desprotegida es la misma material de la sesion original",
-            ResultadoDescifrado.Ok(servicio.clave().encoded),
-            CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobre),
+            servicio.clave().encoded,
+            desprotegida.bytes,
         )
     }
 
@@ -87,12 +90,15 @@ class ClavesDatosTest {
 
         val segunda = ClavesDatos(RaizConfigurable(raiz), almacen)
         val nuevaClave = segunda.clave()
-        assertEquals("la regeneracion vuelve a envolver con la raiz", 1, segunda.metricas.operacionesKeystore.get())
-        val sobreNuevo = requireNotNull(almacen.sobre)
         assertEquals(
-            ResultadoDescifrado.Ok(nuevaClave.encoded),
-            CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobreNuevo),
+            "la regeneracion gasta 2 ops de raiz: la desproteccion fallida y envolver la clave nueva",
+            2,
+            segunda.metricas.operacionesKeystore.get(),
         )
+        val sobreNuevo = requireNotNull(almacen.sobre)
+        val reenvuelta = CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobreNuevo)
+        assertTrue("esperaba Ok, fue $reenvuelta", reenvuelta is ResultadoDescifrado.Ok)
+        assertArrayEquals(nuevaClave.encoded, reenvuelta.bytes)
     }
 
     @Test
@@ -107,9 +113,8 @@ class ClavesDatosTest {
 
         val nuevaClave = segunda.clave()
         val sobre = requireNotNull(almacen.sobre)
-        assertEquals(
-            ResultadoDescifrado.Ok(nuevaClave.encoded),
-            CifradoAes.descifrar(raizNueva, CifradoAes.aad("ClavesDatos", "envuelta"), sobre),
-        )
+        val reenvuelta = CifradoAes.descifrar(raizNueva, CifradoAes.aad("ClavesDatos", "envuelta"), sobre)
+        assertTrue("esperaba Ok, fue $reenvuelta", reenvuelta is ResultadoDescifrado.Ok)
+        assertArrayEquals(nuevaClave.encoded, reenvuelta.bytes)
     }
 }

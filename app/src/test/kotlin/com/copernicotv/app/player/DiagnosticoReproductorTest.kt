@@ -206,4 +206,70 @@ class DiagnosticoReproductorTest {
             activa = activa,
             soportada = true,
         )
+
+    @Test
+    fun `el texto expone el trazado de red sin credenciales ni ruta`() {
+        val diagnostico =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = "http://usuario:clave@127.0.0.1:8080/ruta/1.ts?token=secreto",
+                estado =
+                    EstadoSesion(
+                        estado = EstadoReproductor.ERROR,
+                        codigoError = "http_error",
+                        codigoHttpInicial = 302,
+                        redirecciones = 2,
+                        esquemaInicial = "https",
+                        esquemaFinal = "http",
+                        fuenteMedia = "ProgressiveMediaSource",
+                        agenteUsuario = AGENTE_REPRODUCCION,
+                    ),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(diagnostico)
+
+        assertTrue(texto.contains("Código HTTP inicial: 302"))
+        assertTrue(texto.contains("Redirecciones: 2"))
+        assertTrue(texto.contains("Esquema inicial: https"))
+        assertTrue(texto.contains("Esquema final: http"))
+        assertTrue(texto.contains("MediaSource: ProgressiveMediaSource"))
+        assertTrue(texto.contains("User-Agent: CoperNicoTV/1.0 (Android)"))
+        assertFalse(texto.contains("usuario"))
+        assertFalse(texto.contains("clave"))
+        assertFalse(texto.contains("token"))
+        assertFalse(texto.contains("/ruta"))
+        assertFalse(texto.contains("secreto"))
+    }
+
+    @Test
+    fun `sin trazado de red el texto no inventa datos`() {
+        val diagnostico =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.HLS,
+                url = "http://127.0.0.1:8080/live.m3u8",
+                estado = EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(diagnostico)
+
+        assertTrue(texto.contains("Código HTTP inicial: no disponible"))
+        assertTrue(texto.contains("Redirecciones: no disponible"))
+        assertTrue(texto.contains("Esquema inicial: no disponible"))
+        assertTrue(texto.contains("Esquema final: no disponible"))
+        assertTrue(texto.contains("MediaSource: no disponible"))
+        assertTrue(texto.contains("User-Agent: no disponible"))
+        assertFalse(texto.contains("ciclo detectado"))
+        assertFalse(texto.contains("límite alcanzado"))
+    }
+
+    @Test
+    fun `el contador de redirecciones anota ciclo y limite`() {
+        assertEquals("3 (ciclo detectado; límite alcanzado)", redireccionesTexto(3, true, true))
+        assertEquals("1 (ciclo detectado)", redireccionesTexto(1, true, false))
+        assertEquals("4 (límite alcanzado)", redireccionesTexto(4, false, true))
+        assertEquals("2", redireccionesTexto(2, false, false))
+        assertEquals("no disponible", redireccionesTexto(null, false, false))
+    }
 }

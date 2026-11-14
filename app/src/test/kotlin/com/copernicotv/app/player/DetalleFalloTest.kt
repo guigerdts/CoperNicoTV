@@ -181,6 +181,12 @@ class DetalleFalloTest {
 
         assertTrue(texto.contains("Clasificación: no disponible"))
         assertTrue(texto.contains("Código HTTP: no disponible"))
+        assertTrue(texto.contains("Código HTTP inicial: no disponible"))
+        assertTrue(texto.contains("Redirecciones: no disponible"))
+        assertTrue(texto.contains("Esquema inicial: no disponible"))
+        assertTrue(texto.contains("Esquema final: no disponible"))
+        assertTrue(texto.contains("MediaSource: no disponible"))
+        assertTrue(texto.contains("User-Agent: no disponible"))
         assertTrue(texto.contains("MIME: no disponible"))
         assertTrue(texto.contains("Tamaño de respuesta: no disponible"))
         assertTrue(texto.contains("Excepción: no disponible"))

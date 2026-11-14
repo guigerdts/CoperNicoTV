@@ -34,6 +34,14 @@ data class DiagnosticoReproductor(
     val msHastaFallo: Long = 0L,
     val intentosFallo: Int = 0,
     val clasificacionTecnica: String? = null,
+    val codigoHttpInicial: Int? = null,
+    val redirecciones: Int? = null,
+    val esquemaInicial: String? = null,
+    val esquemaFinal: String? = null,
+    val cicloRedirecciones: Boolean = false,
+    val limiteRedirecciones: Boolean = false,
+    val fuenteMedia: String? = null,
+    val agenteUsuario: String? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -79,6 +87,14 @@ fun construirDiagnostico(
         msHastaFallo = estado.msHastaFallo.coerceAtLeast(0L),
         intentosFallo = estado.intentosFallo.coerceAtLeast(0),
         clasificacionTecnica = estado.clasificacionTecnica,
+        codigoHttpInicial = estado.codigoHttpInicial,
+        redirecciones = estado.redirecciones,
+        esquemaInicial = estado.esquemaInicial,
+        esquemaFinal = estado.esquemaFinal,
+        cicloRedirecciones = estado.cicloRedirecciones,
+        limiteRedirecciones = estado.limiteRedirecciones,
+        fuenteMedia = estado.fuenteMedia,
+        agenteUsuario = estado.agenteUsuario,
     )
 
 /**
@@ -148,12 +164,25 @@ fun textoDiagnostico(diagnostico: DiagnosticoReproductor): String =
         appendLine("Identificador de canal: ${diagnostico.canalId?.toString() ?: SIN_DATO}")
         appendLine("Código Media3: ${diagnostico.codigoMotor ?: SIN_DATO}")
         appendLine("Código HTTP: ${diagnostico.estadoHttp?.toString() ?: SIN_DATO}")
+        appendLine("Código HTTP inicial: ${diagnostico.codigoHttpInicial?.toString() ?: SIN_DATO}")
         appendLine("MIME: ${diagnostico.tipoMime ?: SIN_DATO}")
         appendLine(
             "Tamaño de respuesta: " +
                 if (diagnostico.bytesRespuesta > 0L) "${diagnostico.bytesRespuesta} bytes" else SIN_DATO,
         )
         appendLine("Excepción: ${diagnostico.claseExcepcion ?: SIN_DATO}")
+        appendLine(
+            "Redirecciones: " +
+                redireccionesTexto(
+                    diagnostico.redirecciones,
+                    diagnostico.cicloRedirecciones,
+                    diagnostico.limiteRedirecciones,
+                ),
+        )
+        appendLine("Esquema inicial: ${diagnostico.esquemaInicial ?: SIN_DATO}")
+        appendLine("Esquema final: ${diagnostico.esquemaFinal ?: SIN_DATO}")
+        appendLine("MediaSource: ${diagnostico.fuenteMedia ?: SIN_DATO}")
+        appendLine("User-Agent: ${diagnostico.agenteUsuario ?: SIN_DATO}")
         appendLine("Intentos: ${diagnostico.intentosFallo}")
         appendLine(
             "Duración hasta el fallo: " +
@@ -161,6 +190,22 @@ fun textoDiagnostico(diagnostico: DiagnosticoReproductor): String =
         )
         append("Reintentos: ${diagnostico.reintento}/${diagnostico.reintentosMaximos}")
     }
+
+/** Texto del contador de redirecciones y sus avisos de ciclo o límite. */
+internal fun redireccionesTexto(
+    redirecciones: Int?,
+    ciclo: Boolean,
+    limite: Boolean,
+): String {
+    if (redirecciones == null) return SIN_DATO
+    val avisos =
+        listOfNotNull(
+            "ciclo detectado".takeIf { ciclo },
+            "límite alcanzado".takeIf { limite },
+        )
+    val numero = redirecciones.toString()
+    return if (avisos.isEmpty()) numero else "$numero (${avisos.joinToString("; ")})"
+}
 
 private fun dividirHostPuerto(hostPuerto: String): Pair<String, String>? {
     if (!hostPuerto.startsWith("[")) {

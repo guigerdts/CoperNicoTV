@@ -101,5 +101,5 @@ private fun cifrarMedido(
     if (contador == null) {
         CifradoAes.cifrarDatos(clave, aad, bytes)
     } else {
-        contador.medir { CifradoAes.cifrarDatos(clave, aad, bytes) }
+        contador.medir(CifradoAes.VERSION_DATOS) { CifradoAes.cifrarDatos(clave, aad, bytes) }
     }

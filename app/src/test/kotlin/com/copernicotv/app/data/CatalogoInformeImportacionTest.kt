@@ -155,6 +155,14 @@ class CatalogoInformeImportacionTest {
                 assertNotNull("esperaba lotes", d.lotes)
                 assertTrue("al menos un lote", (d.lotes ?: 0) >= 1)
                 assertEquals(1, d.transacciones)
+                // Ronda 8 (S5): versión de los sobres y ciclo de la clave de datos.
+                assertEquals(3, d.sobre0x02)
+                assertEquals(0, d.sobre0x01)
+                assertNotNull("esperaba ops_keystore", d.operacionesKeystore)
+                assertTrue("ops_keystore no puede ser negativo", (d.operacionesKeystore ?: -1) >= 0)
+                assertTrue("tiempo de generación de clave no puede ser negativo", (d.tiempoGeneracionClaveMs ?: -1) >= 0)
+                assertTrue("tiempo de protección de clave no puede ser negativo", (d.tiempoProteccionClaveMs ?: -1) >= 0)
+                assertTrue("tiempo de desprotección de clave no puede ser negativo", (d.tiempoDesproteccionClaveMs ?: -1) >= 0)
                 assertNotNull(d.canalesPersistidos)
                 // El informe copiable lleva los campos nuevos; sin URL ni credenciales.
                 val informe = d.aInforme("completada")
@@ -165,6 +173,12 @@ class CatalogoInformeImportacionTest {
                 assertTrue("esperaba lotes en el informe", informe.contains("lotes="))
                 assertTrue("esperaba transacciones en el informe", informe.contains("transacciones="))
                 assertTrue("esperaba velocidad_canales_s en el informe", informe.contains("velocidad_canales_s="))
+                assertTrue("esperaba sobre_0x01 en el informe", informe.contains("sobre_0x01="))
+                assertTrue("esperaba sobre_0x02 en el informe", informe.contains("sobre_0x02="))
+                assertTrue("esperaba ops_keystore en el informe", informe.contains("ops_keystore="))
+                assertTrue("esperaba tiempo_generacion_clave_ms en el informe", informe.contains("tiempo_generacion_clave_ms="))
+                assertTrue("esperaba tiempo_proteccion_clave_ms en el informe", informe.contains("tiempo_proteccion_clave_ms="))
+                assertTrue("esperaba tiempo_descifrado_ms en el informe", informe.contains("tiempo_descifrado_ms="))
             }
         }
     }

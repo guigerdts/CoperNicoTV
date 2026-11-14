@@ -440,6 +440,13 @@ class CatalogoRepositorio
                     tiempoInsercionMs = persistida.metricas?.tiempoInsercionMs,
                     lotes = persistida.metricas?.lotes,
                     transacciones = persistida.metricas?.transacciones,
+                    sobre0x01 = persistida.metricas?.sobre0x01,
+                    sobre0x02 = persistida.metricas?.sobre0x02,
+                    tiempoDescifradoMs = persistida.metricas?.tiempoDescifradoMs,
+                    tiempoGeneracionClaveMs = persistida.metricas?.tiempoGeneracionClaveMs,
+                    tiempoProteccionClaveMs = persistida.metricas?.tiempoProteccionClaveMs,
+                    tiempoDesproteccionClaveMs = persistida.metricas?.tiempoDesproteccionClaveMs,
+                    operacionesKeystore = persistida.metricas?.operacionesKeystore,
                 )
             logDiagnostico(final, RESULTADO_COMPLETADA)
             return ResumenImportacion(
@@ -636,7 +643,7 @@ class CatalogoRepositorio
                         fuenteId = fuenteId,
                         nombre = nombreFuente,
                         ubicacionCifrada =
-                            contadorCifrado.medir {
+                            contadorCifrado.medir(CifradoAes.VERSION_DATOS) {
                                 CifradoAes.cifrarDatos(
                                     clavesDatos.clave(),
                                     CifradoAes.aad("Lista", "ubicacion_cifrada"),
@@ -707,6 +714,13 @@ class CatalogoRepositorio
                     tiempoInsercionMs = nanosInsercion / NANOS_POR_MS,
                     lotes = lotes,
                     transacciones = 1,
+                    sobre0x01 = contadorCifrado.sobre0x01(),
+                    sobre0x02 = contadorCifrado.sobre0x02(),
+                    tiempoDescifradoMs = contadorCifrado.msDescifrado(),
+                    tiempoGeneracionClaveMs = clavesDatos.metricas.msGeneracion.sum(),
+                    tiempoProteccionClaveMs = clavesDatos.metricas.msProteccion.sum(),
+                    tiempoDesproteccionClaveMs = clavesDatos.metricas.msDesproteccion.sum(),
+                    operacionesKeystore = clavesDatos.metricas.operacionesKeystore.get(),
                 ),
             )
         }
@@ -784,6 +798,16 @@ class CatalogoRepositorio
             val tiempoInsercionMs: Long,
             val lotes: Int,
             val transacciones: Int,
+            /** Sobres escritos por versión (S5): `0x01` raíz / `0x02` clave de datos. */
+            val sobre0x01: Int,
+            val sobre0x02: Int,
+            /** Tiempo de descifrado AES, separado del cifrado (S5). */
+            val tiempoDescifradoMs: Long,
+            /** Ciclo de vida de la clave de datos, separado de Room (S5). */
+            val tiempoGeneracionClaveMs: Long,
+            val tiempoProteccionClaveMs: Long,
+            val tiempoDesproteccionClaveMs: Long,
+            val operacionesKeystore: Int,
         )
 
         /** Resultado interno de una descarga HTTP. */

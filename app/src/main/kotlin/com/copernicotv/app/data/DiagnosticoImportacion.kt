@@ -81,6 +81,20 @@ data class DiagnosticoImportacion(
     val lotes: Int? = null,
     /** Transacciones Room de la escritura del catálogo (S50). */
     val transacciones: Int? = null,
+    /** Sobres `0x01` escritos con la raíz (S5; 0 en la importación normal). */
+    val sobre0x01: Int? = null,
+    /** Sobres `0x02` escritos con la clave de datos de sesión (S5). */
+    val sobre0x02: Int? = null,
+    /** Tiempo total de descifrado AES, separado del cifrado (S5). */
+    val tiempoDescifradoMs: Long? = null,
+    /** Tiempo de generar la clave de datos con CSPRNG (S5). */
+    val tiempoGeneracionClaveMs: Long? = null,
+    /** Tiempo de proteger (envolver) la clave de datos con la raíz (S5). */
+    val tiempoProteccionClaveMs: Long? = null,
+    /** Tiempo de desproteger la clave de datos envuelta (S5). */
+    val tiempoDesproteccionClaveMs: Long? = null,
+    /** Operaciones reales contra Keystore del ciclo de la clave (S5). */
+    val operacionesKeystore: Int? = null,
 ) {
     /**
      * Línea única para Logcat. Cada campo es acotado y sanitizado: tipo de
@@ -139,6 +153,13 @@ data class DiagnosticoImportacion(
             "tiempo_insercion_ms" to tiempoInsercionMs,
             "lotes" to lotes,
             "transacciones" to transacciones,
+            "sobre_0x01" to sobre0x01,
+            "sobre_0x02" to sobre0x02,
+            "tiempo_descifrado_ms" to tiempoDescifradoMs,
+            "tiempo_generacion_clave_ms" to tiempoGeneracionClaveMs,
+            "tiempo_proteccion_clave_ms" to tiempoProteccionClaveMs,
+            "tiempo_desproteccion_clave_ms" to tiempoDesproteccionClaveMs,
+            "ops_keystore" to operacionesKeystore,
             "velocidad_canales_s" to velocidadCanalesPorSegundo(),
             "ultimo_avance" to ultimoAvance,
             "sin_avance_ms" to sinAvanceMs,

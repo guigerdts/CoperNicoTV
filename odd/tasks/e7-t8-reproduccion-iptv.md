@@ -17,9 +17,9 @@ Branch: feat/e7-t8-reproduccion (cascada sobre feat/ronda9-metricas-room) · Del
 ## Tasks
 
 - T1 (S1/S3) — auditoría del recorrido de reproducción (URL→entidad→descifrado→MediaItem→DataSource→redirecciones→HLS) con causa raíz en archivo y línea. Hecho (inline; hallazgos en L2).
-- T2 (S4) — corrección de redirecciones/configuración HTTP demostrada por T1. Pendiente.
-- T3 (S5) — diagnóstico de reproducción mejorado (campos S5, saneado de credenciales). Pendiente.
-- T4 (S6) — pruebas con servidores HTTP controlados (escenarios S6). Pendiente.
+- T2 (S4) — corrección de redirecciones/configuración HTTP demostrada por T1. Hecho (commits b78f7ce, 5e265ce).
+- T3 (S5) — diagnóstico de reproducción mejorado (campos S5, saneado de credenciales). Hecho (commit 8a4d234; gate GGA omitido por inestabilidad del entorno, ver L5).
+- T4 (S6) — pruebas con servidores HTTP controlados (escenarios S6). Hecho (17 tests :core + 7 tests :app; ver L5).
 - T5 (S7/S8) — CI completa, APK + SHA256, instrucciones de validación física. Pendiente.
 
 ## Log
@@ -41,3 +41,6 @@ Branch: feat/e7-t8-reproduccion (cascada sobre feat/ronda9-metricas-room) · Del
 - L4 (2026-11-14, T2b commit `5e265ce`, T3 en curso).
   - Commit 2 `5e265ce`: corrección en `SesionMedia3.kt:73-86` — `DefaultMediaSourceFactory(FabricaFuenteSeguimiento(trazadora))` con `setAllowCrossProtocolRedirects(true)` + `setUserAgent(AGENTE_REPRODUCCION)` (fin de la causa raíz de L2). `FuenteHttpSeguimiento` delega streaming tal cual y solo ante fallo registra en `TrazadoraRed` (replay acotado vía `ResolverRedirecciones` de `:core`; ante fallo de red NO repite peticiones). 7 tests Robolectric en `FuenteHttpSeguimientoTest` (CI, ADR-0005).
   - T3 (diagnóstico S5): campos E7-T8 en `EstadoSesion` y `DiagnosticoReproductor` (`codigoHttpInicial`, `redirecciones`, `esquemaInicial`, `esquemaFinal`, `cicloRedirecciones`, `limiteRedirecciones`, `fuenteMedia`, `agenteUsuario`), `terminarConError` alimentado desde la trazadora, texto con líneas nuevas y `redireccionesTexto` con avisos (ciclo detectado / límite alcanzado). Solo evidencia segura: esquemas, códigos y contadores.
+- L5 (2026-11-14, commit 3 `8a4d234` — T2/T3/T4 hechos; gate GGA omitido una vez).
+  - **Gate omitido con autorización explícita del usuario**: el entorno reinició el servidor OpenCode 4 veces (~cada 2-5 min, presión de RAM del host Android que mata `opencode serve` cuando la revisión GGA suma su revisor), y GGA nunca pudo terminar una revisión de 3-5 min. Commit `8a4d234` (diagnóstico S5, 4 archivos, +120) se creó con `--no-verify` único; el orchestrador auditó el diff completo como equivalencia: sin drift, cambios aditivos, evidencia segura, tests alineados. Limitación: ktlint/detekt/compilación `:app` quedan verificados por CI (ADR-0005), como todo el módulo `:app`.
+  - T2 (S4) hecho: commits `b78f7ce` + `5e265ce` (L3/L4). T3 (S5) hecho: commit `8a4d234`. T4 (S6) hecho: matriz de escenarios cubierta por `ResolverRedireccionesTest` (17: 200 TS/HLS, 302 mismo protocolo, HTTPS→HTTP, HTTP→HTTPS, ciclo, 401/403, 404, HTML, Location tal cual sin heredar query, cabecera en todos los saltos, sin Cookie/Authorization cross-dominio, esquema ajeno, límite de saltos, fallo de conexión, URL no interpretable, integración real) + `FuenteHttpSeguimientoTest` (7: replay solo tras fallo HTTP real, sin repetir peticiones en fallo de red, delegación de oyentes, fábrica con UA). Pendiente T5 (S7/S8): CI, APK+SHA256, validación física.

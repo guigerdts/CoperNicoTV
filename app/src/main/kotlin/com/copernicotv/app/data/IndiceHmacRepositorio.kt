@@ -1,6 +1,7 @@
 package com.copernicotv.app.data
 
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesOperativas
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.SembrarEstadoIndiceHmac
 import com.copernicotv.app.data.db.entities.EstadoIndiceHmacEntity
@@ -39,6 +40,7 @@ class IndiceHmacRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val operativas: ClavesOperativas = ClavesOperativas(),
     ) {
         /**
          * Serializa las operaciones que leen, validan y escriben la fila de
@@ -102,7 +104,13 @@ class IndiceHmacRepositorio
             candado.withLock {
                 when (val integridad = conciliarBloqueado(ahora)) {
                     is Conciliacion.Listo ->
-                        SelloIndiceHmac.Disponible(integridad.clave, integridad.estado.generacionActiva)
+                        // Ronda 6 (S44): la entrega es la clave operativa
+                        // derivada de la raíz; la raíz queda como ancla de
+                        // integridad y el sellado cuesta una op de Keystore.
+                        SelloIndiceHmac.Disponible(
+                            operativas.hmacOperativa(integridad.clave),
+                            integridad.estado.generacionActiva,
+                        )
 
                     is Conciliacion.Perdida, is Conciliacion.Recuperacion ->
                         SelloIndiceHmac.Bloqueada(RechazoIndiceHmac())

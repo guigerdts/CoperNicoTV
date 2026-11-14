@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesOperativas
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CacheM3UEntity
 import com.copernicotv.app.data.db.entities.CacheXmltvEntity
@@ -50,6 +51,7 @@ class ReconstructorIndiceHmacTest {
     private lateinit var indice: IndiceHmacRepositorio
     private lateinit var reconstructor: ReconstructorIndiceHmac
     private val claves = ClavesEnMemoria()
+    private val operativas = ClavesOperativas()
 
     private val ahora: Instant = Instant.parse("2026-01-01T00:00:00Z")
 
@@ -61,9 +63,9 @@ class ReconstructorIndiceHmacTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        indice = IndiceHmacRepositorio(db, claves)
+        indice = IndiceHmacRepositorio(db, claves, operativas)
         reconstructor =
-            ReconstructorIndiceHmac(db, indice, claves, ReconstruccionValorHmac(indice, claves))
+            ReconstructorIndiceHmac(db, indice, claves, operativas, ReconstruccionValorHmac(indice, claves))
     }
 
     @After
@@ -359,9 +361,11 @@ class ReconstructorIndiceHmacTest {
         cv: Int = 1,
     ): ByteArray {
         val canonica = CanonicalizadorUrl.canonizar(url, campo) as ResultadoCanonizacion.Ok
+        // El reconstructor sella con la operativa derivada de la raíz
+        // objetivo (E7-T7 ronda 6, S44): el sobre esperado usa la misma clave.
         return HmacUrl
             .calcularSobre(
-                clave = claves.crearClaveHmac(generacion),
+                clave = operativas.hmacOperativa(claves.crearClaveHmac(generacion)),
                 generacion = generacion,
                 campo = campo,
                 clase = canonica.clase,

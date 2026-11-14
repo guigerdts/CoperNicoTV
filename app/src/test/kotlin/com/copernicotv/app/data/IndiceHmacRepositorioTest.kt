@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesOperativas
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.hmac.FaseIndiceHmac
 import com.copernicotv.core.hmac.HmacPendiente
@@ -14,7 +15,9 @@ import com.copernicotv.core.hmac.ResultadoTransicion
 import com.copernicotv.core.hmac.VersionOrigenHmac
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -24,6 +27,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.time.Instant
+import javax.crypto.Mac
 
 /**
  * Persistencia del índice HMAC (E2-T6).
@@ -39,6 +43,7 @@ class IndiceHmacRepositorioTest {
     private lateinit var repositorio: IndiceHmacRepositorio
 
     private val claves = ClavesEnMemoria()
+    private val operativas = ClavesOperativas()
 
     private val ahora: Instant = Instant.parse("2026-01-01T00:00:00Z")
 
@@ -50,7 +55,7 @@ class IndiceHmacRepositorioTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = IndiceHmacRepositorio(db, claves)
+        repositorio = IndiceHmacRepositorio(db, claves, operativas)
     }
 
     @After
@@ -69,6 +74,33 @@ class IndiceHmacRepositorioTest {
             assertEquals(0L, estado.filasTotales)
             assertEquals(0L, estado.filasPendientes)
             assertEquals(1, db.estadoIndiceHmacDao().contar())
+        }
+
+    /**
+     * E7-T7 ronda 6 (S44/S45): el sello entrega la clave operativa derivada
+     * de la raíz de la generación activa, no la raíz. La raíz permanece en
+     * la bóveda como ancla de integridad.
+     */
+    @Test
+    fun `selloHmac entrega la clave operativa derivada de la raiz`() =
+        runBlocking {
+            repositorio.inicializarLegitimamente(ahora)
+
+            val sello = repositorio.selloHmac(ahora)
+            val disponible = sello as SelloIndiceHmac.Disponible
+            val raiz = requireNotNull(claves.claveHmac(1))
+
+            val esperada =
+                Mac.getInstance("HmacSHA256").run {
+                    init(raiz)
+                    doFinal("copernicotv/hmac/operativa/v1".toByteArray(Charsets.UTF_8))
+                }
+            assertArrayEquals(esperada, requireNotNull(disponible.clave.encoded))
+            assertFalse(disponible.clave == raiz)
+            // El reuso real: pedir el sello otra vez devuelve la misma
+            // instancia operativa sin volver a derivar material distinto.
+            val otra = repositorio.selloHmac(ahora) as SelloIndiceHmac.Disponible
+            assertEquals(disponible.clave, otra.clave)
         }
 
     @Test

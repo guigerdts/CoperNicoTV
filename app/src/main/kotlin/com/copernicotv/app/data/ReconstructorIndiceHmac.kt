@@ -1,6 +1,7 @@
 package com.copernicotv.app.data
 
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesOperativas
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.db.entities.CacheM3UEntity
@@ -90,6 +91,7 @@ internal class ReconstructorIndiceHmac
         private val db: AppDatabase,
         private val indice: IndiceHmacRepositorio,
         private val claves: ClavesApp,
+        private val operativas: ClavesOperativas = ClavesOperativas(),
         private val valores: ReconstruccionValorHmac,
     ) {
         /**
@@ -118,7 +120,10 @@ internal class ReconstructorIndiceHmac
                 // (DC-04 §7, Q2): solo desde `recuperacion_en_curso`, la fase
                 // que la transición `iniciarReconstruccion` aprueba. Es
                 // idempotente: una pasada reanudada reutiliza la misma clave.
-                val claveObjetivo = claves.crearClaveHmac(generacionObjetivo)
+                // El sellado usa la operativa derivada de esa raíz (ronda 6,
+                // S44): mismo sobre que el sellado normal de la generación.
+                val raizObjetivo = claves.crearClaveHmac(generacionObjetivo)
+                val claveObjetivo = operativas.hmacOperativa(raizObjetivo)
                 val dao = db.reconstruccionHmacDao()
                 val maximoCanal = dao.maximoIdCanal()
                 val maximoLista = dao.maximoIdLista()
@@ -182,7 +187,9 @@ internal class ReconstructorIndiceHmac
                         ?: return@withContext ResultadoReingreso.Rechazada(MotivoReingreso.FASE_INVALIDA.codigo)
                 // Incorporación explícita e idempotente de la clave objetivo;
                 // la fase de reconstrucción abierta es la única que la pide.
-                val claveObjetivo = claves.crearClaveHmac(generacionObjetivo)
+                // El sellado del reingreso usa la operativa derivada (S44).
+                val raizObjetivo = claves.crearClaveHmac(generacionObjetivo)
+                val claveObjetivo = operativas.hmacOperativa(raizObjetivo)
                 val canonica =
                     CanonicalizadorUrl.canonizar(valorOriginal, definicion.campo)
                 if (canonica !is ResultadoCanonizacion.Ok) {

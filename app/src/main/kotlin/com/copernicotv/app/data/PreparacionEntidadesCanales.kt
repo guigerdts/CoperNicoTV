@@ -9,6 +9,7 @@ import com.copernicotv.core.m3u.CodecAtributosExtra
 import com.copernicotv.core.modelo.FilaCanal
 import com.copernicotv.core.modelo.InvariantesCanal
 import java.time.Instant
+import javax.crypto.SecretKey
 
 /**
  * Filas de `Canal` listas para inserción, preparadas fuera del
@@ -36,13 +37,12 @@ internal fun prepararEntidadesCanales(
                 fuenteId = fuenteId,
                 nombre = canal.nombre,
                 urlStreamCifrada =
-                    contadorCifrado.medir {
-                        CifradoAes.cifrar(
-                            claves.claveAes,
-                            CifradoAes.aad("Canal", "url_stream_cifrada"),
-                            canal.urlOriginal.toByteArray(Charsets.UTF_8),
-                        )
-                    },
+                    cifrarMedido(
+                        contadorCifrado,
+                        claves.claveAes,
+                        CifradoAes.aad("Canal", "url_stream_cifrada"),
+                        canal.urlOriginal.toByteArray(Charsets.UTF_8),
+                    ),
                 urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
                 logoUrlCifrada = cifrarLogo(claves, canal.logoOriginal, contadorCifrado),
                 logoUrlHmac = canal.logoHmac?.toByteArray(Charsets.UTF_8),
@@ -81,14 +81,26 @@ private fun cifrarLogo(
     contadorCifrado: ContadorCifrado? = null,
 ): ByteArray? =
     logo?.let {
-        (contadorCifrado ?: ContadorNuloCifrado).medir {
-            CifradoAes.cifrar(
-                claves.claveAes,
-                CifradoAes.aad("Canal", "logo_url_cifrada"),
-                it.toByteArray(Charsets.UTF_8),
-            )
-        }
+        cifrarMedido(
+            contadorCifrado,
+            claves.claveAes,
+            CifradoAes.aad("Canal", "logo_url_cifrada"),
+            it.toByteArray(Charsets.UTF_8),
+        )
     }
 
-/** Medición descartada: el contador solo existe cuando el informe lo pide. */
-private object ContadorNuloCifrado : ContadorCifrado()
+/**
+ * Cifra [bytes] y mide la operación cuando [contadorCifrado] no es nulo:
+ * sin contador el cifrado es el de siempre, sin envoltorios (S50).
+ */
+private fun cifrarMedido(
+    contador: ContadorCifrado?,
+    clave: SecretKey,
+    aad: ByteArray,
+    bytes: ByteArray,
+): ByteArray =
+    if (contador == null) {
+        CifradoAes.cifrar(clave, aad, bytes)
+    } else {
+        contador.medir { CifradoAes.cifrar(clave, aad, bytes) }
+    }

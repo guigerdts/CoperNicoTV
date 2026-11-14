@@ -923,7 +923,9 @@ private fun DialogoCatalogoActivo(
     onDialogo: (DialogoCatalogo?) -> Unit,
 ) {
     when (val actual = dialogo) {
-        null -> Unit
+        // Ronda 7 (S49): InformeImportacion se renderiza fuera de este `when`
+        // (límite de complejidad de detekt); comparte rama con null.
+        null, DialogoCatalogo.InformeImportacion -> Unit
         DialogoCatalogo.NuevaLista ->
             DialogoTexto(
                 titulo = stringResource(R.string.catalogo_nueva_lista),

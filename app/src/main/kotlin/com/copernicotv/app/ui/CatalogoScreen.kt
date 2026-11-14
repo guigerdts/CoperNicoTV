@@ -108,6 +108,12 @@ const val TAG_IMPORTAR_URL_ERROR = "importar-url-error"
 /** Éxito con número de canales del diálogo de importación por URL (E7-T7). */
 const val TAG_IMPORTAR_URL_EXITO = "importar-url-exito"
 
+/** Sección del informe de la última importación en la pantalla (E7-T7 ronda 7, S49). */
+const val TAG_INFORME_IMPORTACION = "informe-importacion"
+
+/** Botón «Copiar informe» del informe sobreviviente (E7-T7 ronda 7, S49). */
+const val TAG_INFORME_IMPORTACION_COPIAR = "informe-importacion-copiar"
+
 /** Etiqueta del disparador de Actualización manual de la Lista activa. */
 const val TAG_ACTUALIZAR = "actualizar-lista"
 
@@ -517,8 +523,9 @@ fun CatalogoScreen(
         }
     }
 
-    DialogoCatalogoActivo(
+    DialogosCatalogo(
         dialogo = dialogo,
+        informe = estado.ultimoInformeImportacion,
         acciones = acciones,
         listas = listas,
         coleccionesUi = coleccionesUi,
@@ -526,6 +533,38 @@ fun CatalogoScreen(
         importacionUrl = estado.importacionUrl,
         importando = estado.importando,
         onDialogo = { dialogo = it },
+    )
+}
+
+/**
+ * Diálogos del catálogo, incluido el informe de la última importación (S49):
+ * vive fuera de `DialogoCatalogoActivo` para mantener bajo el límite de
+ * complejidad de detekt.
+ */
+@Composable
+private fun DialogosCatalogo(
+    dialogo: DialogoCatalogo?,
+    informe: String?,
+    acciones: CatalogoAcciones,
+    listas: List<ListaResumen>,
+    coleccionesUi: ColeccionesUiState,
+    perfilesUi: PerfilesUiState,
+    importacionUrl: ImportacionUrlUi?,
+    importando: Boolean,
+    onDialogo: (DialogoCatalogo?) -> Unit,
+) {
+    if (dialogo == DialogoCatalogo.InformeImportacion) {
+        DialogoInformeImportacion(informe.orEmpty()) { onDialogo(null) }
+    }
+    DialogoCatalogoActivo(
+        dialogo = dialogo,
+        acciones = acciones,
+        listas = listas,
+        coleccionesUi = coleccionesUi,
+        perfilesUi = perfilesUi,
+        importacionUrl = importacionUrl,
+        importando = importando,
+        onDialogo = onDialogo,
     )
 }
 
@@ -620,6 +659,16 @@ private fun Controles(
         focoInicial = focoInicial,
         onDialogo = onDialogo,
     )
+    // Ronda 7 (S49): el informe de la última importación vive fuera del diálogo
+    // de importación; se reabre aquí tras navegar por el catálogo.
+    estado.ultimoInformeImportacion?.let {
+        TextButton(
+            onClick = { onDialogo(DialogoCatalogo.InformeImportacion) },
+            modifier = Modifier.testTag(TAG_INFORME_IMPORTACION),
+        ) {
+            Text(stringResource(R.string.catalogo_informe_ultima_importacion))
+        }
+    }
     SelectorLista(
         listas = listas,
         listaActiva = listaActiva,
@@ -2090,6 +2139,9 @@ private sealed interface DialogoCatalogo {
     data object Perfiles : DialogoCatalogo
 
     data object ImportarUrl : DialogoCatalogo
+
+    /** Ronda 7 (S49): informe de la última importación, disponible tras cerrar el diálogo. */
+    data object InformeImportacion : DialogoCatalogo
 
     data object NuevoCanal : DialogoCatalogo
 

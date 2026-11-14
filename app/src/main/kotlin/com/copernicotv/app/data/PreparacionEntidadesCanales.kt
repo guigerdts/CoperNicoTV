@@ -25,6 +25,7 @@ internal fun prepararEntidadesCanales(
     fuenteId: Long,
     ahora: Instant,
     avance: AvanceImportacion?,
+    contadorCifrado: ContadorCifrado? = null,
 ): List<CanalEntity> {
     val entidades = ArrayList<CanalEntity>(canales.size)
     canales.forEachIndexed { indice, canal ->
@@ -35,13 +36,15 @@ internal fun prepararEntidadesCanales(
                 fuenteId = fuenteId,
                 nombre = canal.nombre,
                 urlStreamCifrada =
-                    CifradoAes.cifrar(
-                        claves.claveAes,
-                        CifradoAes.aad("Canal", "url_stream_cifrada"),
-                        canal.urlOriginal.toByteArray(Charsets.UTF_8),
-                    ),
+                    contadorCifrado.medir {
+                        CifradoAes.cifrar(
+                            claves.claveAes,
+                            CifradoAes.aad("Canal", "url_stream_cifrada"),
+                            canal.urlOriginal.toByteArray(Charsets.UTF_8),
+                        )
+                    },
                 urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
-                logoUrlCifrada = cifrarLogo(claves, canal.logoOriginal),
+                logoUrlCifrada = cifrarLogo(claves, canal.logoOriginal, contadorCifrado),
                 logoUrlHmac = canal.logoHmac?.toByteArray(Charsets.UTF_8),
                 tvgId = canal.tvgId,
                 claveCanonica = canal.claveCanonica,
@@ -75,11 +78,17 @@ internal fun prepararEntidadesCanales(
 private fun cifrarLogo(
     claves: ClavesApp,
     logo: String?,
+    contadorCifrado: ContadorCifrado? = null,
 ): ByteArray? =
     logo?.let {
-        CifradoAes.cifrar(
-            claves.claveAes,
-            CifradoAes.aad("Canal", "logo_url_cifrada"),
-            it.toByteArray(Charsets.UTF_8),
-        )
+        (contadorCifrado ?: ContadorNuloCifrado).medir {
+            CifradoAes.cifrar(
+                claves.claveAes,
+                CifradoAes.aad("Canal", "logo_url_cifrada"),
+                it.toByteArray(Charsets.UTF_8),
+            )
+        }
     }
+
+/** Medición descartada: el contador solo existe cuando el informe lo pide. */
+private object ContadorNuloCifrado : ContadorCifrado()

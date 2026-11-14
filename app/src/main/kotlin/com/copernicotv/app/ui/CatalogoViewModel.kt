@@ -531,6 +531,9 @@ class CatalogoViewModel
                                         error = resumen.error ?: CODIGO_SIN_LISTA,
                                         diagnostico = resumen.diagnostico,
                                     ),
+                                // Ronda 7 (S49): informe sobreviviente también en fallo.
+                                ultimoInformeImportacion =
+                                    resumen.diagnostico?.aInforme(resumen.error ?: CODIGO_SIN_LISTA),
                             )
                         return@launch
                     }
@@ -539,7 +542,17 @@ class CatalogoViewModel
                             importando = false,
                             listaId = listaId,
                             mensaje = null,
-                            importacionUrl = ImportacionUrlUi(canales = resumen.canales),
+                            importacionUrl =
+                                ImportacionUrlUi(
+                                    canales = resumen.canales,
+                                    // Ronda 7 (S48): el diagnóstico de éxito llega a la
+                                    // UI; el botón «Copiar informe» ya no depende del
+                                    // camino de fallo.
+                                    diagnostico = resumen.diagnostico,
+                                ),
+                            // Ronda 7 (S49): el informe sobrevive al cierre del
+                            // diálogo y a la navegación; muere solo con el proceso.
+                            ultimoInformeImportacion = resumen.diagnostico?.aInforme(INFORME_EXITO),
                         )
                     observarCatalogo()
                 }
@@ -737,6 +750,9 @@ class CatalogoViewModel
         private companion object {
             const val CODIGO_FALLO = "importacion_fallida"
             const val CODIGO_SIN_LISTA = "importacion_sin_lista"
+
+            /** Etiqueta `resultado` del informe sobreviviente en éxito (S49). */
+            const val INFORME_EXITO = "completada"
             const val CODIGO_ACTUALIZACION_FALLIDA = "actualizacion_fallida"
             const val ESPERA_TECLEO_MS = 150L
             const val TIEMPO_SIN_SUSCRIPTORES = 5_000L

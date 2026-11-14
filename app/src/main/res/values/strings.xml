@@ -20,6 +20,8 @@
     <string name="catalogo_importar_diagnostico">Detalle: %1$s</string>
     <string name="catalogo_importar_reintentar">Puede reintentar con los datos ya introducidos.</string>
     <string name="catalogo_importar_informe">Copiar informe</string>
+    <string name="catalogo_informe_ultima_importacion">Informe de importación</string>
+    <string name="catalogo_informe_ultima_importacion_cerrar">Cerrar</string>
     <string name="catalogo_buscar">Buscar por nombre</string>
     <string name="catalogo_limpiar">Limpiar</string>
     <string name="catalogo_todos">Todos</string>

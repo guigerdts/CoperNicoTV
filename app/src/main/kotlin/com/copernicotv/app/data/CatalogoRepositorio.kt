@@ -434,6 +434,12 @@ class CatalogoRepositorio
                 diagnostico.conEtapa(avance?.ultimaEtapa()).copy(
                     canalesPersistidos = persistida.canales,
                     tiempoGuardadoMs = System.currentTimeMillis() - inicioGuardado,
+                    // Ronda 7 (S50): tiempos independientes de cifrado e inserción.
+                    tiempoCifradoMs = persistida.metricas?.tiempoCifradoMs,
+                    operacionesAes = persistida.metricas?.operacionesAes,
+                    tiempoInsercionMs = persistida.metricas?.tiempoInsercionMs,
+                    lotes = persistida.metricas?.lotes,
+                    transacciones = persistida.metricas?.transacciones,
                 )
             logDiagnostico(final, RESULTADO_COMPLETADA)
             return ResumenImportacion(
@@ -609,6 +615,10 @@ class CatalogoRepositorio
             opsTotales: Int = 0,
         ): ListaPersistida {
             val ahora = Instant.now()
+            // Ronda 7 (S50): contadores independientes de cifrado e inserción.
+            val contadorCifrado = ContadorCifrado()
+            var nanosInsercion = 0L
+            var lotes = 0
             val fuenteId =
                 db.fuenteDao().porNombre(nombreFuente)?.id
                     ?: db.fuenteDao().insertar(
@@ -626,11 +636,13 @@ class CatalogoRepositorio
                         fuenteId = fuenteId,
                         nombre = nombreFuente,
                         ubicacionCifrada =
-                            CifradoAes.cifrar(
-                                claves.claveAes,
-                                CifradoAes.aad("Lista", "ubicacion_cifrada"),
-                                ubicacion.toByteArray(Charsets.UTF_8),
-                            ),
+                            contadorCifrado.medir {
+                                CifradoAes.cifrar(
+                                    claves.claveAes,
+                                    CifradoAes.aad("Lista", "ubicacion_cifrada"),
+                                    ubicacion.toByteArray(Charsets.UTF_8),
+                                )
+                            },
                         ubicacionHmac =
                             HmacUrl
                                 .calcularSobre(
@@ -660,10 +672,13 @@ class CatalogoRepositorio
             val canalesValidos = canales.count { it.claveDerivable }
             val emisorCanales = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_CANALES, opsTotales)
             val entidades =
-                prepararEntidadesCanales(claves, canales, fuenteId, ahora, avance)
+                prepararEntidadesCanales(claves, canales, fuenteId, ahora, avance, contadorCifrado)
             val idsCanales = ArrayList<Long>(entidades.size)
             entidades.chunked(LOTE_INSERTAR).forEach { lote ->
+                val inicioLote = System.nanoTime()
                 idsCanales += db.canalDao().insertarTodos(lote)
+                nanosInsercion += System.nanoTime() - inicioLote
+                lotes++
                 avance?.ticPreparacion(entidades.size)
                 emisorCanales.emitir(elementos = idsCanales.size, canalesValidos = canalesValidos)
             }
@@ -674,13 +689,26 @@ class CatalogoRepositorio
             val filasApariencias = prepararApariencias(canales, idLista, idsCanales, grupoIdPorNombre, ahora, avance)
             var filasInsertadas = 0
             filasApariencias.chunked(LOTE_INSERTAR).forEach { lote ->
+                val inicioLote = System.nanoTime()
                 db.aparienciaDao().insertarTodas(lote)
+                nanosInsercion += System.nanoTime() - inicioLote
+                lotes++
                 filasInsertadas += lote.size
                 avance?.ticPreparacion(entidades.size)
                 emisorApariencias.emitir(elementos = filasInsertadas, canalesValidos = canalesValidos)
             }
             db.estadoActualizacionDao().finalizar(idEstado, Instant.now(), RESULTADO_COMPLETADA)
-            return ListaPersistida(idLista, canales.size)
+            return ListaPersistida(
+                idLista,
+                canales.size,
+                MetricasPersistencia(
+                    tiempoCifradoMs = contadorCifrado.ms(),
+                    operacionesAes = contadorCifrado.total(),
+                    tiempoInsercionMs = nanosInsercion / NANOS_POR_MS,
+                    lotes = lotes,
+                    transacciones = 1,
+                ),
+            )
         }
 
         /** Grupos únicos de la importación, insertados por lotes una sola vez. */
@@ -738,8 +766,25 @@ class CatalogoRepositorio
             return filas
         }
 
-        /** Lista persistida y cantidad de Canales que la Fuente ya tiene. */
-        private data class ListaPersistida(val id: Long, val canales: Int)
+        /** Lista persistida, cantidad de Canales y métricas de la escritura (S50). */
+        private data class ListaPersistida(
+            val id: Long,
+            val canales: Int,
+            val metricas: MetricasPersistencia? = null,
+        )
+
+        /**
+         * Tiempos independientes de la escritura del catálogo (E7-T7 ronda 7,
+         * S50): cifrado AES y inserción Room medidos por separado, sin
+         * atribuirse mutuamente.
+         */
+        data class MetricasPersistencia(
+            val tiempoCifradoMs: Long,
+            val operacionesAes: Int,
+            val tiempoInsercionMs: Long,
+            val lotes: Int,
+            val transacciones: Int,
+        )
 
         /** Resultado interno de una descarga HTTP. */
         private sealed interface Descarga {
@@ -755,6 +800,7 @@ class CatalogoRepositorio
         }
 
         private companion object {
+            const val NANOS_POR_MS = 1_000_000L
             const val FIXTURE = "fixture-canario.m3u"
             const val NOMBRE_FUENTE = "Fixture canario E1"
             const val UBICACION_FIXTURE = "content://com.copernicotv.app.fixture/fixture-canario.m3u"

@@ -179,6 +179,23 @@ class CatalogoInformeImportacionTest {
                 assertTrue("esperaba tiempo_generacion_clave_ms en el informe", informe.contains("tiempo_generacion_clave_ms="))
                 assertTrue("esperaba tiempo_proteccion_clave_ms en el informe", informe.contains("tiempo_proteccion_clave_ms="))
                 assertTrue("esperaba tiempo_descifrado_ms en el informe", informe.contains("tiempo_descifrado_ms="))
+                // Desglose de la ronda 9 (S2): cierra la brecha entre guardado
+                // e inserción con los tiempos de preparación, grupos y
+                // apariencias, más el total de filas de Apariencia.
+                assertTrue("esperaba tiempo_preparacion_ms en el informe", informe.contains("tiempo_preparacion_ms="))
+                assertTrue("esperaba tiempo_grupos_ms en el informe", informe.contains("tiempo_grupos_ms="))
+                assertTrue("esperaba tiempo_apariencias_ms en el informe", informe.contains("tiempo_apariencias_ms="))
+                assertTrue("esperaba filas_apariencias en el informe", informe.contains("filas_apariencias="))
+                assertNotNull("esperaba filas_apariencias", d.filasApariencias)
+                assertTrue("filas de apariencia no pueden ser negativas", (d.filasApariencias ?: -1) >= 0)
+                // Coherencia de unidades (ronda 9, S1): la inserción no puede
+                // superar al guardado completo, y las métricas de la clave
+                // del ciclo quedan en escala de ms (techo de un minuto).
+                assertTrue(
+                    "inserción no puede superar al guardado",
+                    (d.tiempoInsercionMs ?: 0) <= (d.tiempoGuardadoMs ?: Long.MAX_VALUE),
+                )
+                assertTrue("proteccion de clave en ms, no en ns", (d.tiempoProteccionClaveMs ?: 0) < 60_000)
             }
         }
     }
@@ -196,6 +213,9 @@ class CatalogoInformeImportacionTest {
                 assertNull(d.tiempoInsercionMs)
                 assertNull(d.lotes)
                 assertNull(d.transacciones)
+                // Desglose de la ronda 9 (S2): sin persistencia no hay desglose.
+                assertNull(d.tiempoPreparacionMs)
+                assertNull(d.filasApariencias)
                 val informe = d.aInforme("http_4xx")
                 assertFalse(informe.contains("tiempo_cifrado_ms="))
                 assertFalse(informe.contains("tiempo_insercion_ms="))

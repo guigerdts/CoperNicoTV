@@ -95,6 +95,15 @@ data class DiagnosticoImportacion(
     val tiempoDesproteccionClaveMs: Long? = null,
     /** Operaciones reales contra Keystore del ciclo de la clave (S5). */
     val operacionesKeystore: Int? = null,
+    /**
+     * Desglose del tiempo de guardado de la ronda 9 (S2): preparación de
+     * entidades (cifrado por canal incluido), grupos y apariencias, más el
+     * total de filas de `Apariencia` insertadas.
+     */
+    val tiempoPreparacionMs: Long? = null,
+    val tiempoGruposMs: Long? = null,
+    val tiempoAparienciasMs: Long? = null,
+    val filasApariencias: Int? = null,
 ) {
     /**
      * Línea única para Logcat. Cada campo es acotado y sanitizado: tipo de
@@ -160,6 +169,10 @@ data class DiagnosticoImportacion(
             "tiempo_proteccion_clave_ms" to tiempoProteccionClaveMs,
             "tiempo_desproteccion_clave_ms" to tiempoDesproteccionClaveMs,
             "ops_keystore" to operacionesKeystore,
+            "tiempo_preparacion_ms" to tiempoPreparacionMs,
+            "tiempo_grupos_ms" to tiempoGruposMs,
+            "tiempo_apariencias_ms" to tiempoAparienciasMs,
+            "filas_apariencias" to filasApariencias,
             "velocidad_canales_s" to velocidadCanalesPorSegundo(),
             "ultimo_avance" to ultimoAvance,
             "sin_avance_ms" to sinAvanceMs,

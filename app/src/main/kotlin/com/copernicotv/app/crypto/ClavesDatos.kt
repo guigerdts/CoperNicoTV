@@ -18,15 +18,38 @@ class MetricasClaveDatos {
     /** Operaciones reales contra Android Keystore (envolver/desproteger). */
     val operacionesKeystore = AtomicInteger(0)
 
-    /** Tiempo de generar la clave con CSPRNG (solo la generación). */
-    val msGeneracion = LongAdder()
+    /**
+     * Nanosegundos crudos de generar la clave con CSPRNG (ronda 9, S1): los
+     * acumuladores guardan la unidad nativa de [System.nanoTime] y la
+     * conversión a milisegundos ocurre solo en los accesores `ms*`, para que
+     * un valor sub-milisegundo no se pierda al redondear.
+     */
+    val nanosGeneracion = LongAdder()
 
-    /** Tiempo de proteger (envolver) la clave con la raíz. */
-    val msProteccion = LongAdder()
+    /** Nanosegundos crudos de proteger (envolver) la clave con la raíz. */
+    val nanosProteccion = LongAdder()
 
-    /** Tiempo de desproteger la clave envuelta con la raíz. */
-    val msDesproteccion = LongAdder()
+    /** Nanosegundos crudos de desproteger la clave envuelta con la raíz. */
+    val nanosDesproteccion = LongAdder()
+
+    /** Tiempo de generación de la clave, en milisegundos. */
+    fun msGeneracion(): Long = nanosAMs(nanosGeneracion.sum())
+
+    /** Tiempo de protección de la clave, en milisegundos. */
+    fun msProteccion(): Long = nanosAMs(nanosProteccion.sum())
+
+    /** Tiempo de desprotección de la clave, en milisegundos. */
+    fun msDesproteccion(): Long = nanosAMs(nanosDesproteccion.sum())
 }
+
+/** Nanosegundos por milisegundo; la misma constante del informe (S1). */
+internal const val NANOS_POR_MS_CLAVE = 1_000_000L
+
+/**
+ * Conversión ns→ms con redondeo hacia abajo, igual que el resto del informe
+ * (ronda 9, S1): función interna para poder probar la unidad exacta.
+ */
+internal fun nanosAMs(nanos: Long): Long = nanos / NANOS_POR_MS_CLAVE
 
 /**
  * Clave de datos de sesión para la envolvente `0x02` (E7-T7 ronda 8, S2).
@@ -98,7 +121,7 @@ class ClavesDatos
             val inicio = System.nanoTime()
             metricas.operacionesKeystore.incrementAndGet()
             val resultado = CifradoAes.descifrar(raiz, AAD_ENVUELTA, sobre)
-            metricas.msDesproteccion.add(System.nanoTime() - inicio)
+            metricas.nanosDesproteccion.add(System.nanoTime() - inicio)
             val bytes =
                 when (resultado) {
                     is ResultadoDescifrado.Ok -> resultado.bytes
@@ -119,11 +142,11 @@ class ClavesDatos
         private fun generar(raiz: SecretKey): SecretKey {
             val inicioGeneracion = System.nanoTime()
             val material = ByteArray(LONGITUD_CLAVE).also(aleatorio::nextBytes)
-            metricas.msGeneracion.add(System.nanoTime() - inicioGeneracion)
+            metricas.nanosGeneracion.add(System.nanoTime() - inicioGeneracion)
 
             val inicioProteccion = System.nanoTime()
             val sobre = CifradoAes.cifrar(raiz, AAD_ENVUELTA, material)
-            metricas.msProteccion.add(System.nanoTime() - inicioProteccion)
+            metricas.nanosProteccion.add(System.nanoTime() - inicioProteccion)
             metricas.operacionesKeystore.incrementAndGet()
 
             // `SecretKeySpec` copia el material: la copia interna no es

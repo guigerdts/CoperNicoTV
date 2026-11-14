@@ -70,15 +70,35 @@ internal class FuenteHttpSeguimiento(
     override fun clearAllRequestProperties() = interna.clearAllRequestProperties()
 
     /**
-     * Ante un código HTTP inválido reconstruye la cadena de redirecciones
-     * (replay acotado tras un fallo real) y conserva el esquema y el código
-     * del último salto real, que la fuente interna aún recuerda.
+     * Ante un código HTTP inválido conserva el código real del fallo. Solo
+     * reconstruye la cadena con el trazador puro (replay acotado tras un
+     * fallo real) cuando la redirección llegó cruda (3xx) o el motor ya
+     * siguió saltos y falló al final de la cadena (la fuente interna recuerda
+     * una URL distinta del origen). Para un fallo final sin saltos
+     * (401/403/404/5xx en la URL original) la traza se construye sin hacer
+     * peticiones extra al servidor.
      */
     private fun registrarTrazaFalloHttp(
         dataSpec: DataSpec,
         fallo: HttpDataSource.InvalidResponseCodeException,
     ) {
-        val traza = trazadorRedirecciones(dataSpec.uri.toString())
+        val dejoElOrigen = interna.uri != null && interna.uri != dataSpec.uri
+        val reconstruir = fallo.responseCode in REDIRECCIONES_HTTP || dejoElOrigen
+        val traza =
+            if (reconstruir) {
+                trazadorRedirecciones(dataSpec.uri.toString())
+            } else {
+                val esquema = dataSpec.uri.scheme
+                TrazaRedireccion(
+                    codigoInicial = fallo.responseCode,
+                    codigoFinal = null,
+                    redirecciones = 0,
+                    esquemaInicial = esquema,
+                    esquemaFinal = esquema,
+                    circular = false,
+                    limiteAlcanzado = false,
+                )
+            }
         val esquemaFinalReal = interna.uri?.scheme
         val codigoFinalReal =
             runCatching { interna.responseCode }
@@ -175,3 +195,6 @@ internal class FabricaMediaSourcesGrabadora(
 }
 
 private const val AGENTE_HTTP = "User-Agent"
+
+/** Códigos 3xx: fallos cuya cadena de saltos sí se reconstruye tras el fallo. */
+private val REDIRECCIONES_HTTP = 300..399

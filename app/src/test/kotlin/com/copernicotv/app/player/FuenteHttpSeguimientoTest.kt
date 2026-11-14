@@ -121,18 +121,49 @@ class FuenteHttpSeguimientoTest {
     }
 
     @Test
-    fun `sin respuesta final observable se conserva el codigo de la excepcion`() {
+    fun `un fallo final sin saltos no repite el trazador y no hace peticiones extra`() {
         val trazadora = trazadora()
+        var llamadasAlTrazador = 0
         val interna = FuenteInternaFalsa(uriFinal = null, fallo = falloHttp(403, dataSpec()))
         val envoltorio =
             FuenteHttpSeguimiento(interna, trazadora) {
+                llamadasAlTrazador++
                 TrazaRedireccion(302, 200, 1, "https", "https", false, false)
             }
 
         runCatching { envoltorio.open(dataSpec()) }
 
+        assertEquals(0, llamadasAlTrazador)
         assertEquals(403, trazadora.traza?.codigoFinal)
+        assertEquals(0, trazadora.traza?.redirecciones)
+        assertEquals("https", trazadora.traza?.esquemaInicial)
         assertEquals("https", trazadora.traza?.esquemaFinal)
+    }
+
+    @Test
+    fun `un fallo final al termino de saltos reales reconstruye la cadena`() {
+        val trazadora = trazadora()
+        var llamadasAlTrazador = 0
+        val interna =
+            FuenteInternaFalsa(
+                uriFinal = Uri.parse("http://final.invalid/live/1.ts"),
+                codigo = 404,
+                fallo = falloHttp(404, dataSpec()),
+            )
+        val envoltorio =
+            FuenteHttpSeguimiento(interna, trazadora) { urlOriginal ->
+                llamadasAlTrazador++
+                assertEquals("https://origen.invalid/live/1.ts", urlOriginal)
+                TrazaRedireccion(302, 404, 2, "https", "http", false, false)
+            }
+
+        runCatching { envoltorio.open(dataSpec()) }
+
+        assertEquals(1, llamadasAlTrazador)
+        assertEquals(302, trazadora.traza?.codigoInicial)
+        assertEquals(404, trazadora.traza?.codigoFinal)
+        assertEquals(2, trazadora.traza?.redirecciones)
+        assertEquals("http", trazadora.traza?.esquemaFinal)
     }
 
     @Test

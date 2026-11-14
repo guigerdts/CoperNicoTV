@@ -34,7 +34,7 @@ class ResolverRedirecciones(
     },
 ) {
     fun resolver(urlOriginal: String): TrazaRedireccion {
-        val primera = parsear(urlOriginal) ?: return TRAZA_VACIA
+        val primera = parsear(urlOriginal) ?: return trazaVacia
         val recorrido = seguir(primera)
         return TrazaRedireccion(
             codigoInicial = recorrido.codigoInicial,
@@ -48,7 +48,7 @@ class ResolverRedirecciones(
     }
 
     /** Traza sin contenido: nada observable de la cadena (p. ej. URL inválida). */
-    private val TRAZA_VACIA =
+    private val trazaVacia =
         TrazaRedireccion(
             codigoInicial = null, codigoFinal = null, redirecciones = 0,
             esquemaInicial = null, esquemaFinal = null,
@@ -82,10 +82,9 @@ class ResolverRedirecciones(
             if (respuesta.codigo !in REDIRECCIONES) {
                 return Recorrido(url, codigoInicial, codigoFinal, saltos, false, false)
             }
-            val location = respuesta.location
-                ?: return Recorrido(url, codigoInicial, codigoFinal, saltos, false, false)
             val siguiente =
-                runCatching { java.net.URL(url, location) }.getOrNull()
+                respuesta.location
+                    ?.let { location -> runCatching { java.net.URL(url, location) }.getOrNull() }
                     ?: return Recorrido(url, codigoInicial, codigoFinal, saltos, false, false)
             if (siguiente.protocol !in ESQUEMAS_SOPORTADOS) {
                 // El salto no se sigue (el motor lo rechazaría); el esquema

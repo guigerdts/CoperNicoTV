@@ -633,8 +633,9 @@ class ActualizacionRepositorioTest {
 
     private fun descifrar(cifrado: ByteArray): String {
         val resultado =
-            CifradoAes.descifrar(
+            CifradoAes.descifrarSobre(
                 claves.claveAes,
+                clavesDatos.clave(),
                 CifradoAes.aad("Canal", "url_stream_cifrada"),
                 cifrado,
             )

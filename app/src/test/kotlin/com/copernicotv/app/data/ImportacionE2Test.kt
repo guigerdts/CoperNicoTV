@@ -568,7 +568,8 @@ class ImportacionE2Test {
     }
 
     private fun descifrarLogo(sobre: ByteArray): String {
-        val resultado = CifradoAes.descifrar(claves.claveAes, CifradoAes.aad("Canal", "logo_url_cifrada"), sobre)
+        val resultado =
+            CifradoAes.descifrarSobre(claves.claveAes, clavesDatos.clave(), CifradoAes.aad("Canal", "logo_url_cifrada"), sobre)
         assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
         return String((resultado as ResultadoDescifrado.Ok).bytes, Charsets.UTF_8)
     }

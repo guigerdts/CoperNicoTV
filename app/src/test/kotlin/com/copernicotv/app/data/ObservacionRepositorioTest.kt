@@ -280,8 +280,9 @@ class ObservacionRepositorioTest {
 
     private fun descifrar(cifrado: ByteArray): String {
         val resultado =
-            CifradoAes.descifrar(
+            CifradoAes.descifrarSobre(
                 claves.claveAes,
+                clavesDatos.clave(),
                 CifradoAes.aad("Canal", "url_stream_cifrada"),
                 cifrado,
             )
@@ -290,8 +291,9 @@ class ObservacionRepositorioTest {
 
     private fun descifrarLogo(cifrado: ByteArray): String {
         val resultado =
-            CifradoAes.descifrar(
+            CifradoAes.descifrarSobre(
                 claves.claveAes,
+                clavesDatos.clave(),
                 CifradoAes.aad("Canal", "logo_url_cifrada"),
                 cifrado,
             )

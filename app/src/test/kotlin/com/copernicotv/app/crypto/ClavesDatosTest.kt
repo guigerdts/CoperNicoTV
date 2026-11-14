@@ -4,12 +4,12 @@ import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 /**
  * Pruebas del ciclo de vida de la clave de datos de sesión (E7-T7 ronda 8,
@@ -82,7 +82,8 @@ class ClavesDatosTest {
         val raiz = ClavesEnMemoria().claveAes
         val primera = ClavesDatos(RaizConfigurable(raiz), almacen)
         primera.clave()
-        almacen.sobre!![almacen.sobre!!.lastIndex] = (almacen.sobre!!.last().toInt() xor 0x01).toByte()
+        val envueltaCorrupta = requireNotNull(almacen.sobre)
+        envueltaCorrupta[envueltaCorrupta.lastIndex] = (envueltaCorrupta.last().toInt() xor 0x01).toByte()
 
         val segunda = ClavesDatos(RaizConfigurable(raiz), almacen)
         val nuevaClave = segunda.clave()

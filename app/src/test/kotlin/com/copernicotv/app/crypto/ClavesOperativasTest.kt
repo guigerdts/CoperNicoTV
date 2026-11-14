@@ -1,10 +1,10 @@
 package com.copernicotv.app.crypto
 
 import com.copernicotv.core.crypto.HmacUrl
-import com.copernicotv.core.hmac.SobreHmac
 import com.copernicotv.core.identity.CampoUrl
 import com.copernicotv.core.identity.ClaseUrl
 import com.copernicotv.core.identity.ResultadoSobre
+import com.copernicotv.core.identity.SobreHmac
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking

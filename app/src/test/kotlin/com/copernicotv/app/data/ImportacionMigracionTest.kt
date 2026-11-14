@@ -102,7 +102,8 @@ class ImportacionMigracionTest {
             conServidorConCuerpo(200, TEXTO_XTREAM) { urlReanudacion ->
                 val reanudada = repositorio.importarDesdeUrl("Fuente Interrumpida", urlReanudacion)
                 assertNull(reanudada.error)
-                assertEquals(2, db.canalDao().contar())
+                // 1 canal de Fuente E2 + 2 canales de TEXTO_XTREAM.
+                assertEquals(3, db.canalDao().contar())
             }
         }
     }

@@ -70,8 +70,10 @@ class ClavesDatosTest {
         reinicio.clave()
         assertEquals("desproteger es UNA op", 1, reinicio.metricas.operacionesKeystore.get())
         val sobre = requireNotNull(almacen.sobre)
-        val desprotegida = CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobre)
-        assertTrue("esperaba Ok, fue $desprotegida", desprotegida is ResultadoDescifrado.Ok)
+        val desprotegida =
+            requireNotNull(CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobre) as? ResultadoDescifrado.Ok) {
+                "esperaba Ok en la desproteccion"
+            }
         assertArrayEquals(
             "la clave desprotegida es la misma material de la sesion original",
             servicio.clave().encoded,
@@ -96,8 +98,10 @@ class ClavesDatosTest {
             segunda.metricas.operacionesKeystore.get(),
         )
         val sobreNuevo = requireNotNull(almacen.sobre)
-        val reenvuelta = CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobreNuevo)
-        assertTrue("esperaba Ok, fue $reenvuelta", reenvuelta is ResultadoDescifrado.Ok)
+        val reenvuelta =
+            requireNotNull(CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobreNuevo) as? ResultadoDescifrado.Ok) {
+                "esperaba Ok en la reenvuelta"
+            }
         assertArrayEquals(nuevaClave.encoded, reenvuelta.bytes)
     }
 
@@ -113,8 +117,10 @@ class ClavesDatosTest {
 
         val nuevaClave = segunda.clave()
         val sobre = requireNotNull(almacen.sobre)
-        val reenvuelta = CifradoAes.descifrar(raizNueva, CifradoAes.aad("ClavesDatos", "envuelta"), sobre)
-        assertTrue("esperaba Ok, fue $reenvuelta", reenvuelta is ResultadoDescifrado.Ok)
+        val reenvuelta =
+            requireNotNull(CifradoAes.descifrar(raizNueva, CifradoAes.aad("ClavesDatos", "envuelta"), sobre) as? ResultadoDescifrado.Ok) {
+                "esperaba Ok en la reenvuelta"
+            }
         assertArrayEquals(nuevaClave.encoded, reenvuelta.bytes)
     }
 }

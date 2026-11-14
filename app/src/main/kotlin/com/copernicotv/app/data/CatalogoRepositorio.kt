@@ -22,6 +22,7 @@ import com.copernicotv.core.identity.ClaseUrl
 import com.copernicotv.core.identity.EtapaImportacion
 import com.copernicotv.core.identity.ResultadoCanonizacion
 import com.copernicotv.core.m3u.CanalImportadoM3U
+import com.copernicotv.core.m3u.ImportadorM3U
 import com.copernicotv.core.m3u.ResultadoImportacionM3U
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers

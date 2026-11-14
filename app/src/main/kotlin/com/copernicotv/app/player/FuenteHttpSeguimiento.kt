@@ -1,11 +1,11 @@
 package com.copernicotv.app.player
 
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.TransferListener
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
+import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MediaSourceFactory
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import com.copernicotv.core.player.ResolverRedirecciones

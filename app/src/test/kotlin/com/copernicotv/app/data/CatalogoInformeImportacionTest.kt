@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.actualizacion.EstadoSolicitud
 import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
 import com.copernicotv.app.data.db.AppDatabase
@@ -53,6 +55,7 @@ class CatalogoInformeImportacionTest {
     private lateinit var repositorio: CatalogoRepositorio
     private lateinit var viewModel: CatalogoViewModel
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -63,13 +66,13 @@ class CatalogoInformeImportacionTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+        repositorio = CatalogoRepositorio(db, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
         val preferencias = PreferenciasOrdenEnMemoria()
         viewModel =
             CatalogoViewModel(
                 repositorio,
                 BusquedaCatalogoRepositorio(db),
-                CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias),
+                CatalogoCrudRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), preferencias),
                 preferencias,
                 ColeccionRepositorio(db),
                 PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),

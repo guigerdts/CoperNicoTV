@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.crypto.ClavesOperativas
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CacheM3UEntity
@@ -51,6 +53,7 @@ class ReconstructorIndiceHmacTest {
     private lateinit var indice: IndiceHmacRepositorio
     private lateinit var reconstructor: ReconstructorIndiceHmac
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val operativas = ClavesOperativas()
 
     private val ahora: Instant = Instant.parse("2026-01-01T00:00:00Z")
@@ -65,7 +68,7 @@ class ReconstructorIndiceHmacTest {
                 .build()
         indice = IndiceHmacRepositorio(db, claves, operativas)
         reconstructor =
-            ReconstructorIndiceHmac(db, indice, claves, operativas, ReconstruccionValorHmac(indice, claves))
+            ReconstructorIndiceHmac(db, indice, claves, clavesDatos, operativas, ReconstruccionValorHmac(indice, claves, clavesDatos))
     }
 
     @After

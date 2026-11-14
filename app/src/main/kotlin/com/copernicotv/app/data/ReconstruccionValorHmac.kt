@@ -1,6 +1,7 @@
 package com.copernicotv.app.data
 
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.HmacUrl
 import com.copernicotv.core.crypto.ResultadoDescifrado
@@ -30,6 +31,7 @@ internal class ReconstruccionValorHmac
     constructor(
         private val indice: IndiceHmacRepositorio,
         private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
     ) {
         /**
          * Decide y, si procede, reconstruye un valor HMAC.
@@ -81,7 +83,8 @@ internal class ReconstruccionValorHmac
                 )
                 return ResultadoValor.Pendiente
             }
-            val descifrado = CifradoAes.descifrar(claves.claveAes, valor.identidad.aad, cifrado)
+            val descifrado =
+                CifradoAes.descifrarSobre(claves.claveAes, clavesDatos.clave(), valor.identidad.aad, cifrado)
             if (descifrado is ResultadoDescifrado.Fallo) {
                 val motivo =
                     PlanReconstruccionHmac.motivoPorDescifrado(descifrado)

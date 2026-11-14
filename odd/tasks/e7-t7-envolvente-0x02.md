@@ -36,8 +36,8 @@
 ## Tareas
 
 - T1 (S1) — inspección mapeada (arriba). Completada.
-- T2 (S2/S4) — `:core`: 0x02 en `CifradoAes` + tests de formato (IV único, tamper, clave incorrecta). Pendiente.
-- T3 (S2/S3/S4) — `app`: clave de datos en `ClavesApp`/`ClavesKeystore` + persistencia envuelta en DataStore + ciclo de vida y recuperación. Pendiente.
+- T2 (S2/S4) — `:core`: 0x02 en `CifradoAes` + tests de formato (IV único, tamper, clave incorrecta). Completada (commit `854e878`, RED por compilación, GREEN `:core:test`).
+- T3 (S2/S3/S4) — `app`: clave de datos en `ClavesApp`/`ClavesKeystore` + persistencia envuelta en DataStore + ciclo de vida y recuperación. Completada (commit `bff080d`): `AlmacenClaveDatos` (archivo en `noBackupFilesDir`, síncrono) + `ClavesDatos` (CSPRNG 32B, envuelta 0x01 con la raíz, métricas separadas) + 5 tests JVM con fakes. Estática local verde; compilación `:app` verificada en CI (ADR-0005).
 - T4 (S3) — call sites: escrituras → 0x02, lecturas → despacho de versión. Pendiente.
 - T5 (S5) — instrumentación del informe (nuevas métricas separadas). Pendiente.
 - T6 (S6) — pruebas obligatorias (lista completa). Pendiente.

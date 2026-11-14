@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.GrupoEntity
@@ -32,6 +34,7 @@ class CatalogoAmbitoTest {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: CatalogoRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private val ahora: Instant = Instant.parse("2026-01-01T00:00:00Z")
 
@@ -42,7 +45,7 @@ class CatalogoAmbitoTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+        repositorio = CatalogoRepositorio(db, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
     }
 
     @After

@@ -1,6 +1,5 @@
 package com.copernicotv.app.data
 
-import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.identity.ClaveCanal
@@ -21,7 +20,7 @@ import javax.crypto.SecretKey
  * descarta, sin catálogo parcial.
  */
 internal fun prepararEntidadesCanales(
-    claves: ClavesApp,
+    claveDatos: SecretKey,
     canales: List<CanalImportadoM3U>,
     fuenteId: Long,
     ahora: Instant,
@@ -39,12 +38,12 @@ internal fun prepararEntidadesCanales(
                 urlStreamCifrada =
                     cifrarMedido(
                         contadorCifrado,
-                        claves.claveAes,
+                        claveDatos,
                         CifradoAes.aad("Canal", "url_stream_cifrada"),
                         canal.urlOriginal.toByteArray(Charsets.UTF_8),
                     ),
                 urlStreamHmac = canal.urlStreamHmac.toByteArray(Charsets.UTF_8),
-                logoUrlCifrada = cifrarLogo(claves, canal.logoOriginal, contadorCifrado),
+                logoUrlCifrada = cifrarLogo(claveDatos, canal.logoOriginal, contadorCifrado),
                 logoUrlHmac = canal.logoHmac?.toByteArray(Charsets.UTF_8),
                 tvgId = canal.tvgId,
                 claveCanonica = canal.claveCanonica,
@@ -76,14 +75,14 @@ internal fun prepararEntidadesCanales(
 }
 
 private fun cifrarLogo(
-    claves: ClavesApp,
+    claveDatos: SecretKey,
     logo: String?,
     contadorCifrado: ContadorCifrado? = null,
 ): ByteArray? =
     logo?.let {
         cifrarMedido(
             contadorCifrado,
-            claves.claveAes,
+            claveDatos,
             CifradoAes.aad("Canal", "logo_url_cifrada"),
             it.toByteArray(Charsets.UTF_8),
         )
@@ -100,7 +99,7 @@ private fun cifrarMedido(
     bytes: ByteArray,
 ): ByteArray =
     if (contador == null) {
-        CifradoAes.cifrar(clave, aad, bytes)
+        CifradoAes.cifrarDatos(clave, aad, bytes)
     } else {
-        contador.medir { CifradoAes.cifrar(clave, aad, bytes) }
+        contador.medir { CifradoAes.cifrarDatos(clave, aad, bytes) }
     }

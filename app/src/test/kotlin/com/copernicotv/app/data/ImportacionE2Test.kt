@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
@@ -40,6 +42,7 @@ class ImportacionE2Test {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: CatalogoRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -52,7 +55,7 @@ class ImportacionE2Test {
         repositorio =
             CatalogoRepositorio(
                 db,
-                claves,
+                clavesDatos,
                 IndiceHmacRepositorio(db, claves),
                 contexto,
                 verificaCleartext = { true },
@@ -220,7 +223,7 @@ class ImportacionE2Test {
             val rapido =
                 CatalogoRepositorio(
                     db,
-                    claves,
+                    clavesDatos,
                     IndiceHmacRepositorio(db, claves),
                     contexto,
                     TiemposHttp(lecturaMs = 300),
@@ -438,7 +441,7 @@ class ImportacionE2Test {
             val bloqueado =
                 CatalogoRepositorio(
                     db,
-                    claves,
+                    clavesDatos,
                     IndiceHmacRepositorio(db, claves),
                     contexto,
                     verificaCleartext = { false },

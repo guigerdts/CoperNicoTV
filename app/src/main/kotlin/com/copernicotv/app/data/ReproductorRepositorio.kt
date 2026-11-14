@@ -1,6 +1,7 @@
 package com.copernicotv.app.data
 
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
@@ -59,6 +60,7 @@ class ReproductorRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
     ) {
         suspend fun resolver(canalId: Long): ResultadoStream =
             withContext(Dispatchers.IO) {
@@ -68,7 +70,7 @@ class ReproductorRepositorio
                 val url =
                     when (
                         val descifrado =
-                            CifradoAes.descifrar(claves.claveAes, AAD_URL_STREAM, canal.urlStreamCifrada)
+                            CifradoAes.descifrarSobre(claves.claveAes, clavesDatos.clave(), AAD_URL_STREAM, canal.urlStreamCifrada)
                     ) {
                         is ResultadoDescifrado.Ok -> String(descifrado.bytes, Charsets.UTF_8)
                         is ResultadoDescifrado.Fallo -> return@withContext ResultadoStream.Error(ERROR_URL_ILEGIBLE)

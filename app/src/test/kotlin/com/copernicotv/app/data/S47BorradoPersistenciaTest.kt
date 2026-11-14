@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -28,6 +30,7 @@ import org.robolectric.annotation.Config
 class S47BorradoPersistenciaTest {
     private lateinit var db: AppDatabase
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -106,7 +109,7 @@ class S47BorradoPersistenciaTest {
      */
     private fun sembrar(): CatalogoCrudRepositorio {
         val crud =
-            CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), PreferenciasOrdenEnMemoria())
+            CatalogoCrudRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), PreferenciasOrdenEnMemoria())
         runBlocking {
             assertEquals(ResultadoAccion.Ok, crud.crearLista("Lista de borrado"))
             assertEquals(ResultadoAccion.Ok, crud.crearCanal("Canal Uno", "https://example.com/uno.m3u8"))

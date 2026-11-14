@@ -1,6 +1,8 @@
 package com.copernicotv.app
 
+import com.copernicotv.app.crypto.AlmacenClaveDatos
 import com.copernicotv.app.crypto.ClavesApp
+import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 
@@ -45,4 +47,21 @@ class ClavesEnMemoria : ClavesApp {
 
     /** Cantidad de veces que se materializó una clave para [generacion]; solo pruebas. */
     fun creacionesHmac(generacion: Int): Int = synchronized(candado) { creacionesPorGeneracion[generacion] ?: 0 }
+}
+
+/**
+ * Doble de `AlmacenClaveDatos` para pruebas JVM: sobre en memoria, sin
+ * archivo ni Base64. Guarda copias para que el llamador no pueda mutar el
+ * almacenamiento después de guardar.
+ */
+class AlmacenClaveDatosEnMemoria : AlmacenClaveDatos {
+    var sobre: ByteArray? = null
+    val guardados = AtomicInteger(0)
+
+    override fun leer(): ByteArray? = sobre?.copyOf()
+
+    override fun guardar(sobre: ByteArray) {
+        this.sobre = sobre.copyOf()
+        guardados.incrementAndGet()
+    }
 }

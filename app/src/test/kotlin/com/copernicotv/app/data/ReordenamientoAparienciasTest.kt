@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -32,6 +34,7 @@ import java.time.Instant
 class ReordenamientoAparienciasTest {
     private lateinit var db: AppDatabase
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val preferencias = PreferenciasOrdenEnMemoria()
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private var lista1: Long = 0L
@@ -57,7 +60,7 @@ class ReordenamientoAparienciasTest {
     @Test
     fun `reordena solo L1 y persiste tras reabrir sin tocar la coleccion`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias)
+            val repositorio = CatalogoCrudRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), preferencias)
             assertEquals(
                 listOf("C1", "C2", "C3"),
                 nombres(lista1),
@@ -89,7 +92,7 @@ class ReordenamientoAparienciasTest {
     @Test
     fun `los extremos no se mueven fuera de la lista`() {
         runBlocking {
-            val repositorio = CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias)
+            val repositorio = CatalogoCrudRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), preferencias)
             assertEquals(ResultadoAccion.Ok, repositorio.moverCanal(canal1, -1))
             assertEquals(ResultadoAccion.Ok, repositorio.moverCanal(canal3, 1))
             assertEquals(listOf("C1", "C2", "C3"), nombres(lista1))

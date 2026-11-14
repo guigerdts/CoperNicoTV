@@ -6,7 +6,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.room.withTransaction
-import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.EstadoActualizacionEntity
@@ -78,7 +78,7 @@ class CatalogoRepositorio
     @Inject
     constructor(
         private val db: AppDatabase,
-        private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
         private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
@@ -637,8 +637,8 @@ class CatalogoRepositorio
                         nombre = nombreFuente,
                         ubicacionCifrada =
                             contadorCifrado.medir {
-                                CifradoAes.cifrar(
-                                    claves.claveAes,
+                                CifradoAes.cifrarDatos(
+                                    clavesDatos.clave(),
                                     CifradoAes.aad("Lista", "ubicacion_cifrada"),
                                     ubicacion.toByteArray(Charsets.UTF_8),
                                 )
@@ -672,7 +672,7 @@ class CatalogoRepositorio
             val canalesValidos = canales.count { it.claveDerivable }
             val emisorCanales = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_CANALES, opsTotales)
             val entidades =
-                prepararEntidadesCanales(claves, canales, fuenteId, ahora, avance, contadorCifrado)
+                prepararEntidadesCanales(clavesDatos.clave(), canales, fuenteId, ahora, avance, contadorCifrado)
             val idsCanales = ArrayList<Long>(entidades.size)
             entidades.chunked(LOTE_INSERTAR).forEach { lote ->
                 val inicioLote = System.nanoTime()

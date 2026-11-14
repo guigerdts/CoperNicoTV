@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FavoritoEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
@@ -42,6 +44,7 @@ class ObservacionRepositorioTest {
     private lateinit var actualizacion: ActualizacionRepositorio
     private lateinit var resolucion: ObservacionRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private var fuenteId: Long = 0L
     private var listaId: Long = 0L
@@ -55,7 +58,7 @@ class ObservacionRepositorioTest {
                 .allowMainThreadQueries()
                 .build()
         actualizacion = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
-        resolucion = ObservacionRepositorio(db, claves)
+        resolucion = ObservacionRepositorio(db, claves, clavesDatos)
         runBlocking { sembrarFuenteYLista() }
     }
 

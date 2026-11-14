@@ -1,9 +1,9 @@
 package com.copernicotv.app.crypto
 
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.crypto.ResultadoDescifrado
-import java.util.concurrent.atomic.AtomicInteger
 import javax.crypto.SecretKey
 import javax.crypto.spec.SecretKeySpec
 import kotlin.test.Test
@@ -27,21 +27,9 @@ class ClavesDatosTest {
         override fun crearClaveHmac(generacion: Int): SecretKey = SecretKeySpec(ByteArray(32) { it.toByte() }, "HmacSHA256")
     }
 
-    private class AlmacenEnMemoria : AlmacenClaveDatos {
-        var sobre: ByteArray? = null
-        val guardados = AtomicInteger(0)
-
-        override fun leer(): ByteArray? = sobre
-
-        override fun guardar(sobre: ByteArray) {
-            this.sobre = sobre.copyOf()
-            guardados.incrementAndGet()
-        }
-    }
-
     @Test
     fun `la primera clave se genera una vez y se persiste envuelta`() {
-        val almacen = AlmacenEnMemoria()
+        val almacen = AlmacenClaveDatosEnMemoria()
         val servicio = ClavesDatos(RaizConfigurable(ClavesEnMemoria().claveAes), almacen)
 
         val clave = servicio.clave()
@@ -55,7 +43,7 @@ class ClavesDatosTest {
 
     @Test
     fun `el sobre persistido no contiene la clave en claro`() {
-        val almacen = AlmacenEnMemoria()
+        val almacen = AlmacenClaveDatosEnMemoria()
         val servicio = ClavesDatos(RaizConfigurable(ClavesEnMemoria().claveAes), almacen)
 
         val clave = servicio.clave()
@@ -67,7 +55,7 @@ class ClavesDatosTest {
 
     @Test
     fun `la desproteccion y el guardado son una unica operacion por camino`() {
-        val almacen = AlmacenEnMemoria()
+        val almacen = AlmacenClaveDatosEnMemoria()
         val raiz = ClavesEnMemoria().claveAes
         val servicio = ClavesDatos(RaizConfigurable(raiz), almacen)
 
@@ -90,7 +78,7 @@ class ClavesDatosTest {
 
     @Test
     fun `sobre corrupto se regenera sin lanzar excepcion`() {
-        val almacen = AlmacenEnMemoria()
+        val almacen = AlmacenClaveDatosEnMemoria()
         val raiz = ClavesEnMemoria().claveAes
         val primera = ClavesDatos(RaizConfigurable(raiz), almacen)
         primera.clave()
@@ -108,7 +96,7 @@ class ClavesDatosTest {
 
     @Test
     fun `clave raiz invalida se regenera y persiste bajo la raiz nueva`() {
-        val almacen = AlmacenEnMemoria()
+        val almacen = AlmacenClaveDatosEnMemoria()
         // Primera sesión con una raíz; segunda con otra (raíz regenerada o
         // reemplazada en Keystore): la desprotección falla y se regenera.
         val primera = ClavesDatos(RaizConfigurable(SecretKeySpec(ByteArray(32) { it.toByte() }, "AES")), almacen)

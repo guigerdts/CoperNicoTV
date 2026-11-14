@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -73,6 +74,7 @@ class ActualizacionRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
         private val indice: IndiceHmacRepositorio,
         @ApplicationContext private val contexto: Context,
         private val tiempos: TiemposHttp = TiemposHttp(),
@@ -537,8 +539,9 @@ class ActualizacionRepositorio
                 indice.selloHmac() as? SelloIndiceHmac.Disponible
                     ?: return Lectura.Fallo(ERROR_INDICE_HMAC_NO_OPERATIVO)
             val descifrado =
-                CifradoAes.descifrar(
+                CifradoAes.descifrarSobre(
                     claves.claveAes,
+                    clavesDatos.clave(),
                     CifradoAes.aad("Lista", "ubicacion_cifrada"),
                     lista.ubicacionCifrada,
                 )
@@ -654,8 +657,8 @@ class ActualizacionRepositorio
             tabla: String,
             columna: String,
         ): ByteArray =
-            CifradoAes.cifrar(
-                claves.claveAes,
+            CifradoAes.cifrarDatos(
+                clavesDatos.clave(),
                 CifradoAes.aad(tabla, columna),
                 valor.toByteArray(Charsets.UTF_8),
             )

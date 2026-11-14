@@ -3,6 +3,7 @@ package com.copernicotv.app.di
 import android.content.Context
 import androidx.room.Room
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.TiemposHttp
@@ -146,9 +147,9 @@ object AppModule {
         db: AppDatabase,
         almacen: AlmacenCache,
         descargador: Descargador,
-        claves: ClavesApp,
+        clavesDatos: ClavesDatos,
         indice: IndiceHmacRepositorio,
-    ): RepositorioCache = RepositorioCache(db, almacen, descargador, claves, indice)
+    ): RepositorioCache = RepositorioCache(db, almacen, descargador, clavesDatos, indice)
 
     /** Case folding completo conforme a Unicode 15.1.0 para la identidad. */
     @Provides

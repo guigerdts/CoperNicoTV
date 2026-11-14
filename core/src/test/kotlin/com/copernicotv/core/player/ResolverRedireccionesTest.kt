@@ -21,6 +21,7 @@ import kotlin.test.assertTrue
  */
 class ResolverRedireccionesTest {
     /** Conexión falsa que responde [codigo] y Location [location] sin red. */
+    @Suppress("EmptyFunctionBlock") // los no-ops de la conexión falsa son intencionales
     private class ConexionFalsa(
         url: URL,
         private val codigo: Int,

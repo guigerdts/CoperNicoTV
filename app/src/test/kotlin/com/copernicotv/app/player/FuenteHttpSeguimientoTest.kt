@@ -26,6 +26,7 @@ import java.io.IOException
 @Config(sdk = [34])
 class FuenteHttpSeguimientoTest {
     /** Fuente interna falsa que reproduce el comportamiento de Media3. */
+    @Suppress("EmptyFunctionBlock") // los no-ops de la fuente falsa son intencionales
     private class FuenteInternaFalsa(
         private val uriFinal: Uri?,
         private val codigo: Int = -1,
@@ -193,6 +194,7 @@ class FuenteHttpSeguimientoTest {
             FuenteHttpSeguimiento(interna, trazadora()) {
                 TrazaRedireccion(null, null, 0, null, null, false, false)
             }
+        @Suppress("EmptyFunctionBlock") // el oyente falso no necesita cuerpo
         val oyente =
             object : TransferListener {
                 override fun onTransferInitializing(

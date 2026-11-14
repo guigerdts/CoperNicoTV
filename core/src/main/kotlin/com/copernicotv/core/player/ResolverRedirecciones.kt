@@ -34,60 +34,79 @@ class ResolverRedirecciones(
     },
 ) {
     fun resolver(urlOriginal: String): TrazaRedireccion {
-        val primera = urlOriginal.trim().let { texto ->
-            runCatching { java.net.URL(texto) }.getOrNull()
-        }
-        if (primera == null) {
-            return TrazaRedireccion(
-                codigoInicial = null, codigoFinal = null, redirecciones = 0,
-                esquemaInicial = null, esquemaFinal = null,
-                circular = false, limiteAlcanzado = false,
-            )
-        }
+        val primera = parsear(urlOriginal) ?: return TRAZA_VACIA
+        val recorrido = seguir(primera)
+        return TrazaRedireccion(
+            codigoInicial = recorrido.codigoInicial,
+            codigoFinal = recorrido.codigoFinal,
+            redirecciones = recorrido.saltos,
+            esquemaInicial = primera.protocol,
+            esquemaFinal = recorrido.urlFinal.protocol,
+            circular = recorrido.circular,
+            limiteAlcanzado = recorrido.limiteAlcanzado,
+        )
+    }
+
+    /** Traza sin contenido: nada observable de la cadena (p. ej. URL inválida). */
+    private val TRAZA_VACIA =
+        TrazaRedireccion(
+            codigoInicial = null, codigoFinal = null, redirecciones = 0,
+            esquemaInicial = null, esquemaFinal = null,
+            circular = false, limiteAlcanzado = false,
+        )
+
+    /** Resultado interno de recorrer la cadena hasta donde el motor llegaría. */
+    private data class Recorrido(
+        val urlFinal: java.net.URL,
+        val codigoInicial: Int?,
+        val codigoFinal: Int?,
+        val saltos: Int,
+        val circular: Boolean,
+        val limiteAlcanzado: Boolean,
+    )
+
+    /** Recorre los saltos con `followRedirects=false`, uno a uno. */
+    private fun seguir(primera: java.net.URL): Recorrido {
         var url: java.net.URL = primera
         var codigoInicial: Int? = null
         var codigoFinal: Int? = null
         var saltos = 0
-        var circular = false
-        var limiteAlcanzado = false
         val visitadas = mutableSetOf(url.toString())
         while (true) {
             val respuesta = abrir(url)
-            if (respuesta.codigo == SIN_RESPUESTA) break
+            if (respuesta.codigo == SIN_RESPUESTA) {
+                return Recorrido(url, null, null, saltos, false, false)
+            }
             if (codigoInicial == null) codigoInicial = respuesta.codigo
             codigoFinal = respuesta.codigo
-            if (respuesta.codigo !in REDIRECCIONES) break
-            val location = respuesta.location ?: break
-            val siguiente = runCatching { java.net.URL(url, location) }.getOrNull() ?: break
+            if (respuesta.codigo !in REDIRECCIONES) {
+                return Recorrido(url, codigoInicial, codigoFinal, saltos, false, false)
+            }
+            val location = respuesta.location
+                ?: return Recorrido(url, codigoInicial, codigoFinal, saltos, false, false)
+            val siguiente =
+                runCatching { java.net.URL(url, location) }.getOrNull()
+                    ?: return Recorrido(url, codigoInicial, codigoFinal, saltos, false, false)
             if (siguiente.protocol !in ESQUEMAS_SOPORTADOS) {
                 // El salto no se sigue (el motor lo rechazaría); el esquema
                 // ajeno queda visible en la traza para el diagnóstico.
-                url = siguiente
-                break
+                return Recorrido(siguiente, codigoInicial, codigoFinal, saltos, false, false)
             }
             if (visitadas.contains(siguiente.toString())) {
-                url = siguiente
-                circular = true
-                break
+                return Recorrido(siguiente, codigoInicial, codigoFinal, saltos, true, false)
             }
             visitadas.add(siguiente.toString())
             if (saltos >= maximoSaltos) {
-                limiteAlcanzado = true
-                break
+                return Recorrido(url, codigoInicial, codigoFinal, saltos, false, true)
             }
             saltos += 1
             url = siguiente
         }
-        return TrazaRedireccion(
-            codigoInicial = codigoInicial,
-            codigoFinal = codigoFinal,
-            redirecciones = saltos,
-            esquemaInicial = primera.protocol,
-            esquemaFinal = url.protocol,
-            circular = circular,
-            limiteAlcanzado = limiteAlcanzado,
-        )
     }
+
+    /** Interpreta la URL original; nulo si no es una URL válida. */
+    private fun parsear(texto: String): java.net.URL? =
+        runCatching { java.net.URL(texto.trim()) }.getOrNull()
 
     /** Respuesta de un salto: código y Location (si es redirección). */
     private data class Respuesta(

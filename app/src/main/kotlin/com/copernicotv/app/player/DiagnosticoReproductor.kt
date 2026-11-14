@@ -162,6 +162,16 @@ fun textoDiagnostico(diagnostico: DiagnosticoReproductor): String =
         appendLine("Último error: ${diagnostico.ultimoError ?: SIN_ERROR}")
         appendLine("Clasificación: ${diagnostico.clasificacionTecnica ?: SIN_DATO}")
         appendLine("Identificador de canal: ${diagnostico.canalId?.toString() ?: SIN_DATO}")
+        append(lineasDetalleMotor(diagnostico))
+        append(lineasTrazadoRed(diagnostico))
+    }
+
+/**
+ * Líneas del detalle técnico del fallo observado por Media3: códigos, MIME,
+ * excepción, intentos y reintentos.
+ */
+private fun lineasDetalleMotor(diagnostico: DiagnosticoReproductor): String =
+    buildString {
         appendLine("Código Media3: ${diagnostico.codigoMotor ?: SIN_DATO}")
         appendLine("Código HTTP: ${diagnostico.estadoHttp?.toString() ?: SIN_DATO}")
         appendLine("Código HTTP inicial: ${diagnostico.codigoHttpInicial?.toString() ?: SIN_DATO}")
@@ -171,6 +181,14 @@ fun textoDiagnostico(diagnostico: DiagnosticoReproductor): String =
                 if (diagnostico.bytesRespuesta > 0L) "${diagnostico.bytesRespuesta} bytes" else SIN_DATO,
         )
         appendLine("Excepción: ${diagnostico.claseExcepcion ?: SIN_DATO}")
+    }
+
+/**
+ * Líneas del trazado de red observable (E7-T8, S5): redirecciones, esquemas,
+ * MediaSource, User-Agent, intentos, duración y reintentos.
+ */
+private fun lineasTrazadoRed(diagnostico: DiagnosticoReproductor): String =
+    buildString {
         appendLine(
             "Redirecciones: " +
                 redireccionesTexto(

@@ -96,7 +96,7 @@ private fun cifrarLogo(
 private fun cifrarMedido(
     contador: ContadorCifrado?,
     clave: SecretKey,
-    aad: ByteArray,
+    aad: String,
     bytes: ByteArray,
 ): ByteArray =
     if (contador == null) {

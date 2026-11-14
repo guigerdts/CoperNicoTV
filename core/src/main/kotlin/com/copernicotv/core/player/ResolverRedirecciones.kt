@@ -50,9 +50,13 @@ class ResolverRedirecciones(
     /** Traza sin contenido: nada observable de la cadena (p. ej. URL inválida). */
     private val trazaVacia =
         TrazaRedireccion(
-            codigoInicial = null, codigoFinal = null, redirecciones = 0,
-            esquemaInicial = null, esquemaFinal = null,
-            circular = false, limiteAlcanzado = false,
+            codigoInicial = null,
+            codigoFinal = null,
+            redirecciones = 0,
+            esquemaInicial = null,
+            esquemaFinal = null,
+            circular = false,
+            limiteAlcanzado = false,
         )
 
     /** Resultado interno de recorrer la cadena hasta donde el motor llegaría. */
@@ -104,8 +108,7 @@ class ResolverRedirecciones(
     }
 
     /** Interpreta la URL original; nulo si no es una URL válida. */
-    private fun parsear(texto: String): java.net.URL? =
-        runCatching { java.net.URL(texto.trim()) }.getOrNull()
+    private fun parsear(texto: String): java.net.URL? = runCatching { java.net.URL(texto.trim()) }.getOrNull()
 
     /** Respuesta de un salto: código y Location (si es redirección). */
     private data class Respuesta(

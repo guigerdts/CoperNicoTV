@@ -1,12 +1,12 @@
 package com.copernicotv.core.player
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,10 +38,12 @@ class ResolverRedireccionesTest {
         }
 
         override fun disconnect() {}
+
         override fun usingProxy(): Boolean = false
+
         override fun getResponseCode(): Int = codigo
-        override fun getHeaderField(nombre: String): String? =
-            if (nombre.equals("Location", ignoreCase = true)) location else null
+
+        override fun getHeaderField(nombre: String): String? = if (nombre.equals("Location", ignoreCase = true)) location else null
 
         override fun getInputStream(): InputStream = ByteArrayInputStream(ByteArray(0))
     }
@@ -207,8 +209,12 @@ class ResolverRedireccionesTest {
     fun `superar el maximo de saltos detiene la cadena y se informa`() {
         val abridor =
             AbridorFalso(
-                302 to "/s1.ts", 302 to "/s2.ts", 302 to "/s3.ts",
-                302 to "/s4.ts", 302 to "/s5.ts", 200 to null,
+                302 to "/s1.ts",
+                302 to "/s2.ts",
+                302 to "/s3.ts",
+                302 to "/s4.ts",
+                302 to "/s5.ts",
+                200 to null,
             )
         val traza = trazador(abridor, maximoSaltos = 2).resolver("http://origen.invalid/a.ts")
         assertTrue(traza.limiteAlcanzado)

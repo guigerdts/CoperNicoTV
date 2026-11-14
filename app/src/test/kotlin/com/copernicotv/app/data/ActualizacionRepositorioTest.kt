@@ -402,7 +402,7 @@ class ActualizacionRepositorioTest {
                     .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                     .allowMainThreadQueries()
                     .build()
-            repositorio = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+            repositorio = ActualizacionRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
 
             val actualizado = requireNotNull(db.canalDao().porId(original.id))
             assertEquals(original.id, actualizado.id)

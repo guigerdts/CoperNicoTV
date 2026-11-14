@@ -138,7 +138,7 @@ class CatalogoRepositorioTest {
         aad: String,
         sobre: ByteArray,
     ): String {
-        val resultado = CifradoAes.descifrarSobre(clave, claveDatos.clave(), aad, sobre)
+        val resultado = CifradoAes.descifrarSobre(clave, clavesDatos.clave(), aad, sobre)
         assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
         return String((resultado as ResultadoDescifrado.Ok).bytes, Charsets.UTF_8)
     }

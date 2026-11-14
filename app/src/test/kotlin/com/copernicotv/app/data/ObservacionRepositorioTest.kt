@@ -57,7 +57,7 @@ class ObservacionRepositorioTest {
                 .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                 .allowMainThreadQueries()
                 .build()
-        actualizacion = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+        actualizacion = ActualizacionRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
         resolucion = ObservacionRepositorio(db, claves, clavesDatos)
         runBlocking { sembrarFuenteYLista() }
     }

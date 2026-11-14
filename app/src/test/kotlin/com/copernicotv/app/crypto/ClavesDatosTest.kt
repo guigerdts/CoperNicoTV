@@ -33,11 +33,11 @@ class ClavesDatosTest {
         val servicio = ClavesDatos(RaizConfigurable(ClavesEnMemoria().claveAes), almacen)
 
         val clave = servicio.clave()
-        assertEquals(clave, servicio.clave(), "la segunda llamada devuelve la clave en memoria")
-        assertEquals(1, almacen.guardados.get(), "el sobre se persiste una sola vez")
+        assertEquals("la segunda llamada devuelve la clave en memoria", clave, servicio.clave())
+        assertEquals("el sobre se persiste una sola vez", 1, almacen.guardados.get())
 
         val sobre = requireNotNull(almacen.sobre)
-        assertEquals(CifradoAes.VERSION, sobre[0], "el sobre de la clave es un sobre 0x01 de la raíz")
+        assertEquals("el sobre de la clave es un sobre 0x01 de la raíz", CifradoAes.VERSION, sobre[0])
         assertEquals(1 + 12 + 32 + 16, sobre.size)
     }
 
@@ -50,7 +50,7 @@ class ClavesDatosTest {
         val sobre = requireNotNull(almacen.sobre)
         assertFalse(sobre.toList().containsAll(clave.encoded.toList()))
         val sinRaiz = CifradoAes.descifrar(ClavesEnMemoria().claveAes, CifradoAes.aad("Otra", "columna"), sobre)
-        assertTrue(sinRaiz is ResultadoDescifrado.Fallo, "sin el AAD correcto el sobre no revela la clave")
+        assertTrue("sin el AAD correcto el sobre no revela la clave", sinRaiz is ResultadoDescifrado.Fallo)
     }
 
     @Test
@@ -60,19 +60,19 @@ class ClavesDatosTest {
         val servicio = ClavesDatos(RaizConfigurable(raiz), almacen)
 
         servicio.clave()
-        assertEquals(1, servicio.metricas.operacionesKeystore.get(), "generar+envolver es UNA op")
+        assertEquals("generar+envolver es UNA op", 1, servicio.metricas.operacionesKeystore.get())
         assertTrue(servicio.metricas.msGeneracion.sum() >= 0)
         assertTrue(servicio.metricas.msProteccion.sum() >= 0)
 
         // Reinicio del proceso: nueva instancia del servicio, mismo almacen y raíz.
         val reinicio = ClavesDatos(RaizConfigurable(raiz), almacen)
         reinicio.clave()
-        assertEquals(1, reinicio.metricas.operacionesKeystore.get(), "desproteger es UNA op")
+        assertEquals("desproteger es UNA op", 1, reinicio.metricas.operacionesKeystore.get())
         val sobre = requireNotNull(almacen.sobre)
         assertEquals(
+            "la clave desprotegida es la misma material de la sesion original",
             ResultadoDescifrado.Ok(servicio.clave().encoded),
             CifradoAes.descifrar(raiz, CifradoAes.aad("ClavesDatos", "envuelta"), sobre),
-            "la clave desprotegida es la misma material de la sesion original",
         )
     }
 
@@ -87,7 +87,7 @@ class ClavesDatosTest {
 
         val segunda = ClavesDatos(RaizConfigurable(raiz), almacen)
         val nuevaClave = segunda.clave()
-        assertEquals(1, segunda.metricas.operacionesKeystore.get(), "la regeneracion vuelve a envolver con la raiz")
+        assertEquals("la regeneracion vuelve a envolver con la raiz", 1, segunda.metricas.operacionesKeystore.get())
         val sobreNuevo = requireNotNull(almacen.sobre)
         assertEquals(
             ResultadoDescifrado.Ok(nuevaClave.encoded),

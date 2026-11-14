@@ -130,7 +130,7 @@ class ImportacionMigracionTest {
 
                 assertNull(resumen.error)
                 val d = checkNotNull(resumen.diagnostico)
-                val informe = d.aInforme("completada") + "\n" + d.campos().toString()
+                val informe = d.aInforme("completada")
                 // La envuelta de la clave de datos (lo único que sale del
                 // proceso) nunca aparece en el informe, ni completa ni en
                 // fragmento identificable.

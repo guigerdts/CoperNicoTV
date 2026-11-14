@@ -85,6 +85,8 @@ data class CatalogoUiState(
     val mensajeAccion: String? = null,
     val actualizacion: ResumenActualizacion? = null,
     val importacionUrl: ImportacionUrlUi? = null,
+    /** Informe copiable de la última importación; sobrevive al diálogo (S49). */
+    val ultimoInformeImportacion: String? = null,
 )
 
 /**

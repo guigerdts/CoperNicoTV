@@ -71,6 +71,16 @@ data class DiagnosticoImportacion(
     val etapaOpsCripto: Int? = null,
     /** Canales válidos identificados hasta la última etapa (S34). */
     val etapaCanalesValidos: Int? = null,
+    /** Tiempo total de cifrado AES medido por operación (E7-T7 ronda 7, S50). */
+    val tiempoCifradoMs: Long? = null,
+    /** Operaciones AES-GCM ejecutadas (URL + logo + ubicación, S50). */
+    val operacionesAes: Int? = null,
+    /** Tiempo total de inserción Room medido por lote, sin cifrado (S50). */
+    val tiempoInsercionMs: Long? = null,
+    /** Lotes de inserción Room emitidos (S50). */
+    val lotes: Int? = null,
+    /** Transacciones Room de la escritura del catálogo (S50). */
+    val transacciones: Int? = null,
 ) {
     /**
      * Línea única para Logcat. Cada campo es acotado y sanitizado: tipo de
@@ -124,6 +134,12 @@ data class DiagnosticoImportacion(
             "etapa_gap_ms" to etapaMsDesdeUltimo,
             "etapa_ops" to etapaOpsCripto,
             "etapa_canales_validos" to etapaCanalesValidos,
+            "tiempo_cifrado_ms" to tiempoCifradoMs,
+            "ops_aes" to operacionesAes,
+            "tiempo_insercion_ms" to tiempoInsercionMs,
+            "lotes" to lotes,
+            "transacciones" to transacciones,
+            "velocidad_canales_s" to velocidadCanalesPorSegundo(),
             "ultimo_avance" to ultimoAvance,
             "sin_avance_ms" to sinAvanceMs,
             "motivo" to motivo,
@@ -134,6 +150,19 @@ data class DiagnosticoImportacion(
         valores.entries.joinToString(",") { par ->
             "${par.key}=${par.value}"
         }
+
+    /**
+     * Velocidad de procesamiento en canales por segundo (S50): canales
+     * persistidos sobre la duración total observable (descarga + procesamiento
+     * + guardado). Derivada, sin estado propio; nula si falta algún campo.
+     */
+    private fun velocidadCanalesPorSegundo(): Long? {
+        val canales = canalesPersistidos ?: return null
+        val totalMs =
+            (tiempoDescargaMs ?: 0L) + (tiempoProcesamientoMs ?: 0L) + (tiempoGuardadoMs ?: 0L)
+        if (totalMs <= 0) return null
+        return canales * 1000L / totalMs
+    }
 }
 
 /** Copia el diagnóstico con los campos de la última etapa emitida (S34). */

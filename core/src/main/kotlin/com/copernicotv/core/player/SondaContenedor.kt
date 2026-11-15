@@ -31,10 +31,11 @@ class SondeoContenedor(
  * fallo real de reproducción, nunca en el camino de streaming. Realiza una
  * petición GET con rango limitado (`Range: bytes=0-N-1`), sigue la cadena de
  * redirecciones con las MISMAS reglas de seguridad del trazador E7-T8
- * (`instanceFollowRedirects=false`, solo esquemas HTTP(S), sin ciclos, sin
- * reenviar cabeceras entre dominios) y lee como máximo [limiteBytes] del
- * cuerpo final, aunque el servidor ignore el rango y el stream sea
- * interminable. De la respuesta final captura `Content-Type` y los bytes
+ * (`instanceFollowRedirects=false`, solo esquemas HTTP(S), sin ciclos) y lee
+ * como máximo [limiteBytes] del cuerpo final, aunque el servidor ignore el
+ * rango y el stream sea interminable. Las cabeceras configuradas se envían en
+ * cada salto; el uso actual solo configura el User-Agent —igual que el motor
+ * (E7-T8)—, nunca credenciales ni cabeceras de autenticación. De la respuesta final captura `Content-Type` y los bytes
  * iniciales; el detector clasifica el formato observado.
  *
  * Un fallo de conexión produce un sondeo vacío (sin código, sin bytes); una

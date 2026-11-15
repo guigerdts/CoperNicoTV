@@ -95,24 +95,32 @@ data class SenalAudiovisual(
  */
 fun clasificarCondicion(senal: SenalAudiovisual): CondicionReproduccion =
     when (senal.fase) {
-        FaseBase.ERROR ->
-            if (senal.falloVisto == FalloVisto.DECODIFICACION) {
-                CondicionReproduccion.ERROR_DECODIFICACION
-            } else {
-                CondicionReproduccion.ERROR_TRANSPORTE
-            }
+        FaseBase.ERROR -> condicionError(senal)
         FaseBase.BUFFERING -> CondicionReproduccion.BUFFERING
         FaseBase.DETENIDA -> CondicionReproduccion.DETENIDA
         FaseBase.ESPERANDO -> CondicionReproduccion.ESPERANDO_DATOS
-        FaseBase.REPRODUCIENDO ->
-            when {
-                !senal.audioActivo -> CondicionReproduccion.READY_SIN_PISTAS
-                senal.videoActivo && senal.primerFrameVideoVisto ->
-                    CondicionReproduccion.READY_AUDIO_VIDEO
-                senal.videoActivo && !senal.primerFrameVideoVisto ->
-                    CondicionReproduccion.READY_SIN_PRIMER_FRAME
-                !senal.videoActivo && senal.primerFrameVideoVisto ->
-                    CondicionReproduccion.PERDIDA_SUPERFICIE
-                else -> CondicionReproduccion.READY_SOLO_AUDIO
-            }
+        FaseBase.REPRODUCIENDO -> condicionReproduciendo(senal)
+    }
+
+/** Un fallo de sesión es de decodificación solo si Media3 reportó ese código. */
+private fun condicionError(senal: SenalAudiovisual): CondicionReproduccion =
+    if (senal.falloVisto == FalloVisto.DECODIFICACION) {
+        CondicionReproduccion.ERROR_DECODIFICACION
+    } else {
+        CondicionReproduccion.ERROR_TRANSPORTE
+    }
+
+/**
+ * Una fase REPRODUCIENDO se clasifica por lo que renderiza: audio es el
+ * mínimo utilizable; el video sin primer frame observado es una promesa
+ * incumplida; el video que dejó de renderizar tras haber mostrado frames
+ * es una pérdida de superficie.
+ */
+private fun condicionReproduciendo(senal: SenalAudiovisual): CondicionReproduccion =
+    when {
+        !senal.audioActivo -> CondicionReproduccion.READY_SIN_PISTAS
+        senal.videoActivo && senal.primerFrameVideoVisto -> CondicionReproduccion.READY_AUDIO_VIDEO
+        senal.videoActivo && !senal.primerFrameVideoVisto -> CondicionReproduccion.READY_SIN_PRIMER_FRAME
+        !senal.videoActivo && senal.primerFrameVideoVisto -> CondicionReproduccion.PERDIDA_SUPERFICIE
+        else -> CondicionReproduccion.READY_SOLO_AUDIO
     }

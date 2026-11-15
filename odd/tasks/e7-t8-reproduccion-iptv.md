@@ -20,7 +20,7 @@ Branch: feat/e7-t8-reproduccion (cascada sobre feat/ronda9-metricas-room) · Del
 - T2 (S4) — corrección de redirecciones/configuración HTTP demostrada por T1. Hecho (commits b78f7ce, 5e265ce).
 - T3 (S5) — diagnóstico de reproducción mejorado (campos S5, saneado de credenciales). Hecho (commit 8a4d234; gate GGA omitido por inestabilidad del entorno, ver L5).
 - T4 (S6) — pruebas con servidores HTTP controlados (escenarios S6). Hecho (17 tests :core + 7 tests :app; ver L5).
-- T5 (S7/S8) — CI completa, APK + SHA256, instrucciones de validación física. Pendiente.
+- T5 (S7/S8) — CI completa, APK + SHA256, instrucciones de validación física. Hecho en lo automatizable (CI 5/5, APK+SHA256, ver L9). Validación física del dispositivo: pendiente del usuario (S7).
 
 ## Log
 

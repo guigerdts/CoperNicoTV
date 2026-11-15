@@ -274,14 +274,7 @@ class SondaContenedorTest {
             desconectada = true
         }
 
-        override fun usingProxy(): Boolean = false
-
-        override fun getResponseCode(): Int = codigo
-
-        override fun getHeaderField(nombre: String): String? =
-            if (nombre.equals("Content-Type", ignoreCase = true)) tipoMime else null
-
-        override fun getInputStream(): InputStream =
+        private fun cuerpoInvalidado(): InputStream =
             object : InputStream() {
                 override fun read(): Int =
                     if (desconectada) {
@@ -290,6 +283,14 @@ class SondaContenedorTest {
                         this@ConexionQueSeInvalida.cuerpo.read()
                     }
             }
+
+        override fun usingProxy(): Boolean = false
+
+        override fun getResponseCode(): Int = codigo
+
+        override fun getHeaderField(nombre: String): String? = if (nombre.equals("Content-Type", ignoreCase = true)) tipoMime else null
+
+        override fun getInputStream(): InputStream = cuerpoInvalidado()
     }
 
     @Test

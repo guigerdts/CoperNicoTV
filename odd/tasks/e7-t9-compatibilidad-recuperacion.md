@@ -24,8 +24,8 @@ Branch: feat/e7-t9-compatibilidad (cascada sobre feat/e7-t8-reproduccion) · Del
 - T3 (S5) — diagnóstico ampliado (formato observado, extractor, clasificación contenedor/decodificador/ciclo de vida; evidencia en fallos no-HTTP). **Hecho** (`3631dc7`).
 - T4 (S6/S7) — auditoría de seguridad HTTP (preservar E7-T8) + recuperación selectiva acotada y observable. **Hecho** (L5; único cambio: KDoc de `SondaContenedor` corregido).
 - T5 (S8) — matriz de pruebas A–Q + regresión del camino existente (HBO/Cinecanal) en :core y :app. **Hecho en lo automatizable** (L6; instrumentados y nuevos tests pendientes de CI; validación física HBO/Cinecanal = FIS).
-- T6 (S10) — CI 5/5 verde (tests, ktlint, detekt, instrumentados móvil/TV, apk).
-- T7 (S11) — informe final: causas raíz, arquitectura, archivos, SHA, APK+SHA256, limitaciones reales, protocolo de validación física.
+- T6 (S10) — CI 5/5 verde (tests, ktlint, detekt, instrumentados móvil/TV, apk). **Hecho** (run `43728826443` sobre `38f2766`: apk/jvm-tests/static-analysis/instrumented-mobile/instrumented-tv success; correcciones L7/L8).
+- T7 (S11) — informe final: causas raíz, arquitectura, archivos, SHA, APK+SHA256, limitaciones reales, protocolo de validación física. **Hecho** (L9).
 
 ## Log
 
@@ -72,3 +72,7 @@ Branch: feat/e7-t9-compatibilidad (cascada sobre feat/e7-t8-reproduccion) · Del
   - Causa raíz demostrada (no bug de producción): el test leía `sesionEstado`, pero al ERROR el ViewModel llama `cerrarSesion(conservarDiagnostico = true)` (ReproductorViewModel.kt:362) que vacía `_sesionEstado` con `EstadoSesion()` (línea 421) por diseño E6-T5 — la evidencia congelada para la pantalla de error vive en `diagnostico` (DiagnosticoReproductor.kt:45-48, copiada de la sesión en :102-105), no en `sesionEstado`. `DiagnosticoReproductorTest` pasa porque ya lee el diagnóstico.
   - Fix: el instrumentado ahora lee `viewModelReproductor().diagnostico.value` para los 4 campos (`formatoEsperado`, `formatoObservado`, `formatoObservadoMime`, `reSeleccionMedia`). Sin cambios de producción.
   - Validación local: `:app:ktlintCheck` + `:app:detekt` BUILD SUCCESSFUL. Instrumentados → CI (ADR-0005).
+- L9 (2026-11-15, T6 cerrado + T7 informe final).
+  - CI 5/5 verde: run `43728826443` sobre `38f2766` — apk, jvm-tests, static-analysis, instrumented-mobile, instrumented-tv = success (p1-android/p1-performance skipped por prioridad, como siempre). Código: `38f27664c1cd0fecaf82c0e4d0a5167ada081dd5`. APK artifact `copernicotv-debug-apk` (15.822.110 bytes): SHA256 `082599eb78d66c92b2682a444b3fd5e5666b0855b21f42aa8249d8da4a7e96ef`. main intacto: `6bfb0b7` == origin/main.
+  - Diff de la fase T6 (`1cbc7d3..38f2766`): 5 archivos, +63/−23 (DetectarContenedor.kt, SondaContenedorTest.kt, DetectarContenedorTest.kt, ReproductorReintentosTest.kt, doc ODD).
+  - Limitaciones reales: (a) la compatibilidad de los canales problemáticos (FX 1274/1449) no está demostrada por tests sintéticos: la re-selección HLS/DASH y la sonda se validan con fixtures, y la evidencia física de los streams reales es FIS; (b) HBO/Cinecanal: reproducción real ya verificada en E7-T8, no revalidada físicamente en esta fase (el camino feliz está cubierto por regresión automatizada); (c) verificaciones que exigen dispositivo físico siguen pendientes según la regla de Verificación del repo (procedimiento + resultado esperado documentado en L2).

@@ -216,7 +216,7 @@ class SondaContenedorTest {
         val interminable =
             object : InputStream() {
                 override fun read(): Int {
-                    throw IllegalStateException("la sonda debio detenerse en el limite de bytes")
+                    error("la sonda debio detenerse en el limite de bytes")
                 }
             }
         val abridor =

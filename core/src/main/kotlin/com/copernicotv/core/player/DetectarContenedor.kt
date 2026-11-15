@@ -39,23 +39,31 @@ enum class FormatoObservado(val etiqueta: String) {
  * repetirlos con otro MIME no aporta nada.
  */
 object DetectarContenedor {
-    /** Constantes de MIME de Media3 como literales verificados en :app. */
-    const val MIME_HLS = "application/vnd.apple.mpegurl"
+    /**
+     * MIME declarado al motor en la re-selección (S4): los literales exactos
+     * que `Util.inferContentTypeForUriAndMimeType` reconoce (verificado por
+     * bytecode del AAR de Media3 1.5.0). HLS es `application/x-mpegURL` — NO
+     * `application/vnd.apple.mpegurl`, que el motor no infiere y dejaría la
+     * re-selección en la ruta progresiva que ya falló.
+     */
+    const val MIME_HLS = "application/x-mpegURL"
     const val MIME_DASH = "application/dash+xml"
 
     /** Longitud de muestra suficiente para las reglas de evidencia. */
     const val LONGITUD_MUESTRA = 2_048
 
-    private val PREFIJO_HLS = "#EXTM3U"
-    private val MARCA_MP4 = "ftyp"
+    private const val PREFIJO_HLS = "#EXTM3U"
+    private const val MARCA_MP4 = "ftyp"
 
     /** Observa el formato de la respuesta a partir de su MIME y sus bytes. */
     fun observar(
         tipoMime: String?,
         bytes: ByteArray,
     ): FormatoObservado {
-        val porBytes = porBytes(bytes)
-        if (porBytes != FormatoObservado.DESCONOCIDO) return porBytes
+        val porTexto = porTexto(encabezado(bytes))
+        if (porTexto != FormatoObservado.DESCONOCIDO) return porTexto
+        val porBinario = porBinario(bytes)
+        if (porBinario != FormatoObservado.DESCONOCIDO) return porBinario
         return porMime(tipoMime)
     }
 
@@ -78,26 +86,39 @@ object DetectarContenedor {
         }
 
     /** Clasifica por bytes iniciales; `DESCONOCIDO` si no hay evidencia. */
-    private fun porBytes(bytes: ByteArray): FormatoObservado {
-        val inicio = encabezado(bytes)
-        if (inicio.startsWith(PREFIJO_HLS)) return FormatoObservado.HLS
-        if (inicio.contains("<!DOCTYPE", ignoreCase = true) || inicio.contains("<HTML", ignoreCase = true)) {
-            return FormatoObservado.HTML
+    private fun porTexto(inicio: String): FormatoObservado =
+        when {
+            inicio.startsWith(PREFIJO_HLS) -> FormatoObservado.HLS
+            inicio.contains("<!DOCTYPE", ignoreCase = true) || inicio.contains("<HTML", ignoreCase = true) -> FormatoObservado.HTML
+            inicio.contains("<MPD", ignoreCase = true) -> FormatoObservado.DASH
+            else -> FormatoObservado.DESCONOCIDO
         }
-        if (inicio.contains("<MPD", ignoreCase = true)) return FormatoObservado.DASH
+
+    /** Clasifica contenedores binarios: TS, MP4, MP3, AAC. */
+    private fun porBinario(bytes: ByteArray): FormatoObservado {
         if (esTs(bytes)) return FormatoObservado.TS
-        if (bytes.size >= 8 && String(bytes, 4, 4, Charsets.US_ASCII) == MARCA_MP4) return FormatoObservado.MP4
+        if (esMp4(bytes)) return FormatoObservado.MP4
+        val inicio = encabezado(bytes)
         if (inicio.startsWith("ID3")) return FormatoObservado.MP3
-        if (bytes.size >= 3 && bytes[0] == 0xFF.toByte() && (bytes[1].toInt() and 0xE0) == 0xE0) {
-            return if ((bytes[1].toInt() shr 1) and 0x03 == 0) FormatoObservado.AAC else FormatoObservado.MP3
+        if (esAdts(bytes)) {
+            return if (capaAdtsEsReservada(bytes)) FormatoObservado.AAC else FormatoObservado.MP3
         }
         return FormatoObservado.DESCONOCIDO
     }
 
+    /** MP4: la marca `ftyp` en el desplazamiento 4 con longitud suficiente. */
+    private fun esMp4(bytes: ByteArray): Boolean = bytes.size >= 8 && String(bytes, 4, 4, Charsets.US_ASCII) == MARCA_MP4
+
+    /** Sincronía MPEG de audio: 0xFF y los tres bits superiores de tono 1. */
+    private fun esAdts(bytes: ByteArray): Boolean = bytes.size >= 3 && bytes[0] == 0xFF.toByte() && (bytes[1].toInt() and 0xE0) == 0xE0
+
+    /** Capa reservada en cero distingue AAC ADTS de MP3. */
+    private fun capaAdtsEsReservada(bytes: ByteArray): Boolean = (bytes[1].toInt() shr 1) and 0x03 == 0
+
     /** Descarta BOM y espacios previos para leer las marcas de texto. */
     private fun encabezado(bytes: ByteArray): String {
         var desde = 0
-        if (bytes.size >= 3 && bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()) {
+        if (hayBomUtf8(bytes)) {
             desde = 3
         }
         val esEspacio = byteArrayOf(' '.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte(), '\t'.code.toByte())
@@ -107,6 +128,13 @@ object DetectarContenedor {
         val fin = minOf(bytes.size, desde + LONGITUD_MUESTRA)
         return if (desde >= fin) "" else String(bytes, desde, fin - desde, Charsets.UTF_8)
     }
+
+    /** BOM UTF-8 (EF BB BF) al inicio de la muestra. */
+    private fun hayBomUtf8(bytes: ByteArray): Boolean = bytes.size >= 3 && primerOctetoEsBom(bytes)
+
+    /** Los tres primeros octetos son el BOM UTF-8. */
+    private fun primerOctetoEsBom(bytes: ByteArray): Boolean =
+        bytes[0] == 0xEF.toByte() && bytes[1] == 0xBB.toByte() && bytes[2] == 0xBF.toByte()
 
     /**
      * MPEG-TS: el primer byte es `0x47` y los paquetes se repiten cada 188

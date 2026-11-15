@@ -154,8 +154,9 @@ class ReproductorConectividadTest {
         }
         composeRule.esperarTag(TAG_REPRODUCTOR_RECUPERADA)
         assertEquals(1, PuertaEstabilidad.esperasRegistradas)
-        // Seis esperas de backoff consumidas: cinco fallos más el éxito.
-        assertEquals(6, PuertaReintentos.esperasRegistradas)
+        // Cinco esperas de backoff consumidas: cada fallo espera; el sexto
+        // prepare es el que acierta y no cruza la puerta.
+        assertEquals(5, PuertaReintentos.esperasRegistradas)
 
         // La estabilidad se completa: repone el presupuesto y retira el aviso.
         PuertaEstabilidad.liberar()

@@ -147,6 +147,12 @@ const val TAG_REPRODUCTOR_BUFFER = "reproductor-buffer"
 /** Etiqueta del aviso de reintento durante la recuperación (E6-T4). */
 const val TAG_REPRODUCTOR_REINTENTO = "reproductor-reintento"
 
+/** Etiqueta del aviso «Reproducción recuperada» (E7-T10, S4). */
+const val TAG_REPRODUCTOR_RECUPERADA = "reproductor-recuperada"
+
+/** Etiqueta de la línea de intentos agotados en la pantalla de error (E7-T10, S4). */
+const val TAG_REPRODUCTOR_INTENTOS = "reproductor-intentos"
+
 /** Etiqueta del botón que abre el diagnóstico técnico (E6-T5). */
 const val TAG_REPRODUCTOR_DIAGNOSTICO = "reproductor-diagnostico"
 
@@ -400,7 +406,8 @@ private fun SuperficieReproductor(
     ) {
         SuperficieVideo(motor, modos.modo)
         IndicadorCarga(fase)
-        AvisoReintento(estado)
+        AvisoRecuperacion(estado)
+        AvisoRecuperada(estado)
         DiagnosticoEstado(datos, fase, estado.posicionMs)
         if (controlesVisibles) {
             Controles(
@@ -917,33 +924,76 @@ private fun BoxScope.IndicadorCarga(fase: EstadoReproductor) {
 }
 
 /**
- * Aviso visible mientras S20 agota sus reintentos (E6-T4).
+ * Aviso visible mientras la recuperación (S4) intenta reponer la reproducción.
  *
- * No es un error definitivo: informa el número de reintento en curso y deja los
- * controles disponibles para salir o seguir esperando. El error definitivo lo
- * pinta [ErrorReproduccion] al cerrarse la sesión.
+ * No es un error definitivo: informa el número de reintento en curso con su
+ * espera de backoff, o «esperando conexión» cuando el dispositivo está
+ * desconectado (esa espera no consume reintentos). Deja los controles
+ * disponibles para salir o seguir esperando. El error definitivo lo pinta
+ * [ErrorReproduccion] al cerrarse la recuperación.
  */
 @Composable
-private fun BoxScope.AvisoReintento(estado: EstadoSesion) {
-    if (estado.estado != EstadoReproductor.REINTENTANDO) return
+private fun BoxScope.AvisoRecuperacion(estado: EstadoSesion) {
+    when (estado.estado) {
+        EstadoReproductor.REINTENTANDO -> {
+            val texto =
+                stringResource(
+                    R.string.reproductor_reintento_espera,
+                    estado.reintento.coerceAtLeast(1),
+                    estado.reintentosMaximos.coerceAtLeast(1),
+                    (estado.esperaRecuperacionMs / 1000L).coerceAtLeast(1L),
+                )
+            AvisoRecuperacionCaja(texto)
+        }
+        EstadoReproductor.ESPERANDO_CONEXION ->
+            AvisoRecuperacionCaja(stringResource(R.string.reproductor_recuperacion_esperando))
+        else -> Unit
+    }
+}
+
+/** Caja compartida de los avisos de recuperación, centrada y sobre el video. */
+@Composable
+private fun BoxScope.AvisoRecuperacionCaja(texto: String) {
     Surface(
         modifier = Modifier.align(Alignment.Center),
         color = Color.Black.copy(alpha = 0.78f),
         shape = MaterialTheme.shapes.medium,
     ) {
         Text(
-            text =
-                stringResource(
-                    R.string.reproductor_reintento,
-                    estado.reintento.coerceAtLeast(1),
-                    estado.reintentosMaximos.coerceAtLeast(1),
-                ),
+            text = texto,
             modifier =
                 Modifier
                     .testTag(TAG_REPRODUCTOR_REINTENTO)
                     .padding(horizontal = 24.dp, vertical = 16.dp),
             color = Color.White,
             style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+/**
+ * Aviso «Reproducción recuperada» (S4).
+ *
+ * Aparece en cuanto una recuperación vuelve a dejar sonando la reproducción
+ * y desaparece cuando el periodo de estabilidad repone el presupuesto: el
+ * estado publicado lo lleva en `recuperadoRecientemente`.
+ */
+@Composable
+private fun BoxScope.AvisoRecuperada(estado: EstadoSesion) {
+    if (!estado.recuperadoRecientemente) return
+    Surface(
+        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
+        color = Color.Black.copy(alpha = 0.66f),
+        shape = MaterialTheme.shapes.small,
+    ) {
+        Text(
+            text = stringResource(R.string.reproductor_recuperada),
+            modifier =
+                Modifier
+                    .testTag(TAG_REPRODUCTOR_RECUPERADA)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+            color = Color.White,
+            style = MaterialTheme.typography.labelLarge,
         )
     }
 }
@@ -1024,6 +1074,7 @@ private fun etiquetaFase(fase: EstadoReproductor): String =
         EstadoReproductor.PAUSADO -> stringResource(R.string.reproductor_fase_pausado)
         EstadoReproductor.TERMINADO -> stringResource(R.string.reproductor_fase_terminado)
         EstadoReproductor.REINTENTANDO -> stringResource(R.string.reproductor_fase_reintentando)
+        EstadoReproductor.ESPERANDO_CONEXION -> stringResource(R.string.reproductor_fase_esperando_conexion)
         EstadoReproductor.ERROR -> stringResource(R.string.reproductor_fase_error)
     }
 
@@ -1169,6 +1220,22 @@ private fun ErrorReproduccion(
                     .padding(24.dp)
                     .testTag(TAG_REPRODUCTOR_ERROR),
         )
+        if (diagnostico.intentosFallo > 1) {
+            Text(
+                text =
+                    stringResource(
+                        R.string.reproductor_recuperacion_fallida,
+                        diagnostico.intentosFallo,
+                    ),
+                color = Color.White.copy(alpha = 0.78f),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .padding(top = 88.dp)
+                        .testTag(TAG_REPRODUCTOR_INTENTOS),
+            )
+        }
         if (diagnosticoAbierto) {
             PanelDiagnostico(
                 diagnostico = diagnostico,

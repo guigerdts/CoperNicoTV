@@ -161,8 +161,12 @@
     <string name="reproductor_fase_pausado">Pausado</string>
     <string name="reproductor_fase_terminado">Finalizado</string>
     <string name="reproductor_fase_reintentando">Reintentando</string>
+    <string name="reproductor_fase_esperando_conexion">Esperando conexión</string>
     <string name="reproductor_fase_error">Error</string>
-    <string name="reproductor_reintento">Sin conexión. Reintentando %1$d de %2$d…</string>
+    <string name="reproductor_reintento_espera">Sin conexión. Reintentando %1$d de %2$d · espera %3$d s</string>
+    <string name="reproductor_recuperacion_esperando">Sin conexión a Internet. La reproducción se reanudará cuando vuelva la conexión…</string>
+    <string name="reproductor_recuperada">Reproducción recuperada</string>
+    <string name="reproductor_recuperacion_fallida">No se pudo recuperar la reproducción tras %1$d intentos</string>
     <string name="reproductor_diagnostico">Diagnóstico</string>
     <string name="reproductor_diagnostico_titulo">Diagnóstico técnico</string>
     <string name="reproductor_diagnostico_copiar">Copiar diagnóstico</string>

@@ -252,11 +252,13 @@ class ReproductorReintentosTest {
         composeRule.abrirPantallaReproductor()
 
         composeRule.esperarTag(TAG_REPRODUCTOR_ERROR)
-        val estado = composeRule.viewModelReproductor().sesionEstado.value
-        assertEquals("HTTP/HTTPS progresivo", estado.formatoEsperado)
-        assertEquals("HTML", estado.formatoObservado)
-        assertEquals("application/octet-stream", estado.formatoObservadoMime)
-        assertNull(estado.reSeleccionMedia)
+        // La sesión se cierra al ERROR (E6-T5) y sesionEstado se vacía; la
+        // evidencia congelada para la pantalla de error vive en el diagnóstico.
+        val diagnostico = composeRule.viewModelReproductor().diagnostico.value
+        assertEquals("HTTP/HTTPS progresivo", diagnostico.formatoEsperado)
+        assertEquals("HTML", diagnostico.formatoObservado)
+        assertEquals("application/octet-stream", diagnostico.formatoObservadoMime)
+        assertNull(diagnostico.reSeleccionMedia)
         // Ni reintentos S20 ni sondeos extra: un solo sondeo con `Range`.
         assertEquals(0, PuertaReintentos.esperasRegistradas)
         assertEquals(1, servidor.peticionesConRangoDe(FixturesE7T9.HTML))

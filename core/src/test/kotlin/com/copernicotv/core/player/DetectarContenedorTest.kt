@@ -113,7 +113,7 @@ class DetectarContenedorTest {
 
     @Test
     fun `solo HLS y DASH son alternativas plausibles de re-seleccion`() {
-        assertEquals("application/vnd.apple.mpegurl", DetectarContenedor.mimeTypeDeReSeleccion(FormatoObservado.HLS))
+        assertEquals("application/x-mpegURL", DetectarContenedor.mimeTypeDeReSeleccion(FormatoObservado.HLS))
         assertEquals("application/dash+xml", DetectarContenedor.mimeTypeDeReSeleccion(FormatoObservado.DASH))
         assertNull(DetectarContenedor.mimeTypeDeReSeleccion(FormatoObservado.TS))
         assertNull(DetectarContenedor.mimeTypeDeReSeleccion(FormatoObservado.MP4))

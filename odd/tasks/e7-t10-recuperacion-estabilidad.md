@@ -14,7 +14,7 @@ Branch: cascada sobre feat/e7-t9-compatibilidad (b0564c3) · Delivery: ask-on-ri
 
 ## Tasks
 
-- T1 (S2) — Auditoría dirigida A–G con archivo/línea y punto de intervención por causa. **En curso** (explorador de solo lectura).
+- T1 (S2) — Auditoría dirigida A–G con archivo/línea y punto de intervención por causa. **Hecho** (L2).
 - T2 (S3) — Diagnóstico audiovisual con AnalyticsListener (detectado vs renderizado, primer frame, superficie, renderer, códecs; condición de sesión READY audio/video). Pendiente.
 - T3 (S4) — Política de recuperación de conexión (backoff exponencial + jitter, conectividad, reinicio tras estabilidad, un solo proceso, cancelación, UI de estado). Pendiente.
 - T4 (S5) — Recuperación de imagen (menos invasiva primero; preservar posición; sin audio duplicado). Pendiente.
@@ -24,3 +24,14 @@ Branch: cascada sobre feat/e7-t9-compatibilidad (b0564c3) · Delivery: ask-on-ri
 ## Log
 
 - L1 (2026-11-15). Solicitud E7-T10 (verbatim en S1–S6). Continúa la cascada sobre `feat/e7-t9-compatibilidad` (b0564c3, CI 5/5). Validación física E7-T9 incorporada: 10 canales READY (lista en S1), 1 fallo real (Caracol 2571: 302→403 text/html 72 B) y 3 problemas físicos: audio sin imagen, límite rígido de 3 intentos, diagnósticos con «no disponible» masivo.
+- L2 (2026-11-15, T1 auditoría dirigida — causas con archivo/línea).
+  - A. Los «tres intentos» son la longitud de `ESPERAS_REINTENTO_MS = listOf(1_000L, 2_000L, 4_000L)` (PoliticaReintentos.kt:7; `maximo` = `esperasMs.size` :42-43). Solo 3 clases TRANSITORIO: NETWORK_CONNECTION_FAILED, NETWORK_CONNECTION_TIMEOUT, TIMEOUT (5xx vía BAD_HTTP_STATUS :109-115); 4xx/decoder/parseo = DEFINITIVO (:116). **Presupuesto por sesión que nunca se repone** (:55-58); un fallo duplicado con reintento pendiente → `Ignorar` (:80).
+  - B. Agotados → `MaquinaReintentos.alFallar` devuelve `Definitivo` (:81) → única ruta terminal `terminarConError` (SesionMedia3.kt:366-402). No existe gancho de recuperación posterior.
+  - C. El ViewModel colecciona el ERROR → `ReproductorUiState.Error` + `cerrarSesion(conservarDiagnostico = true)` (ReproductorViewModel.kt:357-363) → `anterior?.liberar()` (:411-421; SesionMedia3.kt:320-327: cancela reintento/alcance, quita listener, `reproductor.release()`). El reproductor queda **liberado por completo**: sin `prepare()` nuevo, sin watcher de conectividad, sin re-armado de `playWhenReady`. No hay release en onStop/onPause (solo `salir` de Compose, ReproductorScreen.kt:217-220).
+  - D. Superficie: un solo `PlayerView` por composición vía `AndroidView` (`player = motor`, update reasigna; ReproductorScreen.kt:884-904). Sobrevive a la re-selección (misma instancia) pero NO al agotamiento (rama `SuperficieReproductor` se desmonta, `motor`→null). Sin detección de pérdida de Surface ni reattach.
+  - E. Cero distinción red vs renderer: `clasificarFallo` solo transporta clases; renderer/decoder → `else -> DEFINITIVO` (PoliticaReintentos.kt:116). La clase «pérdida de Surface» no existe en código.
+  - F. READY solo-audio se publica como REPRODUCIENDO (`faseActual`: READY+isPlaying, SesionMedia3.kt:423-428); el sondeo ignora el contenido de `onTracksChanged`. Solo se toca TRACK_TYPE_TEXT (:288,299,471); VIDEO nunca se inspecciona ni deshabilita (0 matches). Sin `onRenderedFirstFrame`, sin contadores de frames/decoder → audio-sin-imagen indistinguible.
+  - G. Re-pedido tras error bloqueado: guard `canalCargado == canalId && (sesion != null || carga?.isActive)` (ReproductorViewModel.kt:140); tras ERROR de sesión `cerrarSesion` NO resetea `canalCargado` (solo la ruta resolver-Error :188) → el `LaunchedEffect(canalId)` del reingreso es ignorado; `ErrorReproduccion` no tiene botón de reintentar (:1146-1160): hay que salir (reset en `cerrar` :321-326) y reentrar. Zapeo solo funciona a canal distinto.
+  - H. Diagnóstico actual: todo el contenido de error viene de scraping de la cadena de excepciones (DetalleFallo.kt:14-22,93-94) + trazadora/sonda ad-hoc; **no existe ningún AnalyticsListener en el repo** (0 matches). En READY casi nada se publica → «no disponible» masivo (DiagnosticoReproductor.kt:286 `SIN_DATO`). `EstadoSesion` (EstadoReproductor.kt:43-71) + `DiagnosticoReproductor` (:16-48) no incluyen pista/códec/decoder/primer frame de video.
+  - Puntos de intervención derivados (para T2-T4): S3/S5 → AnalyticsListener (onRenderedFirstFrame, onTracksChanged con formatos, onDecoderInitialized, onDroppedVideoFrames, superficie) + condición de sesión audiovisual; S4 → política con backoff exponencial+jitter, reset del presupuesto tras estabilidad, sincronía con conectividad, un solo proceso; G → reset `canalCargado` tras ERROR + acción de reintentar en `ErrorReproduccion`.
+

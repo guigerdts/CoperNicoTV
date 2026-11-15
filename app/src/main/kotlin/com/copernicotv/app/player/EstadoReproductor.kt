@@ -1,5 +1,7 @@
 package com.copernicotv.app.player
 
+import com.copernicotv.core.player.CondicionReproduccion
+
 /** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4). */
 enum class EstadoReproductor {
     CARGANDO,
@@ -69,6 +71,29 @@ data class EstadoSesion(
     val formatoObservado: String? = null,
     val formatoObservadoMime: String? = null,
     val reSeleccionMedia: String? = null,
+    // E7-T10 S3: observabilidad audiovisual vía AnalyticsListener. Los
+    // campos son de sesión y se proyectan del [ObservadorAudiovisual];
+    // solo contienen datos que Media3 entrega realmente. `condicion`
+    // distingue un READY con audio y video de uno con audio sin imagen.
+    val condicion: CondicionReproduccion? = null,
+    val pistaVideoMime: String? = null,
+    val pistaVideoCodec: String? = null,
+    val pistaVideoResolucion: String? = null,
+    val pistaVideoFrameRate: Float? = null,
+    val pistaVideoBitrate: Int? = null,
+    val pistaAudioMime: String? = null,
+    val pistaAudioCodec: String? = null,
+    val pistaAudioBitrate: Int? = null,
+    val decoderVideo: String? = null,
+    val decoderAudio: String? = null,
+    val msHastaPrimerFrameVideo: Long? = null,
+    val framesPerdidosVideo: Int? = null,
+    val framesRenderidosVideo: Int? = null,
+    val framesOmitidosVideo: Int? = null,
+    val videoRendererActivo: Boolean? = null,
+    val audioRendererActivo: Boolean? = null,
+    val pistaVideoDetectada: Boolean? = null,
+    val pistaAudioDetectada: Boolean? = null,
 )
 
 /**

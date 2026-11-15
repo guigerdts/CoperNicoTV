@@ -13,8 +13,11 @@ import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.copernicotv.core.player.DetectarContenedor
+import com.copernicotv.core.player.FalloVisto
+import com.copernicotv.core.player.FaseBase
 import com.copernicotv.core.player.ProtocoloStream
 import com.copernicotv.core.player.SondaContenedor
+import com.copernicotv.core.player.clasificarCondicion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -113,10 +116,17 @@ class SesionMedia3(
 
     /** Marca de apertura de la sesión: base de «duración hasta el fallo». */
     private val inicioAperturaMs = android.os.SystemClock.elapsedRealtime()
+
+    /** Observador audiovisual oficial de Media3 (E7-T10, S3). */
+    private val observadorAudiovisual = ObservadorAudiovisual(inicioAperturaMs)
+
+    /** Clase del último fallo visto: transporte o decodificación (S3/S4). */
+    private var falloVistoSesion = FalloVisto.NINGUNO
     private val oyente =
         object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 if (liberada.get()) return
+                falloVistoSesion = falloVistoDe(error.errorCode)
                 val detalle = capturarDetalleFallo(error)
                 if (candidatoReSeleccion(protocolo, error.errorCode, reSeleccionEnMarcha)) {
                     reSeleccionEnMarcha = true
@@ -149,6 +159,7 @@ class SesionMedia3(
 
     init {
         reproductor.addListener(oyente)
+        reproductor.addAnalyticsListener(observadorAudiovisual)
         // S42a/S42b: el motor gestiona el foco de audio. Una pérdida de foco
         // (una llamada u otra app) pausa o atenúa la reproducción y, al
         // recuperar el foco transitorio, el motor la reanuda solo. Sin
@@ -398,6 +409,12 @@ class SesionMedia3(
                 formatoObservado = formatoObservadoSesion?.first,
                 formatoObservadoMime = formatoObservadoSesion?.second,
                 reSeleccionMedia = mimeReSeleccionado,
+                condicion =
+                    clasificarCondicion(
+                        observadorAudiovisual
+                            .senal(FaseBase.ERROR)
+                            .copy(falloVisto = falloVistoSesion),
+                    ),
             )
     }
 
@@ -405,15 +422,64 @@ class SesionMedia3(
         val fase = _estado.value.estado
         if (fase == EstadoReproductor.ERROR || fase == EstadoReproductor.REINTENTANDO) return
         val duracion = reproductor.duration.tomarSiConocida()
+        val fasePublicada = faseActual()
+        val observacion = observadorAudiovisual.observacion()
+        val pistaVideo = observacion.pistaVideo
+        val pistaAudio = observacion.pistaAudio
         _estado.value =
             EstadoSesion(
-                estado = faseActual(),
+                estado = fasePublicada,
                 posicionMs = reproductor.currentPosition.coerceAtLeast(0L),
                 duracionMs = duracion,
                 bufferMs = reproductor.bufferedPosition.coerceAtLeast(0L),
                 puedeBuscar = duracion > 0L && reproductor.isCurrentMediaItemSeekable,
+                condicion =
+                    clasificarCondicion(
+                        observadorAudiovisual
+                            .senal(faseBaseDe(fasePublicada))
+                            .copy(falloVisto = falloVistoSesion),
+                    ),
+                pistaVideoMime = pistaVideo?.mime,
+                pistaVideoCodec = pistaVideo?.codec,
+                pistaVideoResolucion = pistaVideo?.resolucion,
+                pistaVideoFrameRate = pistaVideo?.frameRate,
+                pistaVideoBitrate = pistaVideo?.bitrate,
+                pistaAudioMime = pistaAudio?.mime,
+                pistaAudioCodec = pistaAudio?.codec,
+                pistaAudioBitrate = pistaAudio?.bitrate,
+                decoderVideo = observacion.decoderVideo,
+                decoderAudio = observacion.decoderAudio,
+                msHastaPrimerFrameVideo = observacion.msHastaPrimerFrameVideo,
+                framesPerdidosVideo = observacion.framesPerdidosVideo,
+                framesRenderidosVideo = observacion.framesRenderidosVideo,
+                framesOmitidosVideo = observacion.framesOmitidosVideo,
+                videoRendererActivo = observacion.videoActivo,
+                audioRendererActivo = observacion.audioActivo,
+                pistaVideoDetectada = observacion.hayGrupoVideo,
+                pistaAudioDetectada = observacion.hayGrupoAudio,
             )
     }
+
+    /** Traduce la fase publicada al vocabulario neutro del clasificador (S3). */
+    private fun faseBaseDe(fase: EstadoReproductor): FaseBase =
+        when (fase) {
+            EstadoReproductor.CARGANDO -> FaseBase.ESPERANDO
+            EstadoReproductor.BUFFERING -> FaseBase.BUFFERING
+            EstadoReproductor.REPRODUCIENDO -> FaseBase.REPRODUCIENDO
+            EstadoReproductor.PAUSADO,
+            EstadoReproductor.TERMINADO,
+            EstadoReproductor.REINTENTANDO,
+            -> FaseBase.DETENIDA
+            EstadoReproductor.ERROR -> FaseBase.ERROR
+        }
+
+    /**
+     * Separa fallos de decodificación de fallos de transporte (S3/S4): los
+     * primeros son un problema audiovisual, no de red, y la política de
+     * recuperación no debe tratarlos como pérdida de conectividad.
+     */
+    private fun falloVistoDe(codigo: Int): FalloVisto =
+        if (codigo in CODIGOS_DECODIFICACION) FalloVisto.DECODIFICACION else FalloVisto.TRANSPORTE
 
     private fun faseActual(): EstadoReproductor =
         when (reproductor.playbackState) {
@@ -562,6 +628,17 @@ class SesionMedia3(
 
     private companion object {
         const val INTERVALO_SONDEO_MS = 250L
+
+        /** Códigos Media3 que son un problema audiovisual, no de red (S3/S4). */
+        val CODIGOS_DECODIFICACION =
+            setOf(
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+                PlaybackException.ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED,
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED,
+            )
     }
 }
 

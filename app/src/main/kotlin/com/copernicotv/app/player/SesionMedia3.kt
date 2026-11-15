@@ -33,6 +33,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.coroutineContext
 
 /**
  * Única sesión Media3 de la pantalla de reproducción (E6-T2, ampliada en E6-T4).
@@ -418,7 +419,9 @@ class SesionMedia3(
                 esperaRecuperacionMs = 0L,
             )
         conectividadSesion.esperarConexion()
-        if (!isActive || liberada.get()) return true
+        // El contexto suspend de la corrutina llamadora: si la sesión canceló
+        // su alcance, la espera vuelve con el contexto cancelado.
+        if (!coroutineContext.isActive || liberada.get()) return true
         _estado.value = _estado.value.copy(estado = EstadoReproductor.REINTENTANDO)
         return false
     }

@@ -94,7 +94,7 @@ class SondaContenedor(
         val bytes: ByteArray,
     )
 
-    /** Construye el recorrido cerrando la lectura del cuerpo de la respuesta. */
+    /** Construye el recorrido a partir de la respuesta con el cuerpo leído. */
     private fun recorrido(
         url: URL?,
         codigoInicial: Int?,
@@ -112,7 +112,7 @@ class SondaContenedor(
             circular,
             limiteAlcanzado,
             respuesta.tipoMime,
-            leer(respuesta.cuerpo),
+            respuesta.bytes,
         )
 
     /** Recorre los saltos con `followRedirects=false` y observa el final. */
@@ -177,21 +177,28 @@ class SondaContenedor(
     /** Interpreta la URL original; nulo si no es una URL válida. */
     private fun parsear(texto: String): URL? = runCatching { URL(texto.trim()) }.getOrNull()
 
-    /** Respuesta de un salto: código, Location, MIME y cuerpo en streaming. */
+    /** Respuesta de un salto: código, Location, MIME y cuerpo ya leído. */
     private data class Respuesta(
         val codigo: Int,
         val location: String?,
         val tipoMime: String?,
-        val cuerpo: java.io.InputStream?,
+        val bytes: ByteArray,
     )
 
-    /** Realiza una conexión GET a [url] y captura código, Location, MIME y cuerpo. */
+    /**
+     * Realiza una conexión GET a [url] y captura código, Location, MIME y
+     * cuerpo. El cuerpo se lee MIENTRAS la conexión sigue abierta: cerrar
+     * la conexión antes de leerlo pierde los bytes que aún no llegaron
+     * (CI 43744031037: el emulador entrega las cabeceras antes que el
+     * cuerpo, y el cierre previo dejaba un sondeo vacío). La lectura está
+     * acotada por [leer] y el tiempo de espera de la conexión.
+     */
     private fun abrir(url: URL): Respuesta {
         val conexion =
             try {
                 conexionDe(url)
             } catch (excepcion: IOException) {
-                return Respuesta(SIN_RESPUESTA, null, null, null)
+                return Respuesta(SIN_RESPUESTA, null, null, ByteArray(0))
             }
         try {
             preparar(conexion)
@@ -203,16 +210,18 @@ class SondaContenedor(
                 } catch (excepcion: IOException) {
                     conexion.errorStream
                 }
-            return Respuesta(
-                codigo = codigo,
-                location = conexion.getHeaderField("Location"),
-                tipoMime = conexion.getHeaderField("Content-Type"),
-                cuerpo = cuerpo,
-            )
-        } catch (excepcion: IOException) {
-            return Respuesta(SIN_RESPUESTA, null, null, null)
-        } finally {
+            val respuesta =
+                Respuesta(
+                    codigo = codigo,
+                    location = conexion.getHeaderField("Location"),
+                    tipoMime = conexion.getHeaderField("Content-Type"),
+                    bytes = leer(cuerpo),
+                )
             cerrarConexion(conexion)
+            return respuesta
+        } catch (excepcion: IOException) {
+            cerrarConexion(conexion)
+            return Respuesta(SIN_RESPUESTA, null, null, ByteArray(0))
         }
     }
 

@@ -12,7 +12,9 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.copernicotv.core.player.DetectarContenedor
 import com.copernicotv.core.player.ProtocoloStream
+import com.copernicotv.core.player.SondaContenedor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -24,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -51,7 +54,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class SesionMedia3(
     contexto: Context,
     url: String,
-    protocolo: ProtocoloStream,
+    private val protocolo: ProtocoloStream,
     private val preferenciasIniciales: PreferenciasPista = PreferenciasPista(),
     private val intervaloMs: Long = INTERVALO_SONDEO_MS,
     private val politica: PoliticaReintentos = PoliticaReintentos(),
@@ -73,6 +76,9 @@ class SesionMedia3(
     /** Estado de trazado de red de esta sesión (E7-T8, S5). */
     private val trazadora = TrazadoraRed(agenteUsuario = AGENTE_REPRODUCCION)
 
+    /** Sonda acotada de contenedor (E7-T9): observación solo tras fallo real. */
+    private val sonda = SondaContenedor(cabeceras = mapOf("User-Agent" to AGENTE_REPRODUCCION))
+
     /** Motor de reproducción; la interfaz solo lo conecta a su superficie. */
     val reproductor: ExoPlayer =
         ExoPlayer.Builder(contexto)
@@ -93,6 +99,18 @@ class SesionMedia3(
     private var grupos: List<Tracks.Group> = emptyList()
     private var firmaGrupos = ""
 
+    /** URL de la sesión; los métodos del oyente la necesitan en el fallo. */
+    private val urlSesion: String = url
+
+    /** La re-selección acotada (E7-T9, S4) es una sola por sesión. */
+    private var reSeleccionEnMarcha = false
+
+    /** Evidencia del formato observado por la sonda (S5), inmune al sondeo de estado. */
+    private var formatoObservadoSesion: Pair<String, String?>? = null
+
+    /** MIME con que se re-seleccionó la fuente, si ocurrió (S4). */
+    private var mimeReSeleccionado: String? = null
+
     /** Marca de apertura de la sesión: base de «duración hasta el fallo». */
     private val inicioAperturaMs = android.os.SystemClock.elapsedRealtime()
     private val oyente =
@@ -100,6 +118,11 @@ class SesionMedia3(
             override fun onPlayerError(error: PlaybackException) {
                 if (liberada.get()) return
                 val detalle = capturarDetalleFallo(error)
+                if (candidatoReSeleccion(protocolo, error.errorCode, reSeleccionEnMarcha)) {
+                    reSeleccionEnMarcha = true
+                    intentarReSeleccion(error, detalle)
+                    return
+                }
                 when (val decision = reintentos.alFallar(clasificarFallo(error.errorCode, detalle.estadoHttp))) {
                     is DecisionReintento.Reintentar -> programarReintento(decision)
                     DecisionReintento.Definitivo ->
@@ -153,6 +176,57 @@ class SesionMedia3(
     fun alternar() {
         if (liberada.get()) return
         if (reproductor.isPlaying) reproductor.pause() else reproductor.play()
+    }
+
+    /**
+     * Re-selección acotada de MediaSource (E7-T9, S3/S4/S7).
+     *
+     * Tras un fallo real de parseo o de IO no tipado en la ruta progresiva,
+     * la sonda observa la respuesta real (rango acotado, mismas reglas de
+     * seguridad que el trazador E7-T8, en un hilo de IO — nunca en el hilo
+     * principal). Solo si el formato alternativo es plausible (HLS o DASH)
+     * se re-selecciona la fuente UNA vez reconstruyendo el `MediaItem` con el
+     * MIME observado: la fábrica elige la fuente correspondiente y no se crea
+     * una arquitectura paralela. El camino feliz no pasa por aquí (S2/S8).
+     */
+    private fun intentarReSeleccion(
+        error: PlaybackException,
+        detalle: DetalleFallo,
+    ) {
+        val codigo = codigoDeError(error.errorCode, detalle.estadoHttp)
+        val msHastaFallo = android.os.SystemClock.elapsedRealtime() - inicioAperturaMs
+        alcance.launch {
+            val sondeo = withContext(Dispatchers.IO) { sonda.sondear(urlSesion) }
+            if (liberada.get()) return@launch
+            formatoObservadoSesion = sondeo.observado.etiqueta to sondeo.tipoMime
+            val mimePlausible = DetectarContenedor.mimeTypeDeReSeleccion(sondeo.observado)
+            if (mimePlausible == null) {
+                // Sin alternativa plausible: fallo definitivo con la evidencia
+                // observada en el diagnóstico (S4/S5). Sin reintento extra (S7).
+                terminarConError(
+                    codigo = codigo,
+                    detalle = detalle,
+                    intentos = reintentos.realizados + 1,
+                    msHastaFallo = msHastaFallo,
+                )
+                return@launch
+            }
+            mimeReSeleccionado = mimePlausible
+            _estado.value =
+                _estado.value.copy(
+                    estado = EstadoReproductor.CARGANDO,
+                    codigoError = null,
+                    formatoObservado = sondeo.observado.etiqueta,
+                    formatoObservadoMime = sondeo.tipoMime,
+                    reSeleccionMedia = mimePlausible,
+                )
+            reproductor.setMediaItem(
+                mediaItemDe(urlSesion, protocolo, mimePlausible),
+                reproductor.currentPosition.coerceAtLeast(0L),
+            )
+            reproductor.prepare()
+            reproductor.playWhenReady = true
+        }
     }
 
     /** Busca una posición absoluta limitada a la duración conocida. */
@@ -320,6 +394,10 @@ class SesionMedia3(
                 limiteRedirecciones = traza?.limiteAlcanzado ?: false,
                 fuenteMedia = trazadora.tipoFuenteMedia,
                 agenteUsuario = trazadora.agenteUsuario,
+                formatoEsperado = protocolo.etiqueta,
+                formatoObservado = formatoObservadoSesion?.first,
+                formatoObservadoMime = formatoObservadoSesion?.second,
+                reSeleccionMedia = mimeReSeleccionado,
             )
     }
 
@@ -475,9 +553,10 @@ class SesionMedia3(
     private fun mediaItemDe(
         url: String,
         protocolo: ProtocoloStream,
+        mimeObservado: String? = null,
     ): MediaItem {
         val declaracion = MediaItem.Builder().setUri(url)
-        mimeDeProtocolo(protocolo)?.let(declaracion::setMimeType)
+        mimeDeMediaItem(protocolo, mimeObservado)?.let(declaracion::setMimeType)
         return declaracion.build()
     }
 
@@ -502,6 +581,37 @@ internal fun mimeDeProtocolo(protocolo: ProtocoloStream): String? =
         ProtocoloStream.SMOOTH_STREAMING -> MimeTypes.APPLICATION_SS
         ProtocoloStream.PROGRESIVO, ProtocoloStream.RTSP, ProtocoloStream.RTMP -> null
     }
+
+/**
+ * MIME que declara el `MediaItem` con la evidencia del fallo (E7-T9, S4).
+ *
+ * El MIME observado por la sonda tiene prioridad: es la evidencia real de la
+ * respuesta y la única base plausible de re-selección. Sin observación,
+ * manda la clasificación del protocolo.
+ */
+internal fun mimeDeMediaItem(
+    protocolo: ProtocoloStream,
+    mimeObservado: String?,
+): String? = mimeObservado ?: mimeDeProtocolo(protocolo)
+
+/**
+ * Candidata a re-selección acotada (E7-T9, S4/S7).
+ *
+ * Solo la ruta progresiva sin MIME declarado, ante los dos códigos de la
+ * evidencia S1 (parseo no reconocido e IO no tipado) y una sola vez por
+ * sesión. Cualquier otro fallo —red tipada, HTTP con código, ciclos de vida—
+ * conserva su tratamiento S20 sin peticiones extra.
+ */
+internal fun candidatoReSeleccion(
+    protocolo: ProtocoloStream,
+    codigoError: Int,
+    reSeleccionYaUsada: Boolean,
+): Boolean {
+    if (reSeleccionYaUsada) return false
+    if (protocolo != ProtocoloStream.PROGRESIVO) return false
+    return codigoError == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
+        codigoError == PlaybackException.ERROR_CODE_IO_UNSPECIFIED
+}
 
 /**
  * Traduce el error del motor a un código propio y estable. El mensaje de

@@ -16,6 +16,7 @@ import com.copernicotv.app.player.DireccionZapeo
 import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
+import com.copernicotv.app.player.FabricaConectividad
 import com.copernicotv.app.player.ModoAspecto
 import com.copernicotv.app.player.PASO_VOLUMEN
 import com.copernicotv.app.player.PistaDisponible
@@ -89,6 +90,7 @@ class ReproductorViewModel
         private val preferenciasPista: RepositorioPreferenciasPista,
         private val preferenciasReproduccion: RepositorioPreferenciasReproduccion,
         private val politicaReintentos: PoliticaReintentos,
+        private val fabricaConectividad: FabricaConectividad,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -343,7 +345,15 @@ class ReproductorViewModel
             protocolo: ProtocoloStream,
             preferencias: PreferenciasPista,
         ): SesionMedia3 {
-            val nueva = SesionMedia3(contexto, url, protocolo, preferencias, politica = politicaReintentos)
+            val nueva =
+                SesionMedia3(
+                    contexto,
+                    url,
+                    protocolo,
+                    preferencias,
+                    politica = politicaReintentos,
+                    conectividad = fabricaConectividad.crear(),
+                )
             sesion = nueva
             recolector?.cancel()
             recolector =

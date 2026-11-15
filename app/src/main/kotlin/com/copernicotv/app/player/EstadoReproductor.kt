@@ -2,7 +2,7 @@ package com.copernicotv.app.player
 
 import com.copernicotv.core.player.CondicionReproduccion
 
-/** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4). */
+/** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4 y E7-T10). */
 enum class EstadoReproductor {
     CARGANDO,
     BUFFERING,
@@ -10,6 +10,7 @@ enum class EstadoReproductor {
     PAUSADO,
     TERMINADO,
     REINTENTANDO,
+    ESPERANDO_CONEXION,
     ERROR,
 }
 
@@ -71,6 +72,14 @@ data class EstadoSesion(
     val formatoObservado: String? = null,
     val formatoObservadoMime: String? = null,
     val reSeleccionMedia: String? = null,
+    // E7-T10 S4: recuperación de reproducción. `esperaRecuperacionMs` solo
+    // tiene sentido en REINTENTANDO/ESPERANDO_CONEXION: es la espera de
+    // backoff vigente del reintento en curso (cero en ESPERANDO_CONEXION y
+    // fuera de esas fases). `recuperadoRecientemente` queda en `true` desde
+    // que una recuperación vuelve a dejar la reproducción estable hasta que
+    // el periodo de estabilidad la repone: alimenta el aviso "recuperada".
+    val esperaRecuperacionMs: Long = 0L,
+    val recuperadoRecientemente: Boolean = false,
     // E7-T10 S3: observabilidad audiovisual vía AnalyticsListener. Los
     // campos son de sesión y se proyectan del [ObservadorAudiovisual];
     // solo contienen datos que Media3 entrega realmente. `condicion`
@@ -106,6 +115,7 @@ fun nombreEstadoMotor(fase: EstadoReproductor): String =
     when (fase) {
         EstadoReproductor.CARGANDO,
         EstadoReproductor.REINTENTANDO,
+        EstadoReproductor.ESPERANDO_CONEXION,
         EstadoReproductor.ERROR,
         -> "IDLE"
         EstadoReproductor.BUFFERING -> "BUFFERING"

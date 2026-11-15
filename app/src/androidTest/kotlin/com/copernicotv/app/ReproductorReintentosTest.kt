@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.player.DiagnosticoReproductor
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.app.ui.ReproductorUiState
@@ -253,8 +254,12 @@ class ReproductorReintentosTest {
 
         composeRule.esperarTag(TAG_REPRODUCTOR_ERROR)
         // La sesión se cierra al ERROR (E6-T5) y sesionEstado se vacía; la
-        // evidencia congelada para la pantalla de error vive en el diagnóstico.
-        val diagnostico = composeRule.viewModelReproductor().diagnostico.value
+        // evidencia congelada para la pantalla de error vive en el diagnóstico
+        // del ViewModel, congelado por el mismo callback que fija el error.
+        val diagnostico =
+            esperarDiagnostico("evidencia del contenedor observado en el diagnóstico") {
+                it.formatoEsperado != null && it.formatoObservado != null
+            }
         assertEquals("HTTP/HTTPS progresivo", diagnostico.formatoEsperado)
         assertEquals("HTML", diagnostico.formatoObservado)
         assertEquals("application/octet-stream", diagnostico.formatoObservadoMime)
@@ -297,6 +302,31 @@ class ReproductorReintentosTest {
             }
         } catch (error: TimeoutCancellationException) {
             throw AssertionError(diagnostico(descripcion), error)
+        }
+
+    /**
+     * Espera la evidencia congelada del error en el diagnóstico del ViewModel
+     * (E7-T9). El congelado ocurre en el mismo callback que fija el error de
+     * UI, pero el lector puede llegar antes: se espera la evidencia con el
+     * mismo patrón de sondeo acotado que [esperarSesion], sin debilitar la
+     * aserción — si la evidencia nunca llega, la prueba falla con timeout.
+     */
+    private fun esperarDiagnostico(
+        descripcion: String,
+        predicado: (DiagnosticoReproductor) -> Boolean,
+    ): DiagnosticoReproductor =
+        try {
+            runBlocking {
+                withTimeout(ESPERA_ESTADO_MS) {
+                    composeRule.viewModelReproductor().diagnostico.first(predicado)
+                }
+            }
+        } catch (error: TimeoutCancellationException) {
+            throw AssertionError(
+                "No llegó $descripcion en " + ESPERA_ESTADO_MS + " ms. diagnóstico=" +
+                    composeRule.viewModelReproductor().diagnostico.value,
+                error,
+            )
         }
 
     /** Contexto acotado del fallo: nunca incluye la URL del flujo (S57a). */

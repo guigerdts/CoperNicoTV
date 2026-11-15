@@ -162,9 +162,15 @@ class ReproductorConectividadTest {
         PuertaEstabilidad.liberar()
         composeRule.esperarTagAusente(TAG_REPRODUCTOR_RECUPERADA)
 
-        // Un nuevo corte transitorio vuelve a tener presupuesto completo:
-        // el reintento vuelve a ser 1, no un error definitivo por agotamiento.
+        // Un nuevo corte transitorio vuelve a tener presupuesto completo: el
+        // reintento vuelve a ser 1, no un error definitivo por agotamiento.
+        // El MP4 ya está en búfer y no vuelve a pedir la red por su cuenta,
+        // así que el fallo se dispara con `prepare()` — exactamente la acción
+        // que la recuperación ejecuta sobre el mismo motor.
         fallar.set(true)
+        composeRule.runOnUiThread {
+            composeRule.viewModelReproductor().sesionActual()?.reproductor?.prepare()
+        }
         val reintento =
             esperarSesion("reintento 1 con presupuesto repuesto") {
                 it.estado == EstadoReproductor.REINTENTANDO && it.reintento == 1

@@ -169,9 +169,10 @@ class FuenteHttpSeguimientoTest {
     @Test
     fun `la apertura exitosa no registra ninguna traza`() {
         val trazadora = trazadora()
-        val envoltorio = FuenteHttpSeguimiento(FuenteInternaFalsa(uriFinal = null), trazadora) {
-            TrazaRedireccion(302, 200, 1, "https", "https", false, false)
-        }
+        val envoltorio =
+            FuenteHttpSeguimiento(FuenteInternaFalsa(uriFinal = null), trazadora) {
+                TrazaRedireccion(302, 200, 1, "https", "https", false, false)
+            }
 
         envoltorio.open(dataSpec())
 
@@ -225,6 +226,7 @@ class FuenteHttpSeguimientoTest {
             FuenteHttpSeguimiento(interna, trazadora()) {
                 TrazaRedireccion(null, null, 0, null, null, false, false)
             }
+
         @Suppress("EmptyFunctionBlock") // el oyente falso no necesita cuerpo
         val oyente =
             object : TransferListener {

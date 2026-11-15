@@ -152,12 +152,9 @@ internal class FabricaFuenteSeguimiento(
             .setAllowCrossProtocolRedirects(true)
             .setUserAgent(trazadora.agenteUsuario)
 
-    override fun createDataSource(): HttpDataSource =
-        FuenteHttpSeguimiento(interna.createDataSource(), trazadora, trazadorRedirecciones)
+    override fun createDataSource(): HttpDataSource = FuenteHttpSeguimiento(interna.createDataSource(), trazadora, trazadorRedirecciones)
 
-    override fun setDefaultRequestProperties(
-        propiedades: Map<String, String>,
-    ): HttpDataSource.Factory {
+    override fun setDefaultRequestProperties(propiedades: Map<String, String>): HttpDataSource.Factory {
         interna.setDefaultRequestProperties(propiedades)
         return this
     }
@@ -179,16 +176,12 @@ internal class FabricaMediaSourcesGrabadora(
 
     override fun getSupportedTypes(): IntArray = base.supportedTypes
 
-    override fun setDrmSessionManagerProvider(
-        proveedor: DrmSessionManagerProvider,
-    ): MediaSourceFactory {
+    override fun setDrmSessionManagerProvider(proveedor: DrmSessionManagerProvider): MediaSourceFactory {
         base.setDrmSessionManagerProvider(proveedor)
         return this
     }
 
-    override fun setLoadErrorHandlingPolicy(
-        politica: LoadErrorHandlingPolicy,
-    ): MediaSourceFactory {
+    override fun setLoadErrorHandlingPolicy(politica: LoadErrorHandlingPolicy): MediaSourceFactory {
         base.setLoadErrorHandlingPolicy(politica)
         return this
     }

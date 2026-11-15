@@ -56,6 +56,7 @@ class ReproductorReintentosTest {
         hiltRule.inject()
         runBlocking { db.clearAllTables() }
         FixturesF15.verificar(InstrumentationRegistry.getInstrumentation().context.assets)
+        FixturesE7T9.verificar(InstrumentationRegistry.getInstrumentation().context.assets)
         PuertaReintentos.reiniciar()
     }
 
@@ -216,6 +217,67 @@ class ReproductorReintentosTest {
         assertSame(sesionB, viewModel.sesionActual())
         assertNull(viewModel.sesionEstado.value.codigoError)
         assertTrue(viewModel.estado.value is ReproductorUiState.Listo)
+    }
+
+    @Test
+    fun unaUrlSinExtensionConListaHlsSeReSeleccionaUnaVez() {
+        // El caso Xtream (S1): ruta sin extensión, 200 y `application/octet-stream`.
+        // El intento progresivo no reconoce los bytes; la sonda observa #EXTM3U y
+        // la re-selección única deja el canal reproduciendo (S4/S7).
+        servidor = servidorConFallos { _, _ -> null }
+        sembrarCanal(catalogo, FixturesE7T9.url(servidor, FixturesE7T9.HLS_SIN_EXTENSION))
+
+        composeRule.abrirReproductor()
+
+        esperarSesion("reproducción tras la re-selección") {
+            it.estado == EstadoReproductor.REPRODUCIENDO || it.estado == EstadoReproductor.PAUSADO
+        }
+        // La re-selección no atraviesa la puerta de reintentos S20 (alFallar no
+        // se invoca en el fallo que la dispara).
+        assertEquals(0, PuertaReintentos.esperasRegistradas)
+        // Sondeo acotado exactamente una vez: la sonda es la única petición con
+        // `Range` (intento progresivo + sondeo + manifiesto HLS en total).
+        assertEquals(1, servidor.peticionesConRangoDe(FixturesE7T9.HLS_SIN_EXTENSION))
+        assertTrue(servidor.peticionesDe(FixturesE7T9.HLS_SIN_EXTENSION) >= 3)
+        assertEquals(1, servidor.peticionesDe(FixturesE7T9.SEGMENTO))
+    }
+
+    @Test
+    fun unaUrlSinExtensionConHtmlTerminaEnErrorDefinitivoSinAlternativa() {
+        // Página HTML en ruta sin extensión: sin alternativa plausible (S4), el
+        // fallo es definitivo con la evidencia observada en el diagnóstico (S5).
+        servidor = servidorConFallos { _, _ -> null }
+        sembrarCanal(catalogo, FixturesE7T9.url(servidor, FixturesE7T9.HTML))
+
+        composeRule.abrirPantallaReproductor()
+
+        composeRule.esperarTag(TAG_REPRODUCTOR_ERROR)
+        val estado = composeRule.viewModelReproductor().sesionEstado.value
+        assertEquals("HTTP/HTTPS progresivo", estado.formatoEsperado)
+        assertEquals("HTML", estado.formatoObservado)
+        assertEquals("application/octet-stream", estado.formatoObservadoMime)
+        assertNull(estado.reSeleccionMedia)
+        // Ni reintentos S20 ni sondeos extra: un solo sondeo con `Range`.
+        assertEquals(0, PuertaReintentos.esperasRegistradas)
+        assertEquals(1, servidor.peticionesConRangoDe(FixturesE7T9.HTML))
+        assertNull(composeRule.viewModelReproductor().sesionActual())
+    }
+
+    @Test
+    fun elCaminoFelizProgresivoNoHaceSondeoNiReSeleccion() {
+        // Regresión S2/S8: un MP4 válido en ruta con extensión reproduce sin
+        // atravesar la re-selección: cero sondeos (`Range`), cero reintentos.
+        servidor = servidorConFallos { _, _ -> null }
+        sembrarCanal(catalogo, FixturesF15.url(servidor, FixturesF15.MP4))
+
+        composeRule.abrirReproductor()
+
+        esperarSesion("reproducción directa del camino feliz") {
+            it.estado == EstadoReproductor.REPRODUCIENDO || it.estado == EstadoReproductor.PAUSADO
+        }
+        assertEquals(0, PuertaReintentos.esperasRegistradas)
+        assertEquals(0, servidor.peticionesConRangoDe(FixturesF15.MP4))
+        assertTrue(servidor.peticionesDe(FixturesF15.MP4) >= 1)
     }
 
     private fun servidorConFallos(decidir: (ruta: String, peticion: Int) -> Int?): ServidorMedios =

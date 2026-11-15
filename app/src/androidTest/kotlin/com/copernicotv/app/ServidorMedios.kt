@@ -41,10 +41,18 @@ internal class ServidorMedios(
         }
     private val alcance = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val contadores = ConcurrentHashMap<String, AtomicInteger>()
+    private val contadoresRango = ConcurrentHashMap<String, AtomicInteger>()
     val puerto: Int = socket.localPort
 
     /** Peticiones recibidas para [ruta] desde que se creó el servidor. */
     fun peticionesDe(ruta: String): Int = contadores[ruta]?.get() ?: 0
+
+    /**
+     * Peticiones con cabecera `Range` para [ruta]: la sonda de E7-T9 es la
+     * única parte del reproductor que las envía, así que este contador mide
+     * exactamente los sondeos.
+     */
+    fun peticionesConRangoDe(ruta: String): Int = contadoresRango[ruta]?.get() ?: 0
 
     fun iniciar() {
         alcance.launch {
@@ -76,6 +84,9 @@ internal class ServidorMedios(
                 }
             }
             val numero = contadores.computeIfAbsent(ruta) { AtomicInteger() }.incrementAndGet()
+            if (rango != null) {
+                contadoresRango.computeIfAbsent(ruta) { AtomicInteger() }.incrementAndGet()
+            }
             val estadoForzado = decidirFallo(ruta, numero)
             if (estadoForzado != null) {
                 responder(abierta, metodo, estadoForzado, "text/plain", "fallo simulado".toByteArray(), null)
@@ -210,6 +221,36 @@ internal object FixturesF15 {
             "f15/smooth.ism/Frag-audio-32000-0.m4sa",
             CORRUPTO,
         ).forEach { ruta ->
+            val primerByte = runCatching { assets.open(ruta).use { it.read() } }.getOrNull()
+            if (primerByte == null || primerByte < 0) {
+                throw AssertionError("Fixture ausente o vacío en el APK de pruebas: $ruta")
+            }
+        }
+    }
+
+    fun url(
+        servidor: ServidorMedios,
+        ruta: String,
+    ): String = "http://127.0.0.1:${servidor.puerto}/$ruta"
+}
+
+/** Fixtures de E7-T9: la re-selección de MediaSource y su evidencia. */
+internal object FixturesE7T9 {
+    /**
+     * Lista HLS servida en una ruta SIN extensión (el caso Xtream): el
+     * `Content-Type` es `application/octet-stream` y la ruta progresiva
+     * inicial no puede reconocer los bytes.
+     */
+    const val HLS_SIN_EXTENSION = "e7t9/sin_extension"
+
+    /** Segmento del manifiesto sin extensión. */
+    const val SEGMENTO = "e7t9/f15_000.ts"
+
+    /** Respuesta HTML en una ruta sin extensión: sin alternativa plausible. */
+    const val HTML = "e7t9/html"
+
+    fun verificar(assets: AssetManager) {
+        listOf(HLS_SIN_EXTENSION, SEGMENTO, HTML).forEach { ruta ->
             val primerByte = runCatching { assets.open(ruta).use { it.read() } }.getOrNull()
             if (primerByte == null || primerByte < 0) {
                 throw AssertionError("Fixture ausente o vacío en el APK de pruebas: $ruta")

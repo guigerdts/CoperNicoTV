@@ -149,4 +149,19 @@ class PoliticaReintentosTest {
             codigoDeError(PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND, null),
         )
     }
+
+    @Test
+    fun `un error de decodificador no se reintenta (matriz O, E7-T9)`() {
+        assertEquals(
+            ClaseFallo.DEFINITIVO,
+            clasificarFallo(PlaybackException.ERROR_CODE_DECODING_FAILED, null),
+        )
+        assertEquals(
+            ClaseFallo.DEFINITIVO,
+            clasificarFallo(PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES, null),
+        )
+        // El tipado del motor agrupa lo no enumerado; el código Media3 queda en
+        // la evidencia técnica.
+        assertEquals("error_reproduccion", codigoDeError(PlaybackException.ERROR_CODE_DECODING_FAILED, null))
+    }
 }

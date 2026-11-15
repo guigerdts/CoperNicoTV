@@ -129,6 +129,20 @@ class SondaContenedorTest {
     }
 
     @Test
+    fun `una redireccion de http a https se sigue (matriz F)`() {
+        val abridor =
+            AbridorFalso(
+                respuesta(302, location = "https://127.0.0.1:9/media/1.ts"),
+                respuesta(200, mime = "video/mp2t", cuerpo = ByteArrayInputStream(ByteArray(570) { 0x47 })),
+            )
+        val sondeo = sonda(abridor).sondear("http://127.0.0.1:9/live/1274")
+        assertEquals(200, sondeo.codigoFinal)
+        assertEquals(1, sondeo.redirecciones)
+        assertEquals("https", sondeo.esquemaFinal)
+        assertEquals(FormatoObservado.TS, sondeo.observado)
+    }
+
+    @Test
     fun `la peticion lleva rango acotado y solo la cabecera segura en todos los saltos`() {
         val abridor =
             AbridorFalso(

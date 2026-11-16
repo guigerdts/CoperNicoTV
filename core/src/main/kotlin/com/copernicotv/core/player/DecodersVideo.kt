@@ -145,37 +145,56 @@ fun seleccionarDecoderVideo(
         return SeleccionVideo(MotivoSoporteVideo.MIME_NO_SOPORTADO)
     }
 
+    val perfil = perfilNivel?.perfil
     var rechazoPerfil = false
+    var seleccion: DecoderVideo? = null
     val descartados = mutableListOf<String>()
     for (candidato in candidatos) {
-        val perfil = perfilNivel?.perfil
-        if (
-            perfil != null &&
-            candidato.perfiles.isNotEmpty() &&
-            candidato.perfiles.none { it == perfil }
-        ) {
-            rechazoPerfil = true
-            descartados += candidato.nombre
-            continue
+        when (evaluarCandidato(candidato, perfil, declaracion)) {
+            null -> {
+                seleccion = candidato
+                break
+            }
+            Descarte.PERFIL -> {
+                rechazoPerfil = true
+                descartados += candidato.nombre
+            }
+            Descarte.RESOLUCION -> descartados += candidato.nombre
         }
-        val fueraDeLimites =
-            (declaracion.ancho != null && candidato.anchoMax != null && declaracion.ancho > candidato.anchoMax) ||
-                (declaracion.alto != null && candidato.altoMax != null && declaracion.alto > candidato.altoMax)
-        if (fueraDeLimites) {
-            descartados += candidato.nombre
-            continue
-        }
-        return SeleccionVideo(
-            MotivoSoporteVideo.SOPORTADO,
-            candidato.nombre,
-            candidato.tipo,
-            descartados,
-        )
     }
 
-    return if (rechazoPerfil) {
-        SeleccionVideo(MotivoSoporteVideo.PERFIL_NO_SOPORTADO, rechazados = descartados)
-    } else {
-        SeleccionVideo(MotivoSoporteVideo.RESOLUCION_NO_SOPORTADA, rechazados = descartados)
+    val aceptado = seleccion
+    return when {
+        aceptado != null ->
+            SeleccionVideo(MotivoSoporteVideo.SOPORTADO, aceptado.nombre, aceptado.tipo, descartados)
+        rechazoPerfil -> SeleccionVideo(MotivoSoporteVideo.PERFIL_NO_SOPORTADO, rechazados = descartados)
+        else -> SeleccionVideo(MotivoSoporteVideo.RESOLUCION_NO_SOPORTADA, rechazados = descartados)
     }
 }
+
+/** Descarte de un candidato, si no sirve para la declaración. */
+private enum class Descarte {
+    PERFIL,
+    RESOLUCION,
+}
+
+/** Evalúa un candidato contra el perfil declarado y los límites de resolución (S3). */
+private fun evaluarCandidato(
+    candidato: DecoderVideo,
+    perfil: Int?,
+    declaracion: DeclaracionFormatoVideo,
+): Descarte? =
+    when {
+        perfil != null && candidato.perfiles.isNotEmpty() && candidato.perfiles.none { it == perfil } ->
+            Descarte.PERFIL
+        !resolucionAceptada(candidato, declaracion) -> Descarte.RESOLUCION
+        else -> null
+    }
+
+/** La resolución declarada cabe en los límites del candidato (S3). */
+private fun resolucionAceptada(
+    candidato: DecoderVideo,
+    declaracion: DeclaracionFormatoVideo,
+): Boolean =
+    (declaracion.ancho == null || candidato.anchoMax == null || declaracion.ancho <= candidato.anchoMax) &&
+        (declaracion.alto == null || candidato.altoMax == null || declaracion.alto <= candidato.altoMax)

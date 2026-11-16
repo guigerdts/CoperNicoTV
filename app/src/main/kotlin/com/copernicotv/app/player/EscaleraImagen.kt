@@ -92,16 +92,7 @@ internal class EscaleraImagen(
     }
 
     /** Evidencia de imagen derivada solo de lo que Media3 reportó (S5). */
-    private fun evidenciaDe(faseBase: FaseBase): EvidenciaImagen =
-        EvidenciaImagen(
-            fase = faseBase,
-            audioActivo = observador.audioActivo,
-            hayGrupoVideo = observador.hayGrupoVideo,
-            pistaVideoSeleccionada = observador.pistaVideo != null,
-            decoderVideoInicializado = observador.decoderVideo != null,
-            primerFrameVisto = observador.primerFrameVideoVisto,
-            superficieActiva = observador.superficieActiva,
-        )
+    private fun evidenciaDe(faseBase: FaseBase): EvidenciaImagen = observador.evidenciaImagen(faseBase)
 
     /** Ejecuta un nivel de la escalera de imagen (S5: del menos invasivo al más costoso). */
     private fun ejecutarNivel(nivel: NivelImagen) {

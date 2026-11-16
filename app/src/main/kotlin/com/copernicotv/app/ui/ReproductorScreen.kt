@@ -959,6 +959,7 @@ private fun BoxScope.AvisoImagen(estado: EstadoSesion) {
             // de estabilidad; es una confirmación, no una solicitud.
             EstadoImagen.IMAGEN_RECUPERADA -> stringResource(R.string.reproductor_imagen_recuperada)
             // Transitorio inicial sin valor informativo para el usuario.
+            EstadoImagen.SIN_VIDEO,
             EstadoImagen.PREPARANDO_VIDEO,
             EstadoImagen.ESPERANDO_PRIMER_FRAME,
             -> return

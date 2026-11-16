@@ -6,6 +6,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import com.copernicotv.core.player.EvidenciaImagen
 import com.copernicotv.core.player.FaseBase
 import com.copernicotv.core.player.SenalAudiovisual
 
@@ -128,6 +129,18 @@ class ObservadorAudiovisual(
             audioActivo = audioActivo,
             videoActivo = videoActivo,
             primerFrameVideoVisto = primerFrameVideoVisto,
+        )
+
+    /** Evidencia de imagen para la escalera de recuperación (E7-T10, S5). */
+    fun evidenciaImagen(fase: FaseBase): EvidenciaImagen =
+        EvidenciaImagen(
+            fase = fase,
+            audioActivo = audioActivo,
+            hayGrupoVideo = hayGrupoVideo,
+            pistaVideoSeleccionada = pistaVideo != null,
+            decoderVideoInicializado = decoderVideo != null,
+            primerFrameVisto = primerFrameVideoVisto,
+            superficieActiva = superficieActiva,
         )
 
     override fun onTracksChanged(

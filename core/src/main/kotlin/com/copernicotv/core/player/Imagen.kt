@@ -120,17 +120,6 @@ private fun causaDeCaso(evidencia: EvidenciaImagen): CausaImagen =
     }
 
 /**
- * Máquina de detección y escalera de recuperación de imagen (E7-T10, S5).
- *
- * Igual que la política de conexión, vive en `:core` como máquina pura: la
- * sesión la sondea con evidencia observada y un reloj inyectado por la
- * sonda. La ventana de confirmación se acumula solo mientras la reproducción
- * avanza (el buffering la congela), cada nivel ejecutado recibe su propia
- * gracia y el agotamiento publica un terminal pegajoso sin volver a abrir
- * casos: no hay bucles de reinicio. La reconstrucción de sesión solo entra
- * si la sesión declara `permitirReconstruccion`.
- */
-/**
  * Configuración de la detección y escalera de imagen (E7-T10, S5).
  *
  * [ventanaConfirmacionMs] es cuánto tiempo de audio activo sin imagen debe
@@ -142,6 +131,17 @@ data class ConfiguracionImagen(
     val ventanaConfirmacionMs: Long = 10_000L,
 )
 
+/**
+ * Máquina de detección y escalera de recuperación de imagen (E7-T10, S5).
+ *
+ * Igual que la política de conexión, vive en `:core` como máquina pura: la
+ * sesión la sondea con evidencia observada y un reloj inyectado por la
+ * sonda. La ventana de confirmación se acumula solo mientras la reproducción
+ * avanza (el buffering la congela), cada nivel ejecutado recibe su propia
+ * gracia y el agotamiento publica un terminal pegajoso sin volver a abrir
+ * casos: no hay bucles de reinicio. La reconstrucción de sesión solo entra
+ * si la sesión declara `permitirReconstruccion`.
+ */
 class MaquinaImagen(
     private val ventanaMs: Long,
 ) {

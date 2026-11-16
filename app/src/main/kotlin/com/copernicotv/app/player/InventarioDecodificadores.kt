@@ -39,8 +39,11 @@ class InventarioDecodificadores(
         fun inventarioNativo(): List<DecoderVideo> {
             val lista = MediaCodecList(MediaCodecList.REGULAR_CODECS)
             return lista.codecInfos
-                .flatMap { info -> info.supportedTypes.filter { it.startsWith("video/") } }
-                .mapNotNull { mime -> decoderDe(info, mime) }
+                .flatMap { info ->
+                    info.supportedTypes
+                        .filter { it.startsWith("video/") }
+                        .mapNotNull { mime -> decoderDe(info, mime) }
+                }
         }
 
         /** Traduce un `MediaCodecInfo` + MIME de video a datos puros de `:core`. */

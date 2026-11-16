@@ -5,8 +5,8 @@ import com.copernicotv.core.player.DecoderVideo
 import com.copernicotv.core.player.DecoderVideoExterno
 import com.copernicotv.core.player.MotivoSoporteVideo
 import com.copernicotv.core.player.TipoDecoder
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Test
+import org.junit.Assert.assertEquals
+import org.junit.Test
 
 /**
  * Consulta del inventario de decoders sobre una fuente inyectada (E7-T11, T2).

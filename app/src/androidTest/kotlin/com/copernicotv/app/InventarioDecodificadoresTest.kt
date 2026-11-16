@@ -106,7 +106,9 @@ class InventarioDecodificadoresTest {
             val estado =
                 runBlocking {
                     withTimeout(ESPERA_MS) {
-                        sesion.estado.first { it.decoderVideoSeleccionado != null || it.pistaVideoDetectadaMime == null }
+                        sesion.estado.first {
+                            it.estado == EstadoReproductor.REPRODUCIENDO && it.decoderVideoSeleccionado != null
+                        }
                     }
                 }
 

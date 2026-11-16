@@ -1,6 +1,7 @@
 package com.copernicotv.app.player
 
 import android.content.Context
+import com.copernicotv.core.player.ConfiguracionImagen
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

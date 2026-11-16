@@ -29,6 +29,9 @@ class InventarioDecodificadores(
 ) {
     private val inventario: List<DecoderVideo> by lazy(fuente)
 
+    /** Inventario ya convertido; visible para pruebas instrumentadas (E7-T11, T5). */
+    fun decoders(): List<DecoderVideo> = inventario
+
     fun seleccionar(declaracion: DeclaracionFormatoVideo?): SeleccionVideo = seleccionarDecoderVideo(declaracion, inventario, externos)
 
     private companion object {

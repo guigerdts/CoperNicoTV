@@ -130,6 +130,18 @@ private fun causaDeCaso(evidencia: EvidenciaImagen): CausaImagen =
  * casos: no hay bucles de reinicio. La reconstrucción de sesión solo entra
  * si la sesión declara `permitirReconstruccion`.
  */
+/**
+ * Configuración de la detección y escalera de imagen (E7-T10, S5).
+ *
+ * [ventanaConfirmacionMs] es cuánto tiempo de audio activo sin imagen debe
+ * acumular la máquina en REPRODUCIENDO antes de abrir un caso: más corto
+ * arriesga falsos positivos con buffering, más largo retrasa la recuperación.
+ * Es configurable para las pruebas instrumentadas (ventana corta).
+ */
+data class ConfiguracionImagen(
+    val ventanaConfirmacionMs: Long = 10_000L,
+)
+
 class MaquinaImagen(
     private val ventanaMs: Long,
 ) {

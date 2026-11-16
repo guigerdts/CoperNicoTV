@@ -119,6 +119,26 @@ data class SeleccionVideo(
 )
 
 /**
+ * Traduce el `profile_idc` del codec string AVC (RFC 6381) al valor de
+ * `MediaCodecInfo.CodecProfileLevel` que el inventario declara: es la misma
+ * familia de perfiles en otra escala (High es 0x64 en el codec string y 8
+ * en las constantes de Android). Devuelve `null` en los perfiles que no
+ * tienen constante directa: la política no finge rechazo con datos que no
+ * existen.
+ */
+fun perfilAvcDePerfilIdc(perfilIdc: Int): Int? =
+    when (perfilIdc) {
+        66 -> 1 // AVCProfileBaseline
+        77 -> 2 // AVCProfileMain
+        88 -> 4 // AVCProfileExtended
+        100 -> 8 // AVCProfileHigh
+        110 -> 16 // AVCProfileHigh10
+        122 -> 32 // AVCProfileHigh422
+        244 -> 64 // AVCProfileHigh444
+        else -> null
+    }
+
+/**
  * Selecciona el decoder de video para la declaración dada (E7-T11, S4).
  *
  * Orden de preferencia: hardware del dispositivo, software del dispositivo,
@@ -133,7 +153,9 @@ fun seleccionarDecoderVideo(
     externos: List<DecoderVideoExterno> = emptyList(),
 ): SeleccionVideo {
     val mime = declaracion?.mime ?: return SeleccionVideo(MotivoSoporteVideo.PISTA_AUSENTE)
-    val perfilNivel = perfilNivelDeCodec(declaracion.codec)
+    // El perfil declarado por el codec string vive en el espacio RFC 6381;
+    // los perfiles del inventario, en el espacio CodecProfileLevel.
+    val perfil = perfilNivelDeCodec(declaracion.codec)?.let { perfilAvcDePerfilIdc(it.perfil) }
 
     val candidatos =
         inventario
@@ -145,7 +167,6 @@ fun seleccionarDecoderVideo(
         return SeleccionVideo(MotivoSoporteVideo.MIME_NO_SOPORTADO)
     }
 
-    val perfil = perfilNivel?.perfil
     var rechazoPerfil = false
     var seleccion: DecoderVideo? = null
     val descartados = mutableListOf<String>()

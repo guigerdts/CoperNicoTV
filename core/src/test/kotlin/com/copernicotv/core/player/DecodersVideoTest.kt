@@ -12,12 +12,15 @@ import org.junit.jupiter.api.Test
  * externo al final, con motivo honesto cuando nada sirve.
  */
 class DecodersVideoTest {
+    // Perfiles en el espacio CodecProfileLevel de Android: 1=Baseline,
+    // 2=Main, 8=High (el codec string avc1.640028 declara profile_idc 100,
+    // que la política traduce a 8).
     private val h264Hardware =
         DecoderVideo(
             nombre = "c2.exynos.h264.decoder",
             mime = "video/avc",
             tipo = TipoDecoder.HARDWARE,
-            perfiles = listOf(0x42, 0x4D),
+            perfiles = listOf(1, 2),
             anchoMax = 1920,
             altoMax = 1080,
         )
@@ -26,7 +29,7 @@ class DecodersVideoTest {
             nombre = "c2.android.avc.decoder",
             mime = "video/avc",
             tipo = TipoDecoder.SOFTWARE,
-            perfiles = listOf(0x42, 0x64),
+            perfiles = listOf(1, 8),
             anchoMax = 1920,
             altoMax = 1080,
         )
@@ -41,6 +44,15 @@ class DecodersVideoTest {
     fun `el codec string avc declara perfil y nivel hexadecimales`() {
         assertEquals(PerfilNivel(0x64, 0x28), perfilNivelDeCodec("avc1.640028"))
         assertEquals(PerfilNivel(0x42, 0x20), perfilNivelDeCodec("avc3.42C020"))
+    }
+
+    @Test
+    fun `el profile_idc del codec string se traduce al espacio CodecProfileLevel`() {
+        assertEquals(1, perfilAvcDePerfilIdc(66))
+        assertEquals(2, perfilAvcDePerfilIdc(77))
+        assertEquals(8, perfilAvcDePerfilIdc(100))
+        assertEquals(16, perfilAvcDePerfilIdc(110))
+        assertNull(perfilAvcDePerfilIdc(123))
     }
 
     @Test
@@ -98,7 +110,7 @@ class DecodersVideoTest {
     fun `el perfil incompatible se rechaza con la lista de decoders descartados`() {
         val seleccion =
             seleccionarDecoderVideo(
-                DeclaracionFormatoVideo(mime = "video/avc", codec = "avc1.530028"),
+                DeclaracionFormatoVideo(mime = "video/avc", codec = "avc1.7A0028"),
                 listOf(h264Hardware, h264Software),
             )
         assertEquals(MotivoSoporteVideo.PERFIL_NO_SOPORTADO, seleccion.motivo)

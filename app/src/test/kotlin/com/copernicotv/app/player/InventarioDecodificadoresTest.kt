@@ -16,12 +16,13 @@ import org.junit.Test
  * con la política de `:core`, incluyendo los decoders externos de la fase 2.
  */
 class InventarioDecodificadoresTest {
+    // Perfiles en el espacio CodecProfileLevel: 1=Baseline, 2=Main, 8=High.
     private val h264 =
         DecoderVideo(
             nombre = "c2.exynos.h264.decoder",
             mime = "video/avc",
             tipo = TipoDecoder.HARDWARE,
-            perfiles = listOf(0x42, 0x4D, 0x64),
+            perfiles = listOf(1, 2, 8),
             anchoMax = 1920,
             altoMax = 1080,
         )

@@ -12,6 +12,7 @@ import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.core.player.EstadoImagen
+import com.copernicotv.core.player.MotivoSoporteVideo
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -108,6 +109,30 @@ class DiagnosticoPersistenteTest {
             assertEquals("REPRODUCIENDO", fila.faseFinal)
             assertEquals(4_000L, fila.posicionMs)
             assertEquals("CIERRE", dao.eventosDeSesion(fila.id).last().tipo)
+        }
+    }
+
+    @Test
+    fun elVeredictoDelInventarioDeDecodersSePersiste() {
+        runBlocking {
+            repositorio.abrir(1L, null, "http://servidor.tv/stream")
+            repositorio.observar(
+                EstadoSesion(
+                    estado = EstadoReproductor.REPRODUCIENDO,
+                    pistaVideoDetectadaMime = "video/mpeg2",
+                    decoderVideoSeleccionado = null,
+                    tipoDecoderVideo = null,
+                    motivoSoporteVideo = MotivoSoporteVideo.MIME_NO_SOPORTADO,
+                    perfilNivelVideo = null,
+                ),
+                EstadoPistas(),
+            )
+            repositorio.drenar()
+            val fila = dao.recientes(1).single()
+            assertNull(fila.decoderVideoSeleccionado)
+            assertNull(fila.tipoDecoderVideo)
+            assertEquals("MIME_NO_SOPORTADO", fila.motivoSoporteVideo)
+            assertNull(fila.perfilNivelVideo)
         }
     }
 

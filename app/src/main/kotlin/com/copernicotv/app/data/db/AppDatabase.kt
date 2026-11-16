@@ -70,7 +70,7 @@ import com.copernicotv.app.data.db.entities.SesionDiagnosticoEntity
  * de esquema y las migraciones futuras tengan una referencia real.
  */
 @Database(
-    version = 3,
+    version = 4,
     exportSchema = true,
     entities = [
         FuenteEntity::class,

@@ -13,6 +13,22 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * ninguna fila se altera ni se pierde.
  */
 object Migraciones {
+    /**
+     * La v4 añade a `SesionDiagnostico` las columnas del veredicto del
+     * inventario de decoders (E7-T11): decoder seleccionado, tipo, motivo
+     * de soporte y perfil/nivel. Todas TEXT; las filas v3 sobreviven con
+     * columnas nulas.
+     */
+    val MIGRACION_3_4: Migration =
+        object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `decoderVideoSeleccionado` TEXT")
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `tipoDecoderVideo` TEXT")
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `motivoSoporteVideo` TEXT")
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `perfilNivelVideo` TEXT")
+            }
+        }
+
     val MIGRACION_2_3: Migration =
         object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {

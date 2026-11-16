@@ -12,6 +12,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.copernicotv.core.player.ConfiguracionImagen
 import com.copernicotv.core.player.DecisionReintento
 import com.copernicotv.core.player.DetectarContenedor
 import com.copernicotv.core.player.FalloVisto
@@ -65,6 +66,10 @@ class SesionMedia3(
     private val intervaloMs: Long = INTERVALO_SONDEO_MS,
     private val politica: PoliticaReintentos = PoliticaReintentos(),
     conectividad: ObservadorConectividad = ConectividadAndroid(contexto),
+    private val configuracionImagen: ConfiguracionImagen = ConfiguracionImagen(),
+    private val permitirReconstruccion: Boolean = true,
+    private val posicionInicialMs: Long = 0L,
+    private val accionesImagen: AccionesImagen = AccionesImagenNula,
 ) {
     private val _estado = MutableStateFlow(EstadoSesion())
     val estado: StateFlow<EstadoSesion> = _estado.asStateFlow()
@@ -131,6 +136,26 @@ class SesionMedia3(
     /** Observador audiovisual oficial de Media3 (E7-T10, S3). */
     private val observadorAudiovisual = ObservadorAudiovisual(inicioAperturaMs)
 
+    /**
+     * Detección de audio-sin-imagen y escalera de recuperación de imagen
+     * (E7-T10, S5). Vive en [EscaleraImagen]; la sesión le presta el motor,
+     * el observador y el estado de publicación.
+     */
+    private val escaleraImagen =
+        EscaleraImagen(
+            ventanaMs = configuracionImagen.ventanaConfirmacionMs,
+            permitirReconstruccion = permitirReconstruccion,
+            acciones = accionesImagen,
+            observador = observadorAudiovisual,
+            liberada = { liberada.get() },
+            reproductor = { reproductor },
+            grupos = { grupos },
+            reiniciarPrimerFrame = { observadorAudiovisual.reiniciarPrimerFrame() },
+            publicar = { visible ->
+                _estado.value = _estado.value.copy(estadoImagen = visible)
+            },
+        )
+
     /** Clase del último fallo visto: transporte o decodificación (S3/S4). */
     private var falloVistoSesion = FalloVisto.NINGUNO
     private val oyente =
@@ -186,7 +211,13 @@ class SesionMedia3(
             // S42a: el motor gestiona el foco de audio (handleAudioFocus).
             true,
         )
-        reproductor.setMediaItem(mediaItemDe(url, protocolo))
+        // La reconstrucción de sesión (E7-T10, S5) preserva la posición con
+        // el arranque inicial dado; sin ella, la apertura es la de siempre.
+        if (posicionInicialMs > 0L) {
+            reproductor.setMediaItem(mediaItemDe(url, protocolo), posicionInicialMs)
+        } else {
+            reproductor.setMediaItem(mediaItemDe(url, protocolo))
+        }
         reproductor.prepare()
         reproductor.playWhenReady = true
         alcance.launch {
@@ -438,6 +469,7 @@ class SesionMedia3(
         trabajoEstabilidad?.cancel()
         trabajoEstabilidad = null
         recuperandoAhora = false
+        escaleraImagen.vaciar()
         val traza = trazadora.traza
         _estado.value =
             _estado.value.copy(
@@ -447,6 +479,7 @@ class SesionMedia3(
                 reintentosMaximos = 0,
                 esperaRecuperacionMs = 0L,
                 recuperadoRecientemente = false,
+                estadoImagen = null,
                 codigoMotor = detalle.codigoMotor,
                 clasesCausa = detalle.clasesCausa,
                 estadoHttp = detalle.estadoHttp,
@@ -526,6 +559,7 @@ class SesionMedia3(
                 pistaAudioDetectada = observacion.hayGrupoAudio,
             )
         gestionarEstabilidad(fasePublicada, observacion)
+        escaleraImagen.gestionar(faseBaseDe(fasePublicada))
     }
 
     /**
@@ -562,6 +596,7 @@ class SesionMedia3(
                     politica.esperarEstabilidad(politica.configuracion.periodoEstabilidadMs)
                     if (!isActive || liberada.get()) return@launch
                     reintentos.alEstabilizar()
+                    escaleraImagen.vaciar()
                     _estado.value = _estado.value.copy(recuperadoRecientemente = false)
                 }
         } else {
@@ -739,6 +774,9 @@ class SesionMedia3(
 
     private companion object {
         const val INTERVALO_SONDEO_MS = 250L
+
+        /** Cuánto queda visible el aviso de «imagen recuperada» (E7-T10, S5). */
+        const val AVISO_IMAGEN_RECUPERADA_MS = 5_000L
 
         /** Códigos Media3 que son un problema audiovisual, no de red (S3/S4). */
         val CODIGOS_DECODIFICACION =

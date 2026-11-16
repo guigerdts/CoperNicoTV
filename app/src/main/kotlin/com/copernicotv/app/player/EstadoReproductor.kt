@@ -1,6 +1,7 @@
 package com.copernicotv.app.player
 
 import com.copernicotv.core.player.CondicionReproduccion
+import com.copernicotv.core.player.EstadoImagen
 
 /** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4 y E7-T10). */
 enum class EstadoReproductor {
@@ -103,6 +104,10 @@ data class EstadoSesion(
     val audioRendererActivo: Boolean? = null,
     val pistaVideoDetectada: Boolean? = null,
     val pistaAudioDetectada: Boolean? = null,
+    // E7-T10 S5/F7: estado de la imagen. `null` = sin aviso (reproducción
+    // normal); los valores del enum los publica la máquina de imagen y la UI
+    // los traduce a mensajes comprensibles solo en reproducción.
+    val estadoImagen: EstadoImagen? = null,
 )
 
 /**

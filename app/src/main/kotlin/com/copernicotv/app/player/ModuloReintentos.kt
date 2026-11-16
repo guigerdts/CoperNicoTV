@@ -25,6 +25,10 @@ object ModuloReintentos {
 
     @Provides
     @Singleton
+    fun configuracionImagen(): ConfiguracionImagen = ConfiguracionImagen()
+
+    @Provides
+    @Singleton
     fun fabricaConectividad(
         @ApplicationContext contexto: Context,
     ): FabricaConectividad = FabricaConectividad { ConectividadAndroid(contexto) }

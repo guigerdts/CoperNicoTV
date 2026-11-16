@@ -51,6 +51,8 @@ data class ObservacionAudiovisual(
     val pistaAudio: InfoPista?,
     val hayGrupoVideo: Boolean,
     val hayGrupoAudio: Boolean,
+    /** Superficie reportada activa; `null` mientras no llegue ningún evento de superficie. */
+    val superficieActiva: Boolean? = null,
 )
 
 /**
@@ -88,6 +90,17 @@ class ObservadorAudiovisual(
     private var pistaAudio: InfoPista? = null
     private var hayGrupoVideo = false
     private var hayGrupoAudio = false
+    private var superficieActiva: Boolean? = null
+
+    /**
+     * Anula la marca de primer frame para exigir evidencia fresca (E7-T10,
+     * S5). Los niveles de la escalera que reinicializan la salida de video
+     * la llaman: la recuperación solo se declara vista cuando Media3
+     * vuelve a entregar un `onRenderedFirstFrame` real.
+     */
+    fun reiniciarPrimerFrame() {
+        primerFrameVideoVisto = false
+    }
 
     /** Instantánea inmutable del estado audiovisual observado. */
     fun observacion(): ObservacionAudiovisual =
@@ -105,6 +118,7 @@ class ObservadorAudiovisual(
             pistaAudio = pistaAudio,
             hayGrupoVideo = hayGrupoVideo,
             hayGrupoAudio = hayGrupoAudio,
+            superficieActiva = superficieActiva,
         )
 
     /** Señal combinada para el clasificador puro de `:core` (S3). */
@@ -200,6 +214,19 @@ class ObservadorAudiovisual(
     ) {
         val acumulados = framesPerdidosVideo ?: 0
         framesPerdidosVideo = (acumulados + droppedFrames.coerceAtLeast(0))
+    }
+
+    /**
+     * Tamaño reportado de la superficie de salida (E7-T10, S5). Un tamaño
+     * cero es la evidencia observada de superficie perdida; mientras no
+     * llegue ningún evento el campo queda `null` y no se asume nada.
+     */
+    override fun onSurfaceSizeChanged(
+        eventTime: AnalyticsListener.EventTime,
+        width: Int,
+        height: Int,
+    ) {
+        superficieActiva = width > 0 && height > 0
     }
 
     private fun formatoSeleccionado(

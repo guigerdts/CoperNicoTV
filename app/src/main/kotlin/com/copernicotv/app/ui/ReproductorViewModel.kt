@@ -11,6 +11,7 @@ import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
 import com.copernicotv.app.data.ReproductorRepositorio
 import com.copernicotv.app.data.ResultadoStream
+import com.copernicotv.app.player.AccionesImagen
 import com.copernicotv.app.player.DiagnosticoReproductor
 import com.copernicotv.app.player.DireccionZapeo
 import com.copernicotv.app.player.EstadoPistas
@@ -28,6 +29,7 @@ import com.copernicotv.app.player.canalVecino
 import com.copernicotv.app.player.construirDiagnostico
 import com.copernicotv.app.player.limitarVolumen
 import com.copernicotv.app.player.sanearUrl
+import com.copernicotv.core.player.ConfiguracionImagen
 import com.copernicotv.core.player.ProtocoloStream
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -91,6 +93,7 @@ class ReproductorViewModel
         private val preferenciasReproduccion: RepositorioPreferenciasReproduccion,
         private val politicaReintentos: PoliticaReintentos,
         private val fabricaConectividad: FabricaConectividad,
+        private val configuracionImagen: ConfiguracionImagen,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -113,6 +116,29 @@ class ReproductorViewModel
         /** Volumen vigente en la escala 0..1 de Media3; no se persiste (E6-T6). */
         private val _volumen = MutableStateFlow(VOLUMEN_INICIAL)
         val volumen: StateFlow<Float> = _volumen.asStateFlow()
+
+        /**
+         * Contador de solicitudes de re-attach de la superficie (E7-T10, S5).
+         *
+         * El nivel RESTAURAR_SUPERFICIE de la escalera lo incrementa; la
+         * pantalla observa el valor y, cuando cambia, desconecta y vuelve a
+         * conectar el reproductor en la vista. Un contador evita depender de
+         * instancias booleanas que ya estén en el valor objetivo.
+         */
+        private val _solicitudSuperficie = MutableStateFlow(0)
+        val solicitudSuperficie: StateFlow<Int> = _solicitudSuperficie.asStateFlow()
+
+        /** Acciones externas de la escalera de imagen que viven en la pantalla o aquí (S5). */
+        private val accionesImagen =
+            object : AccionesImagen {
+                override fun restaurarSuperficie() {
+                    _solicitudSuperficie.value += 1
+                }
+
+                override fun reconstruirSesion(posicionMs: Long) {
+                    reconstruir(posicionMs)
+                }
+            }
 
         /** Disponibilidad de zapeo del Canal activo (E6-T6). */
         private val _zapeo = MutableStateFlow(ZapeoEstado())
@@ -335,6 +361,31 @@ class ReproductorViewModel
         @VisibleForTesting
         fun sesionActual(): SesionMedia3? = sesion
 
+        /**
+         * Reconstruye la sesión completa preservando la posición (E7-T10, S5).
+         *
+         * Es el último nivel de la escalera de imagen: cierra la sesión
+         * actual y abre una nueva con la misma URL y preferencias. Los datos
+         * de la sesión se capturan ANTES de cerrarla, porque `cerrarSesion`
+         * limpia las referencias; el canal cargado se olvida para que la
+         * nueva apertura no se detecte como carga repetida.
+         */
+        fun reconstruir(posicionMs: Long) {
+            val url = urlSaneadaActual ?: return
+            val protocolo = protocoloActual ?: return
+            val preferencias = preferenciasActuales
+            cerrarSesion(conservarDiagnostico = true)
+            canalCargado = null
+            _estado.value = ReproductorUiState.Cargando
+            abrirSesion(url, protocolo, preferencias, posicionInicialMs = posicionMs)
+        }
+
+        /** Solo para pruebas: fuerza la ruta de reconstrucción sin tocar la escalera. */
+        @VisibleForTesting
+        fun reconstruirSesionParaPruebas(posicionMs: Long) {
+            reconstruir(posicionMs)
+        }
+
         override fun onCleared() {
             carga?.cancel()
             cerrarSesion()
@@ -344,6 +395,7 @@ class ReproductorViewModel
             url: String,
             protocolo: ProtocoloStream,
             preferencias: PreferenciasPista,
+            posicionInicialMs: Long = 0L,
         ): SesionMedia3 {
             val nueva =
                 SesionMedia3(
@@ -353,6 +405,9 @@ class ReproductorViewModel
                     preferencias,
                     politica = politicaReintentos,
                     conectividad = fabricaConectividad.crear(),
+                    configuracionImagen = configuracionImagen,
+                    posicionInicialMs = posicionInicialMs,
+                    accionesImagen = accionesImagen,
                 )
             sesion = nueva
             recolector?.cancel()

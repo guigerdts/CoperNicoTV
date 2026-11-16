@@ -232,6 +232,24 @@ class MaquinaImagen(
     }
 
     /**
+     * Abre un caso con la causa dada sin esperar la ventana (E7-T10, S5).
+     *
+     * Es un gancho de pruebas instrumentadas: la evidencia real «audio
+     * activo sin imagen» no siempre se puede provocar en un emulador, así
+     * que la prueba fuerza la causa y observa cómo la sesión ejecuta la
+     * escalera. Nada del camino de producción pasa por aquí.
+     */
+    fun abrirCaso(causa: CausaImagen) {
+        casoAbierto = true
+        this.causa = causa
+        nivelesUsados.clear()
+        ultimoNivel = null
+        terminal = null
+        esperaMs = 0L
+        ultimoMs = null
+    }
+
+    /**
      * `true` cuando la sesión debe ejecutar el siguiente nivel ahora: hay
      * caso abierto, la escalera no está agotada y no queda gracia pendiente.
      */

@@ -60,15 +60,17 @@ import com.copernicotv.app.data.db.entities.ProgramaEntity
 import com.copernicotv.app.data.db.entities.SesionDiagnosticoEntity
 
 /**
- * Room v2. Contiene las 26 tablas de §6.3.1 más las dos del diagnóstico
+ * Room v3. Contiene las 26 tablas de §6.3.1 más las dos del diagnóstico
  * persistente de reproducción (E7-T10, S6a): `SesionDiagnostico` y
- * `EventoDiagnostico`. La migración 1→2 solo crea tablas nuevas.
+ * `EventoDiagnostico`. La migración 1→2 solo crea tablas nuevas; la 2→3
+ * añade a `SesionDiagnostico` las columnas de la pista de video detectada
+ * (E7-T10 T7).
  *
  * `exportSchema` deja el JSON versionado en `app/schemas` para que las pruebas
  * de esquema y las migraciones futuras tengan una referencia real.
  */
 @Database(
-    version = 2,
+    version = 3,
     exportSchema = true,
     entities = [
         FuenteEntity::class,

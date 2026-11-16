@@ -75,6 +75,39 @@ class ImagenTest {
     }
 
     @Test
+    fun laCausaEsVideoNoElegibleCuandoNingunaPistaDeVideoEsSoportada() {
+        // Grupo de video presente, ninguna pista seleccionada y ninguna
+        // soportada: el contenedor declara video que el dispositivo no puede
+        // decodificar (E7-T10 T7, validación física Telecaribe 2719).
+        assertEquals(
+            CausaImagen.VIDEO_NO_ELEGIBLE,
+            clasificarCausaImagen(
+                sinImagen.copy(pistaVideoSeleccionada = false, pistaVideoSoportada = false),
+            ),
+        )
+    }
+
+    @Test
+    fun unaPistaSoportadaSinSeleccionarSigueSiendoPistaNoSeleccionada() {
+        assertEquals(
+            CausaImagen.PISTA_NO_SELECCIONADA,
+            clasificarCausaImagen(
+                sinImagen.copy(pistaVideoSeleccionada = false, pistaVideoSoportada = true),
+            ),
+        )
+    }
+
+    @Test
+    fun elSoporteDesconocidoMantieneLaClasificacionPrevia() {
+        // Sin dato de soporte (pistas no consultadas aún) el comportamiento
+        // es exactamente el previo a T7: pista no seleccionada.
+        assertEquals(
+            CausaImagen.PISTA_NO_SELECCIONADA,
+            clasificarCausaImagen(sinImagen.copy(pistaVideoSeleccionada = false)),
+        )
+    }
+
+    @Test
     fun laClasificacionNoDeclaraCausaConImagenEstableOConFaseNoReproduciendo() {
         assertNull(clasificarCausaImagen(imagenOk))
         assertNull(clasificarCausaImagen(sinImagen.copy(fase = FaseBase.BUFFERING)))
@@ -166,6 +199,23 @@ class ImagenTest {
     // ------------------------------------------------------------------
     // Escalera por niveles (S5: del menos invasivo al más costoso).
     // ------------------------------------------------------------------
+
+    @Test
+    fun sinPistaDeVideoSoportadaLaEscaleraNoEjecutaNivelesYTerminaEnDecodificacion() {
+        val m = maquina()
+        val evidencia = sinImagen.copy(pistaVideoSeleccionada = false, pistaVideoSoportada = false)
+        // El caso se abre al vencer la ventana…
+        assertEquals(EstadoImagen.PREPARANDO_VIDEO, m.tick(evidencia, 0L, true))
+        assertEquals(EstadoImagen.RECUPERANDO_IMAGEN, m.tick(evidencia, ventana, true))
+        // …pero no hay ningún nivel que ejecutar: forzar la selección de una
+        // pista sin decoder dispararía un error de decoder y mataría el audio.
+        assertNull(m.nivelPendiente(permitirReconstruccion = true))
+        assertFalse(m.debeEjecutarNivel(permitirReconstruccion = true))
+        // Con la gracia vencida, terminal pegajoso de decodificación, sin bucle.
+        assertEquals(EstadoImagen.ERROR_DECODIFICACION, m.tick(evidencia, 2 * ventana, true))
+        assertEquals(EstadoImagen.ERROR_DECODIFICACION, m.tick(evidencia, 3 * ventana, true))
+        assertNull(m.nivelPendiente(permitirReconstruccion = true))
+    }
 
     @Test
     fun laEscaleraEmpiezaPorRestaurarLaSuperficie() {

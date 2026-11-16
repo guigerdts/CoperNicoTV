@@ -297,6 +297,38 @@ class ReproductorImagenTest {
     }
 
     @Test
+    fun elVideoNoElegibleNoEjecutaNivelesYTerminaEnErrorDeDecodificacion() {
+        val acciones = AccionesContadas()
+        val sesion = sesionDirecta(acciones, permitirReconstruccion = true)
+        try {
+            esperarDirecto("reproducción directa") {
+                it.estado == EstadoReproductor.REPRODUCIENDO
+            }
+            composeRule.runOnUiThread { sesion.escaleraImagen.forzarCaso(CausaImagen.VIDEO_NO_ELEGIBLE) }
+
+            // El caso con video no elegible no tiene niveles: nada que
+            // restaurar ni reponer (forzar una pista sin decoder mataría el
+            // audio) ni repreparar ni reconstruir.
+            esperarDirecto("terminal de decodificación sin niveles") {
+                it.estadoImagen == EstadoImagen.ERROR_DECODIFICACION
+            }
+            assertEquals("La escalera restauró la superficie", 0, acciones.restauraciones)
+            assertEquals("La escalera reconstruyó la sesión", 0, acciones.reconstrucciones)
+            // El terminal es pegajoso: sin bucles ni niveles tardíos.
+            Thread.sleep(2_000)
+            assertEquals(
+                "El terminal reabrió niveles (bucle)",
+                0,
+                acciones.restauraciones,
+            )
+            assertEquals(0, acciones.reconstrucciones)
+            assertFalse("La escalera liberó la sesión", sesion.estaLiberada())
+        } finally {
+            liberarDirecta(sesion)
+        }
+    }
+
+    @Test
     fun laReconstruccionEsElUltimoNivelDeLaEscalera() {
         val acciones = AccionesContadas()
         val sesion = sesionDirecta(acciones, permitirReconstruccion = true)

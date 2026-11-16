@@ -562,6 +562,9 @@ class SesionMedia3(
                 audioRendererActivo = observacion.audioActivo,
                 pistaVideoDetectada = observacion.hayGrupoVideo,
                 pistaAudioDetectada = observacion.hayGrupoAudio,
+                pistaVideoDetectadaMime = observacion.formatoVideoDetectado?.mime,
+                pistaVideoDetectadaCodec = observacion.formatoVideoDetectado?.codec,
+                pistaVideoSoportada = observacion.pistaVideoSoportada,
             )
         gestionarEstabilidad(fasePublicada, observacion)
         escaleraImagen.gestionar(faseBaseDe(fasePublicada))

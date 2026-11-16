@@ -7,10 +7,21 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Migraciones del esquema de Room.
  *
  * La v2 añade las tablas del diagnóstico persistente de reproducción
- * (E7-T10, S6a). Las tablas existentes no se tocan: ninguna fila de la v1
- * se altera ni se pierde.
+ * (E7-T10, S6a). La v3 añade a `SesionDiagnostico` las columnas de la pista
+ * de video detectada aunque no seleccionada (E7-T10 T7): MIME, códec y
+ * soporte observado del dispositivo. Las tablas existentes no se tocan:
+ * ninguna fila se altera ni se pierde.
  */
 object Migraciones {
+    val MIGRACION_2_3: Migration =
+        object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `pistaVideoDetectadaMime` TEXT")
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `pistaVideoDetectadaCodec` TEXT")
+                db.execSQL("ALTER TABLE `SesionDiagnostico` ADD COLUMN `pistaVideoSoportada` INTEGER")
+            }
+        }
+
     val MIGRACION_1_2: Migration =
         object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {

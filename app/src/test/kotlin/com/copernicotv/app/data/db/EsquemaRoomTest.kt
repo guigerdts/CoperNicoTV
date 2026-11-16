@@ -39,7 +39,7 @@ class EsquemaRoomTest {
     }
 
     @Test
-    fun `el esquema v2 tiene exactamente las 28 tablas normativas`() {
+    fun `el esquema v3 tiene exactamente las 28 tablas normativas`() {
         val tablas = mutableSetOf<String>()
         db.openHelper.readableDatabase
             .query("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -53,8 +53,8 @@ class EsquemaRoomTest {
     }
 
     @Test
-    fun `la version de esquema es 2`() {
-        assertEquals(2, db.openHelper.readableDatabase.version)
+    fun `la version de esquema es 3`() {
+        assertEquals(3, db.openHelper.readableDatabase.version)
     }
 
     private companion object {

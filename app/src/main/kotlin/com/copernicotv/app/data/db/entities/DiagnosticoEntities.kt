@@ -95,6 +95,12 @@ data class SesionDiagnosticoEntity(
     val audioRendererActivo: Boolean? = null,
     val pistaVideoDetectada: Boolean? = null,
     val pistaAudioDetectada: Boolean? = null,
+    /** MIME declarado por la pista de video detectada aunque no seleccionada (T7). */
+    val pistaVideoDetectadaMime: String? = null,
+    /** Códec declarado por la pista de video detectada aunque no seleccionada (T7). */
+    val pistaVideoDetectadaCodec: String? = null,
+    /** Algún `Tracks.Group` de video con pista soportada por el dispositivo (T7). */
+    val pistaVideoSoportada: Boolean? = null,
     /** Resumen de pistas de audio detectadas y seleccionada, saneado y acotado. */
     val pistasAudioTexto: String? = null,
     /** Resumen de subtítulos detectados y seleccionado, saneado y acotado. */

@@ -104,6 +104,14 @@ data class EstadoSesion(
     val audioRendererActivo: Boolean? = null,
     val pistaVideoDetectada: Boolean? = null,
     val pistaAudioDetectada: Boolean? = null,
+    // E7-T10 T7: pista de video detectada en el contenedor aunque no se haya
+    // seleccionado. El MIME y el códec declarados más el soporte observado
+    // (`Tracks.Group.isTrackSupported`) distinguen una fuente con video que
+    // el dispositivo no puede decodificar de una fuente solo-audio, y una
+    // pista deshabilitada de un decoder ausente.
+    val pistaVideoDetectadaMime: String? = null,
+    val pistaVideoDetectadaCodec: String? = null,
+    val pistaVideoSoportada: Boolean? = null,
     // E7-T10 S5/F7: estado de la imagen. `null` = sin aviso (reproducción
     // normal); los valores del enum los publica la máquina de imagen y la UI
     // los traduce a mensajes comprensibles solo en reproducción.

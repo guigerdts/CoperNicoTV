@@ -301,6 +301,11 @@ class DiagnosticoRepositorio
                 audioRendererActivo = estado.audioRendererActivo ?: audioRendererActivo,
                 pistaVideoDetectada = estado.pistaVideoDetectada ?: pistaVideoDetectada,
                 pistaAudioDetectada = estado.pistaAudioDetectada ?: pistaAudioDetectada,
+                pistaVideoDetectadaMime =
+                    estado.pistaVideoDetectadaMime ?: pistaVideoDetectadaMime,
+                pistaVideoDetectadaCodec =
+                    estado.pistaVideoDetectadaCodec ?: pistaVideoDetectadaCodec,
+                pistaVideoSoportada = estado.pistaVideoSoportada ?: pistaVideoSoportada,
                 pistasAudioTexto = resumenPistas(pistas.audio, desactivados = false) ?: pistasAudioTexto,
                 pistasSubtituloTexto =
                     resumenPistas(pistas.subtitulos, pistas.subtitulosDesactivados) ?: pistasSubtituloTexto,

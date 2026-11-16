@@ -44,6 +44,9 @@ enum class CausaImagen {
     /** Hay grupo de video pero ninguna pista de video seleccionada. */
     PISTA_NO_SELECCIONADA,
 
+    /** Hay grupo de video pero ninguna pista del grupo tiene decoder soportado (T7). */
+    VIDEO_NO_ELEGIBLE,
+
     /** Hay pista de video seleccionada pero el decoder no arrancó. */
     DECODER_NO_INICIALIZADO,
 
@@ -83,6 +86,13 @@ data class EvidenciaImagen(
     val decoderVideoInicializado: Boolean? = null,
     val primerFrameVisto: Boolean? = null,
     val superficieActiva: Boolean? = null,
+    /**
+     * El grupo de video tiene alguna pista soportada por los renderers del
+     * dispositivo (`Tracks.Group.isTrackSupported`); `null` cuando el grupo
+     * todavía no se consultó (E7-T10 T7). Distingue una pista no seleccionada
+     * por falta de decoder —no recuperable— de una deselección recuperable.
+     */
+    val pistaVideoSoportada: Boolean? = null,
 )
 
 /**
@@ -93,7 +103,9 @@ data class EvidenciaImagen(
  * Reglas, en orden:
  * 1. Sin grupo de video (o sin audio activo) no hay nada que recuperar.
  * 2. Con imagen estable no hay caso.
- * 3. Grupo de video sin pista seleccionada → pista no seleccionada.
+ * 3. Grupo de video sin pista seleccionada: si ninguna pista del grupo es
+ *    soportada por el dispositivo → video no elegible (T7); si alguna lo
+ *    es → pista no seleccionada.
  * 4. Pista seleccionada sin decoder → decoder no inicializado.
  * 5. Decoder listo con superficie reportada inactiva → superficie perdida.
  * 6. Todo lo demás correcto y sin primer frame → renderer sin frames.
@@ -113,6 +125,8 @@ private fun hayCasoImagen(evidencia: EvidenciaImagen): Boolean =
 /** Causa del caso confirmado, por la primera evidencia que falta (S5). */
 private fun causaDeCaso(evidencia: EvidenciaImagen): CausaImagen =
     when {
+        evidencia.pistaVideoSeleccionada != true && evidencia.pistaVideoSoportada == false ->
+            CausaImagen.VIDEO_NO_ELEGIBLE
         evidencia.pistaVideoSeleccionada != true -> CausaImagen.PISTA_NO_SELECCIONADA
         evidencia.decoderVideoInicializado != true -> CausaImagen.DECODER_NO_INICIALIZADO
         evidencia.superficieActiva == false -> CausaImagen.SUPERFICIE_PERDIDA
@@ -233,7 +247,10 @@ class MaquinaImagen(
         // nivel venció, se publica el terminal pegajoso (sin bucle).
         if (escaleraAgotada(permitirReconstruccion) && esperaMs >= ventanaMs) {
             terminal =
-                if (causa == CausaImagen.DECODER_NO_INICIALIZADO) {
+                if (
+                    causa == CausaImagen.DECODER_NO_INICIALIZADO ||
+                    causa == CausaImagen.VIDEO_NO_ELEGIBLE
+                ) {
                     EstadoImagen.ERROR_DECODIFICACION
                 } else {
                     EstadoImagen.ERROR_RENDERIZADO
@@ -292,6 +309,10 @@ class MaquinaImagen(
         causa: CausaImagen?,
         permitirReconstruccion: Boolean,
     ): List<NivelImagen> {
+        // Video no elegible (T7): ninguna pista del grupo tiene decoder
+        // soportado, así que ningún nivel puede recuperar la imagen y forzar
+        // la selección dispararía un error de decoder que mataría el audio.
+        if (causa == CausaImagen.VIDEO_NO_ELEGIBLE) return emptyList()
         val niveles = mutableListOf(NivelImagen.RESTAURAR_SUPERFICIE)
         if (causa == CausaImagen.PISTA_NO_SELECCIONADA) {
             niveles.add(NivelImagen.REPONER_SELECCION)

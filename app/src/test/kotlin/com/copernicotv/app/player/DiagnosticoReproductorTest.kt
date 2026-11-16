@@ -133,6 +133,42 @@ class DiagnosticoReproductorTest {
     }
 
     @Test
+    fun `el texto incluye la pista de video detectada y su soporte`() {
+        val sinDato =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = "http://127.0.0.1:8080/f19/f19_pistas.mp4",
+                estado = EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                pistas = EstadoPistas(),
+            )
+        // Escenario de validación física (T7): el contenedor declara video
+        // que el dispositivo no puede decodificar (Telecaribe 2719).
+        val conVideoNoElegible =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = "http://127.0.0.1:8080/f19/f19_pistas.mp4",
+                estado =
+                    EstadoSesion(
+                        estado = EstadoReproductor.REPRODUCIENDO,
+                        pistaVideoDetectada = true,
+                        pistaVideoDetectadaMime = "video/mpeg2",
+                        pistaVideoDetectadaCodec = "video/mpeg2",
+                        pistaVideoSoportada = false,
+                    ),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(conVideoNoElegible)
+        assertTrue(texto.contains("Video detectado: sí"))
+        assertTrue(texto.contains("Video MIME detectado: video/mpeg2"))
+        assertTrue(texto.contains("Video códec detectado: video/mpeg2"))
+        assertTrue(texto.contains("Pista video soportada: no"))
+        // Sin datos del grupo, las líneas existen y declaran la ausencia.
+        assertTrue(textoDiagnostico(sinDato).contains("Video MIME detectado: no disponible"))
+        assertTrue(textoDiagnostico(sinDato).contains("Pista video soportada: no disponible"))
+    }
+
+    @Test
     fun `el buffer se actualiza con el estado de la sesion`() {
         val primero =
             construirDiagnostico(

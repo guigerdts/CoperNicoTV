@@ -52,6 +52,17 @@ data class ObservacionAudiovisual(
     val pistaAudio: InfoPista?,
     val hayGrupoVideo: Boolean,
     val hayGrupoAudio: Boolean,
+    /**
+     * Formato declarado por la primera pista del grupo de video, elegida o
+     * no (E7-T10 T7): el MIME y el códec que el contenedor declara aunque la
+     * pista no se haya podido seleccionar. `null` sin grupo o sin dato.
+     */
+    val formatoVideoDetectado: InfoPista? = null,
+    /**
+     * Algún `Tracks.Group` de video con pista soportada por los renderers
+     * del dispositivo (E7-T10 T7); `null` mientras no se consultó el grupo.
+     */
+    val pistaVideoSoportada: Boolean? = null,
     /** Superficie reportada activa; `null` mientras no llegue ningún evento de superficie. */
     val superficieActiva: Boolean? = null,
 )
@@ -91,6 +102,8 @@ class ObservadorAudiovisual(
     private var pistaAudio: InfoPista? = null
     private var hayGrupoVideo = false
     private var hayGrupoAudio = false
+    private var formatoVideoDetectado: InfoPista? = null
+    private var pistaVideoSoportada: Boolean? = null
     private var superficieActiva: Boolean? = null
 
     /**
@@ -119,6 +132,8 @@ class ObservadorAudiovisual(
             pistaAudio = pistaAudio,
             hayGrupoVideo = hayGrupoVideo,
             hayGrupoAudio = hayGrupoAudio,
+            formatoVideoDetectado = formatoVideoDetectado,
+            pistaVideoSoportada = pistaVideoSoportada,
             superficieActiva = superficieActiva,
         )
 
@@ -141,16 +156,26 @@ class ObservadorAudiovisual(
             decoderVideoInicializado = decoderVideo != null,
             primerFrameVisto = primerFrameVideoVisto,
             superficieActiva = superficieActiva,
+            pistaVideoSoportada = pistaVideoSoportada,
         )
 
     override fun onTracksChanged(
         eventTime: AnalyticsListener.EventTime,
         tracks: Tracks,
     ) {
-        hayGrupoVideo = tracks.groups.any { it.type == C.TRACK_TYPE_VIDEO && it.length > 0 }
+        val gruposVideo = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO && it.length > 0 }
+        hayGrupoVideo = gruposVideo.isNotEmpty()
         hayGrupoAudio = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO && it.length > 0 }
         pistaVideo = formatoSeleccionado(tracks, C.TRACK_TYPE_VIDEO)?.let { formatoDe(it) }
         pistaAudio = formatoSeleccionado(tracks, C.TRACK_TYPE_AUDIO)?.let { formatoDe(it) }
+        // El grupo detectado declara su formato aunque ninguna pista se haya
+        // podido seleccionar (T7): ese MIME y ese códec son la evidencia de
+        // por qué el video no llegó al renderer.
+        formatoVideoDetectado = gruposVideo.firstOrNull()?.let { formatoDe(it.getTrackFormat(0)) }
+        pistaVideoSoportada =
+            gruposVideo.any { grupo ->
+                (0 until grupo.length).any { grupo.isTrackSupported(it) }
+            }
     }
 
     override fun onAudioEnabled(

@@ -68,6 +68,11 @@ data class DiagnosticoReproductor(
     val audioRendererActivo: Boolean? = null,
     val pistaVideoDetectada: Boolean? = null,
     val pistaAudioDetectada: Boolean? = null,
+    // E7-T10 T7: la pista de video que el contenedor declara aunque no se
+    // haya seleccionado, con su soporte observado en el dispositivo.
+    val pistaVideoDetectadaMime: String? = null,
+    val pistaVideoDetectadaCodec: String? = null,
+    val pistaVideoSoportada: Boolean? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -144,6 +149,9 @@ fun construirDiagnostico(
         audioRendererActivo = estado.audioRendererActivo,
         pistaVideoDetectada = estado.pistaVideoDetectada,
         pistaAudioDetectada = estado.pistaAudioDetectada,
+        pistaVideoDetectadaMime = estado.pistaVideoDetectadaMime,
+        pistaVideoDetectadaCodec = estado.pistaVideoDetectadaCodec,
+        pistaVideoSoportada = estado.pistaVideoSoportada,
     )
 
 /**
@@ -243,6 +251,9 @@ private fun lineasAudiovisual(diagnostico: DiagnosticoReproductor): String =
         "Renderer audio activo" to valorTexto(booleanoTexto(diagnostico.audioRendererActivo)),
         "Video detectado" to valorTexto(booleanoTexto(diagnostico.pistaVideoDetectada)),
         "Audio detectado" to valorTexto(booleanoTexto(diagnostico.pistaAudioDetectada)),
+        "Video MIME detectado" to valorTexto(diagnostico.pistaVideoDetectadaMime),
+        "Video códec detectado" to valorTexto(diagnostico.pistaVideoDetectadaCodec),
+        "Pista video soportada" to valorTexto(booleanoTexto(diagnostico.pistaVideoSoportada)),
     ).joinToString(separator = "\n", postfix = "\n") { "${it.first}: ${it.second}" }
 
 /** Valor observable como texto; nulo significa «no disponible» (S6). */

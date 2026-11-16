@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
 import com.copernicotv.app.data.BusquedaCatalogoRepositorio
+import com.copernicotv.app.data.DiagnosticoRepositorio
 import com.copernicotv.app.data.PreferenciasReproduccion
 import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
@@ -94,6 +95,7 @@ class ReproductorViewModel
         private val politicaReintentos: PoliticaReintentos,
         private val fabricaConectividad: FabricaConectividad,
         private val configuracionImagen: ConfiguracionImagen,
+        private val diagnostico: DiagnosticoRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -201,6 +203,14 @@ class ReproductorViewModel
                             // El volumen vigente sobrevive al zapeo: la sesión
                             // nueva hereda el nivel actual (E6-T6).
                             nueva.fijarVolumen(_volumen.value)
+                            // La fila de diagnóstico persistente abre con la
+                            // sesión (E7-T10, S6a): sobrevive al cierre del
+                            // reproductor.
+                            diagnostico.abrir(
+                                resultado.stream.canalId,
+                                resultado.stream.nombre,
+                                resultado.stream.url,
+                            )
                             // Si la sesión falló antes de publicar el Canal, el
                             // error definitivo ya ganó: no lo pisamos con Listo.
                             if (sesion === nueva) {
@@ -380,10 +390,14 @@ class ReproductorViewModel
             val url = urlReproduccionActual ?: return
             val protocolo = protocoloActual ?: return
             val preferencias = preferenciasActuales
+            val canalIdReconstruido = canalCargado
+            val nombreReconstruido = (_estado.value as? ReproductorUiState.Listo)?.nombre
             cerrarSesion(conservarDiagnostico = true)
             canalCargado = null
             _estado.value = ReproductorUiState.Cargando
             abrirSesion(url, protocolo, preferencias, posicionInicialMs = posicionMs)
+            // La sesión reconstruida tiene su propia fila de diagnóstico.
+            diagnostico.abrir(canalIdReconstruido, nombreReconstruido, url)
         }
 
         /** Solo para pruebas: fuerza la ruta de reconstrucción sin tocar la escalera. */
@@ -425,6 +439,11 @@ class ReproductorViewModel
                         _sesionEstado.value = estadoSesion
                         estadoSesion.codigoError?.let { ultimoError = it }
                         actualizarDiagnostico(estadoSesion, _estadoPistas.value)
+                        if (estadoSesion.estado == EstadoReproductor.TERMINADO) {
+                            // Fin de stream: la fila se cierra aunque la
+                            // sesión siga viva hasta el zapeo siguiente.
+                            diagnostico.cerrar()
+                        }
                         if (estadoSesion.estado == EstadoReproductor.ERROR) {
                             _estado.value =
                                 ReproductorUiState.Error(estadoSesion.codigoError ?: "error_reproduccion")
@@ -468,6 +487,7 @@ class ReproductorViewModel
             estadoSesion: EstadoSesion,
             pistas: EstadoPistas,
         ) {
+            diagnostico.observar(estadoSesion, pistas)
             _diagnostico.value =
                 construirDiagnostico(
                     protocolo = protocoloActual,
@@ -489,6 +509,10 @@ class ReproductorViewModel
             recolectorPistas?.cancel()
             recolectorPistas = null
             anterior?.liberar()
+            // La fila de la sesión cerrada termina aquí (E7-T10, S6a): zapeo,
+            // reconstrucción, abandono o error definitivo, cada cierre se
+            // registra una sola vez.
+            diagnostico.cerrar()
             _sesionEstado.value = EstadoSesion()
             _estadoPistas.value = EstadoPistas()
             if (!conservarDiagnostico) {

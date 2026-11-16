@@ -11,6 +11,7 @@ import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
 import com.copernicotv.app.data.db.dao.DetalleAusenciaDao
+import com.copernicotv.app.data.db.dao.DiagnosticoDao
 import com.copernicotv.app.data.db.dao.EstadoActualizacionDao
 import com.copernicotv.app.data.db.dao.EstadoIndiceHmacDao
 import com.copernicotv.app.data.db.dao.EvidenciaColisionDao
@@ -40,6 +41,7 @@ import com.copernicotv.app.data.db.entities.ColeccionEntity
 import com.copernicotv.app.data.db.entities.DetalleAusenciaEntity
 import com.copernicotv.app.data.db.entities.EstadoActualizacionEntity
 import com.copernicotv.app.data.db.entities.EstadoIndiceHmacEntity
+import com.copernicotv.app.data.db.entities.EventoDiagnosticoEntity
 import com.copernicotv.app.data.db.entities.EvidenciaColisionEntity
 import com.copernicotv.app.data.db.entities.FavoritoEntity
 import com.copernicotv.app.data.db.entities.FuenteEntity
@@ -55,15 +57,18 @@ import com.copernicotv.app.data.db.entities.OcultacionGrupoEntity
 import com.copernicotv.app.data.db.entities.PerfilEntity
 import com.copernicotv.app.data.db.entities.PerfilListaEntity
 import com.copernicotv.app.data.db.entities.ProgramaEntity
+import com.copernicotv.app.data.db.entities.SesionDiagnosticoEntity
 
 /**
- * Room v1. Contiene las 26 tablas de §6.3.1, sin entidades adicionales.
+ * Room v2. Contiene las 26 tablas de §6.3.1 más las dos del diagnóstico
+ * persistente de reproducción (E7-T10, S6a): `SesionDiagnostico` y
+ * `EventoDiagnostico`. La migración 1→2 solo crea tablas nuevas.
  *
  * `exportSchema` deja el JSON versionado en `app/schemas` para que las pruebas
  * de esquema y las migraciones futuras tengan una referencia real.
  */
 @Database(
-    version = 1,
+    version = 2,
     exportSchema = true,
     entities = [
         FuenteEntity::class,
@@ -92,10 +97,14 @@ import com.copernicotv.app.data.db.entities.ProgramaEntity
         CacheXmltvEntity::class,
         EstadoIndiceHmacEntity::class,
         HmacPendienteEntity::class,
+        SesionDiagnosticoEntity::class,
+        EventoDiagnosticoEntity::class,
     ],
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun diagnosticoDao(): DiagnosticoDao
+
     abstract fun estadoActualizacionDao(): EstadoActualizacionDao
 
     abstract fun detalleAusenciaDao(): DetalleAusenciaDao

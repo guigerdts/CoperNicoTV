@@ -13,6 +13,7 @@ import com.copernicotv.app.data.cache.Descargador
 import com.copernicotv.app.data.cache.DescargadorHttp
 import com.copernicotv.app.data.cache.RepositorioCache
 import com.copernicotv.app.data.db.AppDatabase
+import com.copernicotv.app.data.db.Migraciones
 import com.copernicotv.app.data.db.SembrarEstadoIndiceHmac
 import com.copernicotv.app.data.db.dao.AparienciaDao
 import com.copernicotv.app.data.db.dao.CacheM3UDao
@@ -59,6 +60,7 @@ object AppModule {
     ): AppDatabase =
         Room
             .databaseBuilder(contexto, AppDatabase::class.java, AppDatabase.NOMBRE)
+            .addMigrations(Migraciones.MIGRACION_1_2)
             .addCallback(SembrarEstadoIndiceHmac.callback())
             .build()
 

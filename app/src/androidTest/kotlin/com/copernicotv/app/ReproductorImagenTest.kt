@@ -145,6 +145,12 @@ class ReproductorImagenTest {
         val contadorAlZapear = viewModel.solicitudSuperficie.value
 
         viewModel.zapearSiguiente()
+        // La sesión vieja sigue en REPRODUCIENDO hasta que la corrutina de
+        // zapeo la sustituya: esperar ese estado matchearía al instante con
+        // el valor vigente. Se espera la sustitución observada (E6-T4).
+        composeRule.esperarHasta {
+            viewModel.sesionActual() != null && viewModel.sesionActual() !== anterior
+        }
         esperarSesionVm("reproducción del canal B") {
             it.estado == EstadoReproductor.REPRODUCIENDO
         }
@@ -188,33 +194,36 @@ class ReproductorImagenTest {
         val viewModel = composeRule.viewModelReproductor()
         composeRule.esperarReproduccionAvanzando()
 
+        // La desconexión simulada corta el observador de conectividad de la
+        // app, no los sockets: el contenido de 12 s queda buferado entero y
+        // la reproducción termina por fin de stream mientras la red sigue
+        // «perdida». El punto de S5 es que, pase lo que pase durante el
+        // corte, la escalera de imagen no reacciona; la transición a
+        // ESPERANDO_CONEXION con reintentos es territorio de S4 y su suite
+        // propia la cubre.
         ConectividadPrueba.desconectar()
-        esperarSesionVm("esperando conexión") {
-            it.estado == EstadoReproductor.ESPERANDO_CONEXION
+        try {
+            esperarSesionVm("fin de la reproducción durante el corte de red") {
+                it.estado != EstadoReproductor.REPRODUCIENDO
+            }
+            assertEquals(
+                "La pérdida de red abrió un caso de imagen",
+                0,
+                viewModel.solicitudSuperficie.value,
+            )
+            val imagenEnCorte = viewModel.sesionEstado.value.estadoImagen
+            assertTrue(
+                "La pérdida de red publicó un estado de recuperación de imagen: $imagenEnCorte",
+                imagenEnCorte == null ||
+                    imagenEnCorte == EstadoImagen.PREPARANDO_VIDEO ||
+                    imagenEnCorte == EstadoImagen.ESPERANDO_PRIMER_FRAME,
+            )
+        } finally {
+            // El observador es un singleton compartido: dejar la red
+            // desconectada contaminaría el resto de la suite.
+            ConectividadPrueba.conectar()
+            PuertaReintentos.liberar()
         }
-        assertEquals(
-            "La pérdida de red abrió un caso de imagen",
-            0,
-            viewModel.solicitudSuperficie.value,
-        )
-        val imagenEnCorte = viewModel.sesionEstado.value.estadoImagen
-        assertTrue(
-            "La pérdida de red publicó un estado de recuperación de imagen: $imagenEnCorte",
-            imagenEnCorte == null ||
-                imagenEnCorte == EstadoImagen.PREPARANDO_VIDEO ||
-                imagenEnCorte == EstadoImagen.ESPERANDO_PRIMER_FRAME,
-        )
-
-        ConectividadPrueba.conectar()
-        PuertaReintentos.liberar()
-        esperarSesionVm("reproducción tras volver la red") {
-            it.estado == EstadoReproductor.REPRODUCIENDO
-        }
-        assertEquals(
-            "La recuperación de red pidió un re-attach de superficie",
-            0,
-            viewModel.solicitudSuperficie.value,
-        )
     }
 
     @Test

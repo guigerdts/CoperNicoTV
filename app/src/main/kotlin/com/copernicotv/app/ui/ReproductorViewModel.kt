@@ -155,6 +155,7 @@ class ReproductorViewModel
         private var recolectorPistas: Job? = null
         private var preferenciasActuales = PreferenciasPista()
         private var protocoloActual: ProtocoloStream? = null
+        private var urlReproduccionActual: String? = null
         private var urlSaneadaActual: String? = null
         private var ultimoError: String? = null
 
@@ -175,6 +176,7 @@ class ReproductorViewModel
                     when (val resultado = repositorio.resolver(canalId)) {
                         is ResultadoStream.Ok -> {
                             val urlSaneada = sanearUrl(resultado.stream.url)
+                            urlReproduccionActual = resultado.stream.url
                             protocoloActual = resultado.stream.protocolo
                             urlSaneadaActual = urlSaneada
                             ultimoError = null
@@ -368,10 +370,14 @@ class ReproductorViewModel
          * actual y abre una nueva con la misma URL y preferencias. Los datos
          * de la sesión se capturan ANTES de cerrarla, porque `cerrarSesion`
          * limpia las referencias; el canal cargado se olvida para que la
-         * nueva apertura no se detecte como carga repetida.
+         * nueva apertura no se detecte como carga repetida. La URL es la
+         * cruda de reproducción, no la saneada de diagnóstico: `sanearUrl`
+         * reduce la dirección a esquema/host/puerto para mostrarla en
+         * pantalla y una sesión reconstruida con ella no apuntaría al
+         * stream real.
          */
         fun reconstruir(posicionMs: Long) {
-            val url = urlSaneadaActual ?: return
+            val url = urlReproduccionActual ?: return
             val protocolo = protocoloActual ?: return
             val preferencias = preferenciasActuales
             cerrarSesion(conservarDiagnostico = true)
@@ -489,6 +495,7 @@ class ReproductorViewModel
                 _diagnostico.value = DiagnosticoReproductor()
             }
             protocoloActual = null
+            urlReproduccionActual = null
             urlSaneadaActual = null
             ultimoError = null
         }

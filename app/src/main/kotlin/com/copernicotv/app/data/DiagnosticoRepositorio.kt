@@ -54,7 +54,7 @@ class DiagnosticoRepositorio
         /** Fila de la sesión en curso; solo la toca el consumidor de [ordenes]. */
         private var fila: SesionDiagnosticoEntity? = null
         private var estadoPrevio: EstadoSesion? = null
-        private var ultimoEvento: Pair<String, String?>? = null
+        private var ultimoEvento: Pair<String?, String?>? = null
 
         init {
             alcance.launch {
@@ -155,7 +155,11 @@ class DiagnosticoRepositorio
                     )
                 }
                 val imagenPrevio = previo.estadoImagen
-                if (imagenPrevio in ESTADOS_RECUPERACION_IMAGEN && estado.estadoImagen == EstadoImagen.IMAGEN_RECUPERADA) {
+                if (
+                    imagenPrevio != null &&
+                    imagenPrevio in ESTADOS_RECUPERACION_IMAGEN &&
+                    estado.estadoImagen == EstadoImagen.IMAGEN_RECUPERADA
+                ) {
                     nueva = nueva.copy(recuperacionesImagen = nueva.recuperacionesImagen + 1)
                     registrarEvento(
                         nueva.id,

@@ -95,7 +95,7 @@ class ReproductorViewModel
         private val politicaReintentos: PoliticaReintentos,
         private val fabricaConectividad: FabricaConectividad,
         private val configuracionImagen: ConfiguracionImagen,
-        private val diagnostico: DiagnosticoRepositorio,
+        private val registroDiagnosticos: DiagnosticoRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -206,7 +206,7 @@ class ReproductorViewModel
                             // La fila de diagnóstico persistente abre con la
                             // sesión (E7-T10, S6a): sobrevive al cierre del
                             // reproductor.
-                            diagnostico.abrir(
+                            registroDiagnosticos.abrir(
                                 resultado.stream.canalId,
                                 resultado.stream.nombre,
                                 resultado.stream.url,
@@ -397,7 +397,7 @@ class ReproductorViewModel
             _estado.value = ReproductorUiState.Cargando
             abrirSesion(url, protocolo, preferencias, posicionInicialMs = posicionMs)
             // La sesión reconstruida tiene su propia fila de diagnóstico.
-            diagnostico.abrir(canalIdReconstruido, nombreReconstruido, url)
+            registroDiagnosticos.abrir(canalIdReconstruido, nombreReconstruido, url)
         }
 
         /** Solo para pruebas: fuerza la ruta de reconstrucción sin tocar la escalera. */
@@ -442,7 +442,7 @@ class ReproductorViewModel
                         if (estadoSesion.estado == EstadoReproductor.TERMINADO) {
                             // Fin de stream: la fila se cierra aunque la
                             // sesión siga viva hasta el zapeo siguiente.
-                            diagnostico.cerrar()
+                            registroDiagnosticos.cerrar()
                         }
                         if (estadoSesion.estado == EstadoReproductor.ERROR) {
                             _estado.value =
@@ -487,7 +487,7 @@ class ReproductorViewModel
             estadoSesion: EstadoSesion,
             pistas: EstadoPistas,
         ) {
-            diagnostico.observar(estadoSesion, pistas)
+            registroDiagnosticos.observar(estadoSesion, pistas)
             _diagnostico.value =
                 construirDiagnostico(
                     protocolo = protocoloActual,
@@ -512,7 +512,7 @@ class ReproductorViewModel
             // La fila de la sesión cerrada termina aquí (E7-T10, S6a): zapeo,
             // reconstrucción, abandono o error definitivo, cada cierre se
             // registra una sola vez.
-            diagnostico.cerrar()
+            registroDiagnosticos.cerrar()
             _sesionEstado.value = EstadoSesion()
             _estadoPistas.value = EstadoPistas()
             if (!conservarDiagnostico) {

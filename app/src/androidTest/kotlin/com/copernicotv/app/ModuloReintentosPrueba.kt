@@ -4,6 +4,7 @@ import com.copernicotv.app.player.FabricaConectividad
 import com.copernicotv.app.player.ModuloReintentos
 import com.copernicotv.app.player.ObservadorConectividad
 import com.copernicotv.app.player.PoliticaReintentos
+import com.copernicotv.core.player.ConfiguracionImagen
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.components.SingletonComponent
@@ -35,6 +36,15 @@ object ModuloReintentosPrueba {
             esperar = { PuertaReintentos.esperar() },
             esperarEstabilidad = { PuertaEstabilidad.esperar() },
         )
+
+    @Provides
+    @Singleton
+    fun configuracionImagen(): ConfiguracionImagen =
+        // Ventana corta: la escalera de imagen avanza rápido en el emulador
+        // sin tocar la política de producción. Los tests existentes usan
+        // fixtures con evidencia estable o sin audio, así que la detección
+        // nunca abre casos espurios.
+        ConfiguracionImagen(ventanaConfirmacionMs = 1_000L)
 
     @Provides
     @Singleton

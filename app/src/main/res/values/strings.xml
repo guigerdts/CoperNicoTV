@@ -167,6 +167,12 @@
     <string name="reproductor_recuperacion_esperando">Sin conexión a Internet. La reproducción se reanudará cuando vuelva la conexión…</string>
     <string name="reproductor_recuperada">Reproducción recuperada</string>
     <string name="reproductor_recuperacion_fallida">No se pudo recuperar la reproducción tras %1$d intentos</string>
+
+    <!-- Escalera de imagen (E7-T10, S5/F7). -->
+    <string name="reproductor_imagen_recuperando">Restaurando la imagen…</string>
+    <string name="reproductor_imagen_error_decoder">La imagen no se pudo recuperar. El audio sigue disponible</string>
+    <string name="reproductor_imagen_error_renderizado">La imagen no se pudo recuperar. El audio sigue disponible</string>
+    <string name="reproductor_imagen_recuperada">Imagen restaurada</string>
     <string name="reproductor_diagnostico">Diagnóstico</string>
     <string name="reproductor_diagnostico_titulo">Diagnóstico técnico</string>
     <string name="reproductor_diagnostico_copiar">Copiar diagnóstico</string>

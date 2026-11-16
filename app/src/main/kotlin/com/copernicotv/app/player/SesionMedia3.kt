@@ -1,6 +1,7 @@
 package com.copernicotv.app.player
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -140,8 +141,12 @@ class SesionMedia3(
      * Detección de audio-sin-imagen y escalera de recuperación de imagen
      * (E7-T10, S5). Vive en [EscaleraImagen]; la sesión le presta el motor,
      * el observador y el estado de publicación.
+     *
+     * Visible para las pruebas instrumentadas: permiten abrir un caso de
+     * imagen real vía [EscaleraImagen.forzarCaso] sin esperar la detección.
      */
-    private val escaleraImagen =
+    @VisibleForTesting
+    val escaleraImagen =
         EscaleraImagen(
             ventanaMs = configuracionImagen.ventanaConfirmacionMs,
             permitirReconstruccion = permitirReconstruccion,

@@ -38,7 +38,7 @@ import javax.inject.Inject
  *
  * La detección real «audio activo sin imagen» exige provocar un caso que el
  * emulador no siempre permite, así que la sesión expone el gancho
- * `forzarCasoImagen` sobre una sesión construida sin superficie (la prueba
+ * `forzarCaso` sobre una sesión construida sin superficie (la prueba
  * nunca la adjunta a una vista). Los casos de reproducción real (arranque
  * normal, pérdida de red) se prueban sin el gancho: la máquina no debe abrir
  * casos espurios, y una pérdida de red no es un problema de imagen.
@@ -105,7 +105,7 @@ class ReproductorImagenTest {
         composeRule.runOnUiThread {
             assertFalse(
                 "El reemplazo de selección dejó el video deshabilitado",
-                sesion.reproductor.trackSelectionParameters.isTrackTypeDisabled(C.TRACK_TYPE_VIDEO),
+                sesion.reproductor.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO),
             )
         }
         assertSame(
@@ -246,7 +246,7 @@ class ReproductorImagenTest {
             esperarDirecto("reproducción directa") {
                 it.estado == EstadoReproductor.REPRODUCIENDO
             }
-            composeRule.runOnUiThread { sesion.forzarCasoImagen(CausaImagen.SUPERFICIE_PERDIDA) }
+            composeRule.runOnUiThread { sesion.escaleraImagen.forzarCaso(CausaImagen.SUPERFICIE_PERDIDA) }
 
             // El re-attach externo ejecutado, la sesión reprepara con su motor
             // (se observa el estado publicado) y la escalera termina pegajosa.
@@ -295,7 +295,7 @@ class ReproductorImagenTest {
             esperarDirecto("reproducción directa") {
                 it.estado == EstadoReproductor.REPRODUCIENDO
             }
-            composeRule.runOnUiThread { sesion.forzarCasoImagen(CausaImagen.SUPERFICIE_PERDIDA) }
+            composeRule.runOnUiThread { sesion.escaleraImagen.forzarCaso(CausaImagen.SUPERFICIE_PERDIDA) }
 
             esperarDirecto("reconstrucción de la sesión") {
                 acciones.reconstrucciones >= 1

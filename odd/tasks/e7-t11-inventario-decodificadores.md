@@ -25,7 +25,7 @@ Branch: cascada sobre feat/e7-t9-compatibilidad (ec74154) · Delivery: ask-on-ri
 
 ## Tasks
 
-- T1 (S2/S3/S5) — Política de selección y modelo en `:core` (puro, JVM-testeable): parseo de codec string a perfil/nivel, `DecoderVideo` (datos), política hardware→software→externo→incompatible con motivos. **Pendiente**.
+- T1 (S2/S3/S5) — Política de selección y modelo en `:core` (puro, JVM-testeable): parseo de codec string a perfil/nivel, `DecoderVideo` (datos), política hardware→software→externo→incompatible con motivos. **Hecho** (12 pruebas en `DecodersVideoTest`, RED→GREEN, commit `6538b1a`).
 - T2 (S1/S2/S6) — Servicio Android `InventarioDecodificadores` (MediaCodecList/REGULAR_CODECS → `DecoderVideo`), detección hardware/software con guard API 29, consulta por formato con perfil/nivel/resolución vía CodecCapabilities/VideoCapabilities; interfaz de registro para decoders externos (`RegistroDecodersVideo`, vacío en fase 1). **Pendiente**.
 - T3 (S1/S6) — Integración: `SesionMedia3.publicarEstado` consulta la selección para el formato de video detectado (T7) y publica `decoderVideoSeleccionado`/`tipoDecoderVideo`/`motivoSoporteVideo`/`perfilNivelVideo`; panel de diagnóstico +4 líneas; memoización por formato. **Pendiente**.
 - T4 (S5) — Persistencia v4: +4 columnas TEXT en `SesionDiagnosticoEntity`, `MIGRACION_3_4` (ALTER TABLE ADD COLUMN ×4), AppDatabase v4, contratos JVM v4, test de migración 3→4 con fila v3 sobreviviente. **Pendiente**.

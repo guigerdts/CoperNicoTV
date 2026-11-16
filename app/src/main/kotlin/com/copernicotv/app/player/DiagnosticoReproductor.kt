@@ -1,7 +1,9 @@
 package com.copernicotv.app.player
 
 import com.copernicotv.core.player.CondicionReproduccion
+import com.copernicotv.core.player.MotivoSoporteVideo
 import com.copernicotv.core.player.ProtocoloStream
+import com.copernicotv.core.player.TipoDecoder
 import java.util.Locale
 
 /**
@@ -73,6 +75,12 @@ data class DiagnosticoReproductor(
     val pistaVideoDetectadaMime: String? = null,
     val pistaVideoDetectadaCodec: String? = null,
     val pistaVideoSoportada: Boolean? = null,
+    // E7-T11: veredicto del inventario de decoders del dispositivo para la
+    // pista de video detectada; la selección es la política de `:core`.
+    val decoderVideoSeleccionado: String? = null,
+    val tipoDecoderVideo: TipoDecoder? = null,
+    val motivoSoporteVideo: MotivoSoporteVideo? = null,
+    val perfilNivelVideo: String? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -152,6 +160,10 @@ fun construirDiagnostico(
         pistaVideoDetectadaMime = estado.pistaVideoDetectadaMime,
         pistaVideoDetectadaCodec = estado.pistaVideoDetectadaCodec,
         pistaVideoSoportada = estado.pistaVideoSoportada,
+        decoderVideoSeleccionado = estado.decoderVideoSeleccionado,
+        tipoDecoderVideo = estado.tipoDecoderVideo,
+        motivoSoporteVideo = estado.motivoSoporteVideo,
+        perfilNivelVideo = estado.perfilNivelVideo,
     )
 
 /**
@@ -254,6 +266,10 @@ private fun lineasAudiovisual(diagnostico: DiagnosticoReproductor): String =
         "Video MIME detectado" to valorTexto(diagnostico.pistaVideoDetectadaMime),
         "Video códec detectado" to valorTexto(diagnostico.pistaVideoDetectadaCodec),
         "Pista video soportada" to valorTexto(booleanoTexto(diagnostico.pistaVideoSoportada)),
+        "Decoder video seleccionado" to valorTexto(diagnostico.decoderVideoSeleccionado),
+        "Tipo decoder video" to valorTexto(diagnostico.tipoDecoderVideo?.name),
+        "Motivo soporte video" to valorTexto(diagnostico.motivoSoporteVideo?.name),
+        "Perfil/nivel video" to valorTexto(diagnostico.perfilNivelVideo),
     ).joinToString(separator = "\n", postfix = "\n") { "${it.first}: ${it.second}" }
 
 /** Valor observable como texto; nulo significa «no disponible» (S6). */

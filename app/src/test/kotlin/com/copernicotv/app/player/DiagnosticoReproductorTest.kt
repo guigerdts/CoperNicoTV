@@ -1,6 +1,8 @@
 package com.copernicotv.app.player
 
+import com.copernicotv.core.player.MotivoSoporteVideo
 import com.copernicotv.core.player.ProtocoloStream
+import com.copernicotv.core.player.TipoDecoder
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -351,5 +353,48 @@ class DiagnosticoReproductorTest {
     fun `el formato observado sin MIME se muestra solo con la etiqueta`() {
         assertEquals("HTML", formatoObservadoTexto(DiagnosticoReproductor(formatoObservado = "HTML")))
         assertEquals("no disponible", formatoObservadoTexto(DiagnosticoReproductor()))
+    }
+
+    @Test
+    fun `el panel muestra la seleccion de decoder del inventario (E7-T11)`() {
+        val diagnostico =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = null,
+                estado =
+                    EstadoSesion(
+                        estado = EstadoReproductor.REPRODUCIENDO,
+                        pistaVideoDetectadaMime = "video/avc",
+                        pistaVideoDetectadaCodec = "avc1.640028",
+                        decoderVideoSeleccionado = "c2.exynos.h264.decoder",
+                        tipoDecoderVideo = TipoDecoder.HARDWARE,
+                        motivoSoporteVideo = MotivoSoporteVideo.SOPORTADO,
+                        perfilNivelVideo = "perfil 0x64 nivel 0x28",
+                    ),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(diagnostico)
+        assertTrue(texto.contains("Decoder video seleccionado: c2.exynos.h264.decoder"))
+        assertTrue(texto.contains("Tipo decoder video: HARDWARE"))
+        assertTrue(texto.contains("Motivo soporte video: SOPORTADO"))
+        assertTrue(texto.contains("Perfil/nivel video: perfil 0x64 nivel 0x28"))
+    }
+
+    @Test
+    fun `sin veredicto del inventario el panel lo declara no disponible`() {
+        val diagnostico =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = null,
+                estado = EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(diagnostico)
+        assertTrue(texto.contains("Decoder video seleccionado: no disponible"))
+        assertTrue(texto.contains("Tipo decoder video: no disponible"))
+        assertTrue(texto.contains("Motivo soporte video: no disponible"))
+        assertTrue(texto.contains("Perfil/nivel video: no disponible"))
     }
 }

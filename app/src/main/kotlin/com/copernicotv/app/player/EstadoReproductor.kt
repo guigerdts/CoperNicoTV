@@ -2,6 +2,8 @@ package com.copernicotv.app.player
 
 import com.copernicotv.core.player.CondicionReproduccion
 import com.copernicotv.core.player.EstadoImagen
+import com.copernicotv.core.player.MotivoSoporteVideo
+import com.copernicotv.core.player.TipoDecoder
 
 /** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4 y E7-T10). */
 enum class EstadoReproductor {
@@ -112,6 +114,14 @@ data class EstadoSesion(
     val pistaVideoDetectadaMime: String? = null,
     val pistaVideoDetectadaCodec: String? = null,
     val pistaVideoSoportada: Boolean? = null,
+    // E7-T11: inventario y selección de decoders. La selección viene de la
+    // política pura de `:core` consultada sobre el inventario real del
+    // dispositivo (MediaCodecList); el perfil/nivel se parsea del codec
+    // string y queda nulo cuando el formato no lo declara.
+    val decoderVideoSeleccionado: String? = null,
+    val tipoDecoderVideo: TipoDecoder? = null,
+    val motivoSoporteVideo: MotivoSoporteVideo? = null,
+    val perfilNivelVideo: String? = null,
     // E7-T10 S5/F7: estado de la imagen. `null` = sin aviso (reproducción
     // normal); los valores del enum los publica la máquina de imagen y la UI
     // los traduce a mensajes comprensibles solo en reproducción.

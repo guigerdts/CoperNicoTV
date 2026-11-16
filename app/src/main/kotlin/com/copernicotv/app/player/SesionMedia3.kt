@@ -146,7 +146,7 @@ class SesionMedia3(
      * imagen real vía [EscaleraImagen.forzarCaso] sin esperar la detección.
      */
     @VisibleForTesting
-    val escaleraImagen =
+    internal val escaleraImagen =
         EscaleraImagen(
             ventanaMs = configuracionImagen.ventanaConfirmacionMs,
             permitirReconstruccion = permitirReconstruccion,

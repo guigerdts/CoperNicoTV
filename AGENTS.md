@@ -38,7 +38,7 @@ Repo single-context: `GLOSSARY.md` en la raíz + `docs/adr/`. Ver `docs/agents/d
 
 ## Enfoque del proyecto
 
-- El **MVP incluye TODAS las funcionalidades del README**, sin excepciones ni aplazamientos al post-MVP. Las entregas E1–E7 organizan la implementación; no recortan alcance. El plan de entregas y su criterio de cierre están registrados en `odd/tasks/mvp-copernicotv.md` (§8 y §9). El documento de funcionalidad del MVP (seguimiento por tarea) se publica en `odd/tasks/mvp-copernicotv.md`; su existencia no aprueba U0 ni inicia E1. La ruta `odd/tasks/` se crea con este documento.
+- El **MVP incluye TODAS las funcionalidades del README**, sin excepciones ni aplazamientos al post-MVP. Las entregas E1–E7 organizan la implementación; no recortan alcance. El plan de entregas y su criterio de cierre están registrados en `odd/tasks/mvp-copernicotv.md` (§8 y §9). El documento de funcionalidad del MVP (seguimiento por tarea) se publica en `odd/tasks/mvp-copernicotv.md`; su existencia no aprueba U0 ni inicia E1. La ruta `odd/tasks/` se crea con este documento. La **evidencia de validaciones físicas** (CI, emulador, dispositivo, documental, pendiente) se consolida en `docs/evidence/validaciones-fisicas.md` (F-01..F-11), fuente primaria de ese estado; el roadmap vigente vive en `odd/tasks/e7-t13-integracion-reconciliacion.md` (§Roadmap).
 
 ## Entorno (Termux)
 

@@ -11,7 +11,9 @@ import com.copernicotv.app.ui.TAG_REPRODUCTOR_RECUPERADA
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_REINTENTO
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -169,15 +171,21 @@ class ReproductorConectividadTest {
         // recuperación real: el error deja el motor en IDLE y `prepare()`
         // re-abre la fuente, así que aquí se pasa por `stop()` primero.
         fallar.set(true)
-        composeRule.runOnUiThread {
-            composeRule.viewModelReproductor().sesionActual()?.reproductor?.let { motor ->
-                motor.stop()
-                motor.prepare()
-            }
-        }
+        // Observación anticipada: el permiso sobrante de la puerta puede
+        // cruzar el primer backoff del corte sin pausa, y REINTENTANDO(1)
+        // es efímero; la suscripción tardía pierde la carrera en un
+        // emulador lento (flakiness observado en CI).
         val reintento =
-            esperarSesion("reintento 1 con presupuesto repuesto") {
-                it.estado == EstadoReproductor.REINTENTANDO && it.reintento == 1
+            esperarSesionTras(
+                "reintento 1 con presupuesto repuesto",
+                { it.estado == EstadoReproductor.REINTENTANDO && it.reintento == 1 },
+            ) {
+                composeRule.runOnUiThread {
+                    composeRule.viewModelReproductor().sesionActual()?.reproductor?.let { motor ->
+                        motor.stop()
+                        motor.prepare()
+                    }
+                }
             }
         assertEquals(6, reintento.reintentosMaximos)
 
@@ -216,6 +224,37 @@ class ReproductorConectividadTest {
                 withTimeout(ESPERA_TEST_MS) {
                     composeRule.viewModelReproductor().sesionEstado.first(predicado)
                 }
+            }
+        } catch (error: TimeoutCancellationException) {
+            throw AssertionError(
+                "No llegó $descripcion en $ESPERA_TEST_MS ms. estado=${composeRule.viewModelReproductor().sesionEstado.value}",
+                error,
+            )
+        }
+
+    /**
+     * Suscribe la observación ANTES de ejecutar [accion] y espera el estado
+     * que produzca.
+     *
+     * Necesaria cuando el estado esperado es efímero: la puerta de
+     * reintentos puede tener un permiso sobrante (p. ej. la liberación que
+     * no consume el prepare que acierta) y el motor la cruza sin pausa, con
+     * lo que el valor intermedio del StateFlow desaparece antes de que una
+     * suscripción tardía llegue a verlo.
+     */
+    private fun esperarSesionTras(
+        descripcion: String,
+        predicado: (EstadoSesion) -> Boolean,
+        accion: () -> Unit,
+    ): EstadoSesion =
+        try {
+            runBlocking {
+                val observacion =
+                    async(start = CoroutineStart.UNDISPATCHED) {
+                        composeRule.viewModelReproductor().sesionEstado.first(predicado)
+                    }
+                accion()
+                withTimeout(ESPERA_TEST_MS) { observacion.await() }
             }
         } catch (error: TimeoutCancellationException) {
             throw AssertionError(

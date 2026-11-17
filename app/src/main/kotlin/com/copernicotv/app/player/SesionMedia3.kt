@@ -70,12 +70,18 @@ class SesionMedia3(
     /** Pistas del contenido actual y preferencia aplicada (E6-T3). */
     val estadoPistas: StateFlow<EstadoPistas> = _estadoPistas.asStateFlow()
 
+    /** Estado de trazado de red de esta sesión (E7-T8, S5). */
+    private val trazadora = TrazadoraRed(agenteUsuario = AGENTE_REPRODUCCION)
+
     /** Motor de reproducción; la interfaz solo lo conecta a su superficie. */
     val reproductor: ExoPlayer =
         ExoPlayer.Builder(contexto)
             .setMediaSourceFactory(
-                DefaultMediaSourceFactory(contexto)
-                    .setLoadErrorHandlingPolicy(PoliticaErroresMedia3()),
+                FabricaMediaSourcesGrabadora(
+                    DefaultMediaSourceFactory(FabricaFuenteSeguimiento(trazadora))
+                        .setLoadErrorHandlingPolicy(PoliticaErroresMedia3()),
+                    trazadora,
+                ),
             )
             .build()
 
@@ -291,6 +297,7 @@ class SesionMedia3(
     ) {
         trabajoReintento?.cancel()
         trabajoReintento = null
+        val traza = trazadora.traza
         _estado.value =
             _estado.value.copy(
                 estado = EstadoReproductor.ERROR,
@@ -305,6 +312,14 @@ class SesionMedia3(
                 msHastaFallo = msHastaFallo.coerceAtLeast(0L),
                 intentosFallo = intentos.coerceAtLeast(1),
                 clasificacionTecnica = clasificacionTecnica(detalle),
+                codigoHttpInicial = traza?.codigoInicial,
+                redirecciones = traza?.redirecciones,
+                esquemaInicial = traza?.esquemaInicial,
+                esquemaFinal = traza?.esquemaFinal,
+                cicloRedirecciones = traza?.circular ?: false,
+                limiteRedirecciones = traza?.limiteAlcanzado ?: false,
+                fuenteMedia = trazadora.tipoFuenteMedia,
+                agenteUsuario = trazadora.agenteUsuario,
             )
     }
 

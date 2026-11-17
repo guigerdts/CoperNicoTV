@@ -26,6 +26,12 @@ enum class EstadoReproductor {
  * `tipoMime`, `bytesRespuesta`, `msHastaFallo`, `intentosFallo` y
  * `clasificacionTecnica`) solo se rellenan en [EstadoReproductor.ERROR] y
  * contienen únicamente evidencia segura para mostrar (DetalleFallo.kt).
+ *
+ * Los campos de trazado de red de E7-T8 (`codigoHttpInicial`, `redirecciones`,
+ * `esquemaInicial`, `esquemaFinal`, `cicloRedirecciones`,
+ * `limiteRedirecciones`, `fuenteMedia` y `agenteUsuario`) también solo tienen
+ * contenido en [EstadoReproductor.ERROR]: provienen de la [TrazadoraRed] de la
+ * sesión y son evidencia segura para mostrar (esquemas, códigos y contadores).
  */
 data class EstadoSesion(
     val estado: EstadoReproductor = EstadoReproductor.CARGANDO,
@@ -44,6 +50,14 @@ data class EstadoSesion(
     val msHastaFallo: Long = 0L,
     val intentosFallo: Int = 0,
     val clasificacionTecnica: String? = null,
+    val codigoHttpInicial: Int? = null,
+    val redirecciones: Int? = null,
+    val esquemaInicial: String? = null,
+    val esquemaFinal: String? = null,
+    val cicloRedirecciones: Boolean = false,
+    val limiteRedirecciones: Boolean = false,
+    val fuenteMedia: String? = null,
+    val agenteUsuario: String? = null,
 )
 
 /**

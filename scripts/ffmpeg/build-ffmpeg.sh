@@ -132,7 +132,11 @@ build_abi() {
             --disable-asm \
             --enable-pic \
             --enable-small \
-            --extra-cflags="-ffunction-sections -fdata-sections"
+            --extra-cflags="-ffunction-sections -fdata-sections" || {
+            echo "ERROR: configure falló para $abi; config.log:" >&2
+            tail -60 config.log >&2 || true
+            exit 1
+        }
         # LGPL effective configuration check BEFORE compiling (S6/Fase F):
         # the generated configuration must declare GPL and nonfree disabled.
         grep -q "^#define CONFIG_GPL 0" config.h || {

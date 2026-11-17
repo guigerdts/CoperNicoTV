@@ -101,7 +101,7 @@ class ReproductorDecoderSoftwareTest {
 
         // Liberación doble: `liberar()` es idempotente y la segunda llamada
         // no debe corromper el estado ni el hilo de decodificación nativo.
-        val sesion = viewModelReproductor().sesionActual() ?: error("Sin sesión activa")
+        val sesion = composeRule.viewModelReproductor().sesionActual() ?: error("Sin sesión activa")
         composeRule.runOnUiThread {
             sesion.liberar()
             sesion.liberar()
@@ -119,7 +119,7 @@ class ReproductorDecoderSoftwareTest {
         }
         // El emulador puede decodificarlo con MediaCodec o con el externo:
         // lo que la política exige es un decoder, no uno concreto.
-        val estado = viewModelReproductor().sesionEstado.value
+        val estado = composeRule.viewModelReproductor().sesionEstado.value
         assertTrue(
             "Debe haber decoder de video asignado",
             estado.decoderVideo != null || estado.decoderVideoSeleccionado != null,
@@ -174,13 +174,13 @@ class ReproductorDecoderSoftwareTest {
         try {
             runBlocking {
                 withTimeout(ESPERA_TEST_MS) {
-                    viewModelReproductor().sesionEstado.first(predicado)
+                    composeRule.viewModelReproductor().sesionEstado.first(predicado)
                 }
             }
         } catch (error: TimeoutCancellationException) {
             throw AssertionError(
                 "No llegó $descripcion en $ESPERA_TEST_MS ms. " +
-                    "estado=${viewModelReproductor().sesionEstado.value}",
+                    "estado=${composeRule.viewModelReproductor().sesionEstado.value}",
                 error,
             )
         }

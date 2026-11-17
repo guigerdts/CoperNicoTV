@@ -37,16 +37,16 @@ Citas verbatim de la solicitud del usuario (2026-11-16). El alcance completo est
 
 ## Tasks
 
-- T1 (S1) — Fase A: verificación técnica con evidencias (API pública Media3 1.5.0, licencias, ABIs, CI/NDK, tamaño) y PRESENTACIÓN de la decisión; STOP hasta aprobación. Route: inline.
-- T2 (S2) — Fase B: módulo nativo FFmpeg LGPL (subconjunto mpeg2video/mpeg4/h263) con CMake + NDK en CI; JNI propio. Route: inline/escritura + build CI.
-- T3 (S2) — Fase B: decoder propio implementando `androidx.media3.decoder.Decoder<DecoderInputBuffer, VideoDecoderOutputBuffer, DecoderException>` (API pública, Apache-2.0). Route: inline.
-- T4 (S2) — Fase B: `RendererVideoSoftware extends DecoderVideoRenderer` + RenderersFactory hardware primero + integración con `DecoderVideoExterno`/selector de E7-T11. Route: inline.
-- T5 (S2) — Fase B: Surface, liberación de recursos, cambios de canal; sin duplicados ni fugas (pruebas instrumentadas). Route: inline + CI.
-- T6 (S3) — Fase C: matriz MPEG-2 → MPEG-4 Part 2 → H.263 → H.264 (regresión) → HEVC (evaluación). Route: inline + CI + física.
-- T7 (S4) — Fase D: diagnóstico ampliado (estado decoder software, fallback, init, primer frame, errores, tiempo). Route: inline.
-- T8 (S5) — Fase E: medición CPU/memoria/temperatura/init/frames perdidos/estabilidad; sin bloqueo del hilo principal. Route: inline.
-- T9 (S6) — Fase F: CI con NDK (si aplica), pruebas unitarias/integración/instrumentadas/selección/Surface/regresión H.264/licencias, APK debug. Route: CI.
-- T10 (S8/S9) — ADR actualizado + informe con limitaciones y protocolo de validación física. Route: inline.
+- T1 (S1) — Fase A: verificación técnica con evidencias y presentación de la decisión; STOP hasta aprobación. Route: inline. **HECHO** (L2; aprobación L3).
+- T2 (S2) — Fase B: módulo nativo FFmpeg LGPL (subconjunto mpeg2video/mpeg4/h263) con CMake + NDK en CI; JNI propio. Route: inline/escritura + build CI. **HECHO** (commit `c672ffe`; configure con sysroot corregido en `4149dcd`, CI pendiente).
+- T3 (S2) — Fase B: decoder propio implementando `androidx.media3.decoder.Decoder`. Route: inline. **HECHO** (`c672ffe`; firmas Media3 corregidas en `6328933`, compilación verificada en CI jvm-tests).
+- T4 (S2) — Fase B: `RendererVideoSoftware extends DecoderVideoRenderer` + RenderersFactory hardware primero + integración con selector E7-T11. Route: inline. **HECHO** (`c672ffe` + `6328933`).
+- T5 (S2) — Fase B: Surface, liberación de recursos, cambios de canal; sin duplicados ni fugas. Route: inline + CI. **HECHO** (`c672ffe`; doble liberar instrumentado en `97b6290`; CI pendiente).
+- T6 (S3) — Fase C: matriz MPEG-2 → MPEG-4 Part 2 → H.263 → H.264 (regresión) → HEVC (evaluación). Route: inline + CI + física. **CI en curso** (`97b6290`); HEVC = evaluación documentada; física pendiente (S9).
+- T7 (S4) — Fase D: diagnóstico ampliado (init ms, error de decodificación). Route: inline. **HECHO** (`6328933`; runtime-only, Room v4 intacta).
+- T8 (S5) — Fase E: medición CPU/memoria/temperatura/init/frames perdidos/estabilidad; sin bloqueo del hilo principal. Route: inline. **PARCIAL**: init ms y frames medibles en EstadoSesion/diagnóstico; CPU/temperatura requieren tooling externo no disponible — documentado en el informe (T10).
+- T9 (S6) — Fase F: CI con NDK, pruebas, licencias, APK debug. Route: CI. **EN CURSO**: paso FFmpeg + instrumentadas en CI; `THIRD_PARTY_NOTICES.md` y guard GPL/nonfree listos (`4149dcd`); CI pendiente.
+- T10 (S8/S9) — ADR actualizado + informe con limitaciones y protocolo de validación física. Route: inline. **PARCIAL**: ADR-0008 y docs/compatibilidad-video.md actualizados (`4149dcd`); informe final tras CI verde.
 
 ## Log
 
@@ -74,3 +74,5 @@ Trabaja por entregas verificables. No cierres la tarea declarando soporte MPEG-2
   6. Licencias: libavcodec con decoders `mpeg2video`, `mpeg4`, `h263` (y `h264` solo si se necesitara; no se necesita: H.264 va por hardware) compila sin `--enable-gpl` ni `--enable-nonfree` → binario LGPL-2.1+; se enlaza como librería compartida separada (`libavcodec.so` etc.) con scripts de build publicados en el repo (cumple LGPL). Código Java/Kotlin propio: Apache-2.0 (licencia del proyecto, sin cambios).
   7. Decisión documentada en ADR-0008 ruta C como principal; ruta D (libmpeg2 AOSP Apache-2.0, solo MPEG-2) como fallback mínimo.
 - L3 (2026-11-16): AUTORIZACIÓN RUTA C del usuario (verbatim): FFmpeg LGPL subconjunto, JNI propio, renderer propio sobre API pública Media3 1.5.0, media3-decoder:1.5.0, ABIs arm64/arm32/x86_64, MPEG-2/MPEG-4 Part 2/H.263 iniciales, hardware primero. Ejecución continua sin parar entre fases; commits de trabajo en la rama actual; límites: sin GPL/nonfree, sin merge, sin git destructivo, sin cambiar licencia, sin declarar soporte no verificado. MPEG-2 solo se declara soportado con: init real, JNI packets, frames recibidos, YUV correcto, imagen real en Surface, audio sincronizado, sin bloqueo del hilo principal, liberación correcta, reproducción estable. Control de licencias obligatorio antes de distribuir APK (verificar config LGPL efectiva, sin GPL/nonfree, avisos y materiales LGPL, scripts documentados).
+- L4 (2026-11-17): Fases C y F avanzadas. Fixtures generados con FFmpeg de Termux (mpeg2.ts 262 KB mpeg2video+mp2; mpeg4.mp4 79 KB mpeg4+aac; h263.3gp 78 KB h263+aac; H.264 de regresión reutiliza f19_pistas.mp4). `ReproductorDecoderSoftwareTest` (4 tests end-to-end) y veredicto MPEG-2 con externo en `InventarioDecodificadoresTest` (commit `97b6290`). Regresión H.264: en emulador x86_64 el MediaCodec puede ser software (c2.*), así que la aserción correcta es «nunca ffmpeg:*», no «HARDWARE».
+- L5 (2026-11-17): Diagnóstico CI: el configure de FFmpeg fallaba en el runner porque el script pasaba `--sysroot=<ndk>/bin/sysroot` (inexistente; el sysroot real está fuera de `bin/`). Corregido + guard temprano + diagnóstico de `ffbuild/config.log` (commit `4149dcd`). Licencias: `THIRD_PARTY_NOTICES.md` creado, ADR-0008 actualizado a fase 2 ejecutada, docs/compatibilidad-video.md con estado software y validación física pendiente.

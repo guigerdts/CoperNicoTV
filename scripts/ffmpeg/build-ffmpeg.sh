@@ -96,7 +96,8 @@ build_abi() {
             ;;
         x86_64)
             arch="x86_64"
-            cpu="x86_64"
+            # clang valida CPUs x86 con guion: -march=x86-64 (x86_64 es inválido)
+            cpu="x86-64"
             cc="$TOOLCHAIN/x86_64-linux-android${API_LEVEL}-clang"
             ;;
         *)

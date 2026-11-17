@@ -76,4 +76,34 @@ class MigracionDiagnosticoTest {
             }
         }
     }
+
+    @Test
+    fun laMigracion3a4AnadeLasColumnasDelInventarioDeDecodersSinPerderDatos() {
+        val nombre = "prueba-migracion-diagnostico-v4.db"
+        helper.createDatabase(nombre, 3).use { v3 ->
+            v3.execSQL(
+                "INSERT INTO SesionDiagnostico (inicio, recuperacionesRed, recuperacionesImagen) " +
+                    "VALUES (900, 0, 0)",
+            )
+        }
+        helper.runMigrationsAndValidate(nombre, 4, true, Migraciones.MIGRACION_3_4).use { v4 ->
+            // La fila v3 sobrevive y las columnas nuevas aceptan valores.
+            v4.execSQL(
+                "UPDATE SesionDiagnostico SET decoderVideoSeleccionado = 'c2.exynos.h264.decoder', " +
+                    "tipoDecoderVideo = 'HARDWARE', motivoSoporteVideo = 'SOPORTADO', " +
+                    "perfilNivelVideo = 'perfil 0x64 nivel 0x28' WHERE inicio = 900",
+            )
+            v4.query(
+                "SELECT decoderVideoSeleccionado, tipoDecoderVideo, motivoSoporteVideo, perfilNivelVideo " +
+                    "FROM SesionDiagnostico WHERE inicio = 900",
+            ).use { cursor ->
+                assertEquals(1, cursor.count)
+                cursor.moveToFirst()
+                assertEquals("c2.exynos.h264.decoder", cursor.getString(0))
+                assertEquals("HARDWARE", cursor.getString(1))
+                assertEquals("SOPORTADO", cursor.getString(2))
+                assertEquals("perfil 0x64 nivel 0x28", cursor.getString(3))
+            }
+        }
+    }
 }

@@ -1,0 +1,44 @@
+# E7-T11 Fase 1 — Inventario y selección inteligente de decodificadores
+
+Objetivo: inventario dinámico de capacidades audiovisuales del dispositivo y política de selección de decodificadores, integrados con el diagnóstico existente (E7-T10) y persistidos en Room v4. Preparar la interfaz para decoders externos (fase 2) sin implementar decodificación software simulada. Caso que motiva: Telecaribe 2719 (video/mpeg2 detectado, pista no soportada, renderer inactivo, audio funcional); referencia sana Caracol 2704 (H.264 avc1.640028 1280x720, c2.exynos.h264.decoder).
+Branch: cascada sobre feat/e7-t9-compatibilidad (ec74154) · Delivery: ask-on-risk · Runner: ./gradlew :core:test local; :app tests/instrumentados/apk en CI (ADR-0005)
+
+## Specs
+
+- S1 (alcance autorizado, verbatim del usuario):
+  1. «Crear un servicio de inventario audiovisual basado en MediaCodecList y MediaCodecInfo.»
+  2. «Detectar decodificadores hardware y software.»
+  3. «Evaluar MIME, codec string, perfil, nivel y resolución.»
+  4. «Implementar una política de selección que priorice hardware compatible y después software disponible.»
+  5. «Distinguir decoder inexistente, formato no soportado, perfil incompatible, resolución fuera de límites y fallo de inicialización.»
+  6. «Integrar la información con ObservadorAudiovisual y los diagnósticos existentes.»
+  7. «Implementar migración Room v3→v4 y sus pruebas.»
+  8. «Preparar una interfaz de integración para futuros decodificadores externos.»
+  9. «Añadir pruebas unitarias e instrumentadas.»
+  10. «Mantener compatibilidad con Media3 1.5.0.»
+- S2 (matriz inicial, verbatim): «Evaluar: MPEG-2, MPEG-4 Part 2, H.263, H.264/AVC, H.265/HEVC, VP8, VP9, AV1, VC-1.» «No declarar soporte por MIME solamente. Consultar las capacidades reales del dispositivo.»
+- S3 (restricciones, verbatim): «No incorporar org.jellyfin.media3:media3-ffmpeg-decoder. No introducir dependencias GPL. No incorporar NDK todavía. No modificar la licencia del proyecto. No simular decodificación software. No alterar T3/T4 ni la clasificación VIDEO_NO_ELEGIBLE. No perjudicar la reproducción H.264 actual. No modificar innecesariamente la arquitectura Media3. No hacer merge.»
+- S4 (ADR, verbatim): «Documentar una ADR que compare las alternativas de decoder MPEG-2 bajo LGPL, incluyendo viabilidad técnica, licencia, mantenimiento, ABI, tamaño, rendimiento y coste de CI. Dejar preparada una propuesta de segunda fase para incorporar decodificación software real, sin implementarla todavía.»
+- S5 (entrega, verbatim): «Implementación completa de esta fase. Migración Room v4. Pruebas unitarias e instrumentadas. ADR de decodificación. Documentación de la matriz de compatibilidad. CI completo. APK debug.»
+- S6 (diagnóstico, de E7-T11 prompt): diferenciar claramente «Pista inexistente. Pista deshabilitada. Códec no soportado. Decoder disponible pero fallido. Error de inicialización. Error de renderizado. Fallo de Surface.» — en esta fase se instrumenta la clasificación de disponibilidad/selección (fallo de inicialización real queda para la fase con decoder externo; se declara honestamente).
+- S7 (criterios de aceptación heredados): Caracol 2704 conserva H.264; hardware preferido; diagnóstico explica exactamente por qué si no es viable; sin bucles de recuperación; sin audio duplicado; CI 5/5; limitaciones de validación física documentadas.
+
+## Tasks
+
+- T1 (S2/S3/S5) — Política de selección y modelo en `:core` (puro, JVM-testeable): parseo de codec string a perfil/nivel, `DecoderVideo` (datos), política hardware→software→externo→incompatible con motivos. **Hecho** (12 pruebas en `DecodersVideoTest`, RED→GREEN, commit `6538b1a`).
+- T2 (S1/S2/S6) — Servicio Android `InventarioDecodificadores` (MediaCodecList/REGULAR_CODECS → `DecoderVideo`), detección hardware/software con guard API 29, consulta por formato con perfil/nivel/resolución vía CodecCapabilities/VideoCapabilities; punto de integración para decoders externos (`DecoderVideoExterno` inyectado, vacío en fase 1). **Hecho** (commit T2; pruebas JVM con fuente inyectada, conversión MediaCodecInfo cubierta por instrumentadas).
+- T3 (S1/S6) — Integración: `SesionMedia3.publicarEstado` consulta la selección para el formato de video detectado (T7) vía `SelectorVideoSesion` (memoización por formato) y publica `decoderVideoSeleccionado`/`tipoDecoderVideo`/`motivoSoporteVideo`/`perfilNivelVideo`; panel de diagnóstico +4 líneas; aserciones JVM en DiagnosticoReproductorTest. **Hecho** (commit T3; batería local verde; compilación de :app en CI por límite AAPT2).
+- T4 (S5) — Persistencia v4: +4 columnas TEXT en `SesionDiagnosticoEntity`, `MIGRACION_3_4` (ALTER TABLE ADD COLUMN ×4), AppDatabase v4, contratos JVM v4, test de migración 3→4 con fila v3 sobreviviente. **Hecho** (commit T4; contratos v4 actualizados; validación completa en CI).
+- T5 (S9) — Pruebas instrumentadas: `InventarioDecodificadoresTest` (inventario no vacío y consistente, h264 garantizado en emulador, veredicto MPEG-2 consistente con el dispositivo, end-to-end sobre fixture H.264 con motivo soportado); registro en ci.yml (móvil). **Hecho** (CI verde en run 43970243422).
+- T6 (S4/S5) — ADR-0008 (comparación LGPL: extensión FFmpeg oficial solo audio descartada para video / AAR Jellyfin GPL-3 descartada por restricción / FFmpeg LGPL auto-build + port del renderer / libmpeg2 Apache-2.0 de AOSP + decoder propio) + matriz de compatibilidad documentada + propuesta de fase 2 sin implementarla. **Hecho** (`docs/adr/0008-decodificacion-video-ampliada.md`, `docs/compatibilidad-video.md`).
+- T7 (S5) — CI completo + APK debug + cierre. **Hecho** (run 43970243422 SUCCESS 5/5 en commit `a7b7807`; APK `copernicotv-debug-apk` ≈15,9 MB publicado como artifact).
+
+## Log
+
+- L1 (2026-11-16): solicitud Fase 1 del usuario, verbatim en S1–S5. Decisión previa de sesión: la ruta GPL-3 (AAR Jellyfin con FfmpegVideoRenderer real, MPEG-2/MPEG-4/H.263/H.264/HEVC compilados en nativo, 2.9 MB, 4 ABIs, compatible con media3 1.5.0) fue presentada y el usuario eligió la opción 3 (sin GPL, sin NDK). La investigación quedó documentada y alimenta la ADR.
+- L2 (2026-11-16, T1): política en `:core` con datos puros. Parseo codec string honesto: solo `avc1`/`avc3` → profile_idc/nivel; HEVC, H.263, MPEG-4 y strings ausentes quedan desconocidos (no se finge rechazo). La matriz de MIME del veredicto se construye desde el DISPOSITIVO (MediaCodecList), nunca hardcodeada.
+- L3 (2026-11-16, T2–T3): la conversión `MediaCodecInfo → DecoderVideo` requiere framework (no JVM): cubierta por instrumentadas; la consulta JVM usa fuente inyectada. `SesionMedia3` no creció (constructor en 12 parámetros): la memoización por formato vive en `SelectorVideoSesion`. ReproductorViewModel intacto (30/30 detekt).
+- L4 (2026-11-16, T4): migración 3→4 con fila v3 sobreviviente; contratos v4 (28 tablas, versión 4); `2.json`/`3.json`/`4.json` generados por ksp en CI; `conEvidenciaAudiovisual` quedó en detekt tras extraer `conVeredictoDecoders`.
+- L5 (2026-11-16, CI 3 corridas): lecciones de revisión CI. (a) `conVeredictoDecoders` quedó duplicado por una edición no casada — solo CI lo detecta (L9). (b) Los tests JVM de `:app` usan **JUnit 4** (`org.junit.Test`), no `org.junit.jupiter`. (c) El end-to-end de instrumentadas publicó la selección en BUFFERING: el predicado debe exigir REPRODUCIENDO + selección juntas.
+- L6 (2026-11-16, T7): causa raíz del rechazo espurio de perfiles: **las constantes `MediaCodecInfo.CodecProfileLevel` no son los `profile_idc` del RFC 6381** (AVCProfileHigh = 8, el string `avc1.640028` declara 100). La política traduce con `perfilAvcDePerfilIdc` (66→1, 77→2, 88→4, 100→8, 110→16, 122→32, 244→64); perfiles sin constante quedan desconocidos. Corregido en commit `a7b7807`.
+- L7 (2026-11-16, T7): CI 5/5 en run 43970243422 (commit `a7b7807`): jvm-tests (contratos v4, JUnit4), static-analysis, apk (`copernicotv-debug-apk` ≈15,9 MB), instrumented-mobile (InventarioDecodificadoresTest incluido), instrumented-tv. Pendiente de validación física: diagnóstico de Telecaribe 2719 debe mostrar «Decoder video seleccionado: no disponible» con motivo `MIME_NO_SOPORTADO` y «Pista video soportada: no»; la imagen real queda para la fase 2 (requiere decoder software bajo LGPL — ADR-0008).

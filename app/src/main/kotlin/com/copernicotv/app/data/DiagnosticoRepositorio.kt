@@ -309,6 +309,16 @@ class DiagnosticoRepositorio
                 pistasAudioTexto = resumenPistas(pistas.audio, desactivados = false) ?: pistasAudioTexto,
                 pistasSubtituloTexto =
                     resumenPistas(pistas.subtitulos, pistas.subtitulosDesactivados) ?: pistasSubtituloTexto,
+            ).conVeredictoDecoders(estado)
+
+        /** E7-T11: el veredicto del inventario viaja como texto del enum; nulo sin pista. */
+        private fun SesionDiagnosticoEntity.conVeredictoDecoders(estado: EstadoSesion): SesionDiagnosticoEntity =
+            copy(
+                decoderVideoSeleccionado =
+                    estado.decoderVideoSeleccionado ?: decoderVideoSeleccionado,
+                tipoDecoderVideo = estado.tipoDecoderVideo?.name ?: tipoDecoderVideo,
+                motivoSoporteVideo = estado.motivoSoporteVideo?.name ?: motivoSoporteVideo,
+                perfilNivelVideo = estado.perfilNivelVideo ?: perfilNivelVideo,
             )
 
         private fun Long?.positivo(anterior: Long?): Long? = this?.takeIf { it > 0L } ?: anterior

@@ -101,6 +101,14 @@ data class SesionDiagnosticoEntity(
     val pistaVideoDetectadaCodec: String? = null,
     /** Algún `Tracks.Group` de video con pista soportada por el dispositivo (T7). */
     val pistaVideoSoportada: Boolean? = null,
+    /** Decoder de video seleccionado por la política del inventario (E7-T11). */
+    val decoderVideoSeleccionado: String? = null,
+    /** Tipo del decoder seleccionado (HARDWARE/SOFTWARE) o vacío (E7-T11). */
+    val tipoDecoderVideo: String? = null,
+    /** Motivo del veredicto de soporte de la pista de video (E7-T11). */
+    val motivoSoporteVideo: String? = null,
+    /** Perfil/nivel parseado del codec string de la pista (E7-T11). */
+    val perfilNivelVideo: String? = null,
     /** Resumen de pistas de audio detectadas y seleccionada, saneado y acotado. */
     val pistasAudioTexto: String? = null,
     /** Resumen de subtítulos detectados y seleccionado, saneado y acotado. */

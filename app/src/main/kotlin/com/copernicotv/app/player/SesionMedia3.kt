@@ -92,6 +92,13 @@ class SesionMedia3(
     /** Sonda acotada de contenedor (E7-T9): observación solo tras fallo real. */
     private val sonda = SondaContenedor(cabeceras = mapOf("User-Agent" to AGENTE_REPRODUCCION))
 
+    /**
+     * Selección de decoder por formato memoizada (E7-T11, T3): el inventario
+     * del dispositivo no cambia en runtime, así que la misma declaración de
+     * formato siempre produce el mismo veredicto.
+     */
+    private val selectorVideo = SelectorVideoSesion()
+
     /** Motor de reproducción; la interfaz solo lo conecta a su superficie. */
     val reproductor: ExoPlayer =
         ExoPlayer.Builder(contexto)
@@ -528,6 +535,7 @@ class SesionMedia3(
         val observacion = observadorAudiovisual.observacion()
         val pistaVideo = observacion.pistaVideo
         val pistaAudio = observacion.pistaAudio
+        val seleccion = selectorVideo.seleccion(observacion.formatoVideoDetectado)
         _estado.value =
             EstadoSesion(
                 estado = fasePublicada,
@@ -565,6 +573,12 @@ class SesionMedia3(
                 pistaVideoDetectadaMime = observacion.formatoVideoDetectado?.mime,
                 pistaVideoDetectadaCodec = observacion.formatoVideoDetectado?.codec,
                 pistaVideoSoportada = observacion.pistaVideoSoportada,
+                // E7-T11: selección de decoder consultada sobre el inventario
+                // real del dispositivo; los cuatro campos viajan juntos.
+                decoderVideoSeleccionado = seleccion?.decoder,
+                tipoDecoderVideo = seleccion?.tipo,
+                motivoSoporteVideo = seleccion?.motivo,
+                perfilNivelVideo = selectorVideo.perfilNivelTexto(observacion.formatoVideoDetectado?.codec),
             )
         gestionarEstabilidad(fasePublicada, observacion)
         escaleraImagen.gestionar(faseBaseDe(fasePublicada))

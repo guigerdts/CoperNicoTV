@@ -23,8 +23,6 @@ import com.copernicotv.core.identity.EtapaImportacion
 import com.copernicotv.core.identity.ResultadoCanonizacion
 import com.copernicotv.core.m3u.CanalImportadoM3U
 import com.copernicotv.core.m3u.ImportadorM3U
-import com.copernicotv.core.m3u.LecturaM3U
-import com.copernicotv.core.m3u.LimitesParserM3U
 import com.copernicotv.core.m3u.ResultadoImportacionM3U
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -36,11 +34,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.io.InputStream
-import java.net.ConnectException
-import java.net.HttpURLConnection
-import java.net.SocketTimeoutException
-import java.net.URL
-import java.net.UnknownHostException
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -85,6 +78,9 @@ class CatalogoRepositorio
         private val verificaCleartext: VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida),
     ) {
         private val io = Dispatchers.IO
+
+        /** Descarga HTTP extraída de esta clase (ronda 9): detekt LargeClass. */
+        private val descargaHttp = DescargaListaHttp(tiempos, verificaCleartext)
 
         fun canalesDeLista(listaId: Long): Flow<List<String?>> = db.aparienciaDao().nombresDeLista(listaId)
 
@@ -193,7 +189,7 @@ class CatalogoRepositorio
                     }
                 val activo = { contexto.ensureActive() }
                 try {
-                    when (val descarga = descargar(canonica.urlCanonica, faseVerificada, avance, activo)) {
+                    when (val descarga = descargaHttp.descargar(canonica.urlCanonica, faseVerificada, avance, activo)) {
                         is Descarga.Ok -> {
                             faseVerificada(FaseImportacion.PROCESANDO)
                             val inicioProceso = System.currentTimeMillis()
@@ -428,7 +424,7 @@ class CatalogoRepositorio
                 }
             emisorCompletada.emitir(
                 elementos = persistida.canales,
-                canalesValidos = importado.canales.count { it.claveDerivable },
+                canalesValidos = persistida.canalesValidos,
             )
             val final =
                 diagnostico.conEtapa(avance?.ultimaEtapa()).copy(
@@ -447,6 +443,10 @@ class CatalogoRepositorio
                     tiempoProteccionClaveMs = persistida.metricas?.tiempoProteccionClaveMs,
                     tiempoDesproteccionClaveMs = persistida.metricas?.tiempoDesproteccionClaveMs,
                     operacionesKeystore = persistida.metricas?.operacionesKeystore,
+                    tiempoPreparacionMs = persistida.metricas?.tiempoPreparacionMs,
+                    tiempoGruposMs = persistida.metricas?.tiempoGruposMs,
+                    tiempoAparienciasMs = persistida.metricas?.tiempoAparienciasMs,
+                    filasApariencias = persistida.metricas?.filasApariencias,
                 )
             logDiagnostico(final, RESULTADO_COMPLETADA)
             return ResumenImportacion(
@@ -461,103 +461,6 @@ class CatalogoRepositorio
 
         private fun canonicalizar(ubicacion: String): ResultadoCanonizacion.Ok? =
             CanonicalizadorUrl.canonizar(ubicacion, CampoUrl.LISTA_UBICACION) as? ResultadoCanonizacion.Ok
-
-        /**
-         * Descarga y parsea en streaming la Lista de [url].
-         *
-         * Reporta la fase CONECTANDO hasta obtener respuesta y DESCARGANDO
-         * mientras fluye el cuerpo: el parseo consume el flujo en caliente, así
-         * que la lectura de red domina esa fase. El diagnóstico recoge código
-         * HTTP, tipo de contenido, bytes y tiempos, sin datos de la lista.
-         *
-         * E7-T7: la lectura no retiene las entradas del parser; cada una se
-         * convierte a declaración de identidad al completarse y el avance se
-         * publica por entrada (S21/S22). El chequeo de detención NO corre en
-         * los ticks de entrada: en red lenta pero viva el que manda es el
-         * timeout de lectura, y abortar antes sería descartar servidores
-         * legítimamente lentos.
-         */
-        private fun descargar(
-            url: String,
-            alFase: (FaseImportacion) -> Unit,
-            avance: AvanceImportacion,
-            activo: () -> Unit,
-        ): Descarga {
-            if (url.startsWith("http://", ignoreCase = true) && !verificaCleartext.permitido(URL(url).host)) {
-                return Descarga.Fallo(ERROR_BLOQUEO_HTTP, DiagnosticoImportacion(motivo = ERROR_BLOQUEO_HTTP))
-            }
-            val inicioDescarga = System.currentTimeMillis()
-            alFase(FaseImportacion.CONECTANDO)
-            val conexion =
-                URL(url).openConnection() as? HttpURLConnection
-                    ?: return Descarga.Fallo(ERROR_SIN_CONEXION, DiagnosticoImportacion(motivo = ERROR_SIN_CONEXION))
-            conexion.connectTimeout = tiempos.conexionMs
-            conexion.readTimeout = tiempos.lecturaMs
-            conexion.requestMethod = "GET"
-            return try {
-                when (val codigo = conexion.responseCode) {
-                    in 200..299 -> {
-                        alFase(FaseImportacion.DESCARGANDO)
-                        val tipoContenido = conexion.contentType
-                        conexion.inputStream.use { entrada ->
-                            val contada = InputStreamContado(entrada)
-                            avance.bytesProveedor = { contada.contados }
-                            val lectura =
-                                ImportadorM3U.leerDeclaraciones(
-                                    contada,
-                                    LimitesParserM3U(),
-                                ) { total ->
-                                    activo()
-                                    avance.ticEntrada(total)
-                                }
-                            Descarga.Ok(
-                                lectura,
-                                DiagnosticoImportacion(
-                                    codigoHttp = codigo,
-                                    tipoContenido = tipoContenido,
-                                    bytesDescargados = contada.contados,
-                                    tiempoDescargaMs = System.currentTimeMillis() - inicioDescarga,
-                                ),
-                            )
-                        }
-                    }
-                    in 400..499 ->
-                        Descarga.Fallo(
-                            ERROR_HTTP_4XX,
-                            DiagnosticoImportacion(codigoHttp = codigo, motivo = ERROR_HTTP_4XX),
-                        )
-                    in 500..599 ->
-                        Descarga.Fallo(
-                            ERROR_HTTP_5XX,
-                            DiagnosticoImportacion(codigoHttp = codigo, motivo = ERROR_HTTP_5XX),
-                        )
-                    else ->
-                        Descarga.Fallo(
-                            ERROR_SIN_CONEXION,
-                            DiagnosticoImportacion(codigoHttp = codigo, motivo = ERROR_SIN_CONEXION),
-                        )
-                }
-            } catch (error: SocketTimeoutException) {
-                Descarga.Fallo(
-                    ERROR_TIMEOUT,
-                    DiagnosticoImportacion(
-                        tiempoDescargaMs = System.currentTimeMillis() - inicioDescarga,
-                        motivo = ERROR_TIMEOUT,
-                    ),
-                )
-            } catch (error: UnknownHostException) {
-                Descarga.Fallo(ERROR_DNS, DiagnosticoImportacion(motivo = ERROR_DNS))
-            } catch (error: ConnectException) {
-                Descarga.Fallo(
-                    ERROR_CONEXION_RECHAZADA,
-                    DiagnosticoImportacion(motivo = ERROR_CONEXION_RECHAZADA),
-                )
-            } catch (error: IOException) {
-                Descarga.Fallo(ERROR_SIN_CONEXION, DiagnosticoImportacion(motivo = ERROR_SIN_CONEXION))
-            } finally {
-                conexion.disconnect()
-            }
-        }
 
         /** Registro de diagnóstico en Logcat, acotado y sin datos sensibles. */
         private fun logDiagnostico(
@@ -678,8 +581,13 @@ class CatalogoRepositorio
                 )
             val canalesValidos = canales.count { it.claveDerivable }
             val emisorCanales = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_CANALES, opsTotales)
+            // Desglose ronda 9 (S2): la preparación de entidades (cifrado por
+            // canal incluido) corre dentro de la transacción y su tiempo debe
+            // ser visible para cerrar la brecha guardado - inserción.
+            val inicioPreparacion = System.nanoTime()
             val entidades =
                 prepararEntidadesCanales(clavesDatos.clave(), canales, fuenteId, ahora, avance, contadorCifrado)
+            val tiempoPreparacionMs = (System.nanoTime() - inicioPreparacion) / NANOS_POR_MS
             val idsCanales = ArrayList<Long>(entidades.size)
             entidades.chunked(LOTE_INSERTAR).forEach { lote ->
                 val inicioLote = System.nanoTime()
@@ -690,10 +598,14 @@ class CatalogoRepositorio
                 emisorCanales.emitir(elementos = idsCanales.size, canalesValidos = canalesValidos)
             }
             val emisorGrupos = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_GRUPOS, opsTotales)
+            val inicioGrupos = System.nanoTime()
             val grupoIdPorNombre = prepararGrupos(canales, idLista)
+            val tiempoGruposMs = (System.nanoTime() - inicioGrupos) / NANOS_POR_MS
             emisorGrupos.emitir(elementos = grupoIdPorNombre.size, canalesValidos = canalesValidos)
             val emisorApariencias = EmisorEtapaPersistencia(alEtapa, EtapaImportacion.PERSISTENCIA_APARIENCIAS, opsTotales)
+            val inicioApariencias = System.nanoTime()
             val filasApariencias = prepararApariencias(canales, idLista, idsCanales, grupoIdPorNombre, ahora, avance)
+            val tiempoAparienciasMs = (System.nanoTime() - inicioApariencias) / NANOS_POR_MS
             var filasInsertadas = 0
             filasApariencias.chunked(LOTE_INSERTAR).forEach { lote ->
                 val inicioLote = System.nanoTime()
@@ -708,6 +620,7 @@ class CatalogoRepositorio
             return ListaPersistida(
                 idLista,
                 canales.size,
+                canalesValidos,
                 MetricasPersistencia(
                     tiempoCifradoMs = contadorCifrado.ms(),
                     operacionesAes = contadorCifrado.total(),
@@ -717,10 +630,14 @@ class CatalogoRepositorio
                     sobre0x01 = contadorCifrado.sobre0x01(),
                     sobre0x02 = contadorCifrado.sobre0x02(),
                     tiempoDescifradoMs = contadorCifrado.msDescifrado(),
-                    tiempoGeneracionClaveMs = clavesDatos.metricas.msGeneracion.sum(),
-                    tiempoProteccionClaveMs = clavesDatos.metricas.msProteccion.sum(),
-                    tiempoDesproteccionClaveMs = clavesDatos.metricas.msDesproteccion.sum(),
+                    tiempoGeneracionClaveMs = clavesDatos.metricas.msGeneracion(),
+                    tiempoProteccionClaveMs = clavesDatos.metricas.msProteccion(),
+                    tiempoDesproteccionClaveMs = clavesDatos.metricas.msDesproteccion(),
                     operacionesKeystore = clavesDatos.metricas.operacionesKeystore.get(),
+                    tiempoPreparacionMs = tiempoPreparacionMs,
+                    tiempoGruposMs = tiempoGruposMs,
+                    tiempoAparienciasMs = tiempoAparienciasMs,
+                    filasApariencias = filasApariencias.size,
                 ),
             )
         }
@@ -780,49 +697,6 @@ class CatalogoRepositorio
             return filas
         }
 
-        /** Lista persistida, cantidad de Canales y métricas de la escritura (S50). */
-        private data class ListaPersistida(
-            val id: Long,
-            val canales: Int,
-            val metricas: MetricasPersistencia? = null,
-        )
-
-        /**
-         * Tiempos independientes de la escritura del catálogo (E7-T7 ronda 7,
-         * S50): cifrado AES y inserción Room medidos por separado, sin
-         * atribuirse mutuamente.
-         */
-        data class MetricasPersistencia(
-            val tiempoCifradoMs: Long,
-            val operacionesAes: Int,
-            val tiempoInsercionMs: Long,
-            val lotes: Int,
-            val transacciones: Int,
-            /** Sobres escritos por versión (S5): `0x01` raíz / `0x02` clave de datos. */
-            val sobre0x01: Int,
-            val sobre0x02: Int,
-            /** Tiempo de descifrado AES, separado del cifrado (S5). */
-            val tiempoDescifradoMs: Long,
-            /** Ciclo de vida de la clave de datos, separado de Room (S5). */
-            val tiempoGeneracionClaveMs: Long,
-            val tiempoProteccionClaveMs: Long,
-            val tiempoDesproteccionClaveMs: Long,
-            val operacionesKeystore: Int,
-        )
-
-        /** Resultado interno de una descarga HTTP. */
-        private sealed interface Descarga {
-            data class Ok(
-                val lectura: LecturaM3U,
-                val diagnostico: DiagnosticoImportacion,
-            ) : Descarga
-
-            data class Fallo(
-                val codigo: String,
-                val diagnostico: DiagnosticoImportacion?,
-            ) : Descarga
-        }
-
         private companion object {
             const val NANOS_POR_MS = 1_000_000L
             const val FIXTURE = "fixture-canario.m3u"
@@ -840,13 +714,6 @@ class CatalogoRepositorio
             const val ERROR_PERMISO_SAF = "permiso_saf_no_persistido"
             const val ERROR_INDICE_HMAC_NO_OPERATIVO = "indice_hmac_no_operativo"
             const val ERROR_ARCHIVO_INACCESIBLE = "archivo_inaccesible"
-            const val ERROR_SIN_CONEXION = "sin_conexion"
-            const val ERROR_TIMEOUT = "timeout"
-            const val ERROR_HTTP_4XX = "http_4xx"
-            const val ERROR_DNS = "dns_no_resuelto"
-            const val ERROR_CONEXION_RECHAZADA = "conexion_rechazada"
-            const val ERROR_BLOQUEO_HTTP = "bloqueo_http"
-            const val ERROR_HTTP_5XX = "http_5xx"
             const val ERROR_SIN_CANALES = "sin_canales"
             const val ERROR_AVANCE_DETENIDO = "avance_detenido"
 

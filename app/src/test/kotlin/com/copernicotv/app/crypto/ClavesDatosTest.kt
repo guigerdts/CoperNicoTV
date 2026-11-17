@@ -62,8 +62,8 @@ class ClavesDatosTest {
 
         servicio.clave()
         assertEquals("generar+envolver es UNA op", 1, servicio.metricas.operacionesKeystore.get())
-        assertTrue(servicio.metricas.msGeneracion.sum() >= 0)
-        assertTrue(servicio.metricas.msProteccion.sum() >= 0)
+        assertTrue(servicio.metricas.msGeneracion() >= 0)
+        assertTrue(servicio.metricas.msProteccion() >= 0)
 
         // Reinicio del proceso: nueva instancia del servicio, mismo almacen y raíz.
         val reinicio = ClavesDatos(RaizConfigurable(raiz), almacen)
@@ -122,5 +122,36 @@ class ClavesDatosTest {
                 "esperaba Ok en la reenvuelta"
             }
         assertArrayEquals(nuevaClave.encoded, reenvuelta.bytes)
+    }
+
+    @Test
+    fun `la conversion de nanosegundos a milisegundos es la del informe`() {
+        // Ronda 9 (S1): la unidad exacta del acceso en ms, probada con valores
+        // deterministas; 999_999 ns todavía no es un milisegundo completo.
+        assertEquals(5L, nanosAMs(5_000_000L))
+        assertEquals(11L, nanosAMs(11_263_039L))
+        assertEquals(0L, nanosAMs(999_999L))
+    }
+
+    @Test
+    fun `las metricas del ciclo de la clave se reportan en escala de ms`() {
+        // Ronda 9 (S1): el bug físico reportó tiempo_proteccion_clave_ms=
+        // 11263039 (nanosegundos etiquetados como ms, ≈3,1 horas imposibles).
+        // Un ciclo real de generar+envolver tarda mucho menos de un minuto:
+        // si la unidad se rompe de nuevo, este techo lo detecta.
+        val almacen = AlmacenClaveDatosEnMemoria()
+        val servicio = ClavesDatos(RaizConfigurable(ClavesEnMemoria().claveAes), almacen)
+        servicio.clave()
+
+        assertEquals(
+            "el acceso en ms es la conversion del acumulador en ns",
+            servicio.metricas.nanosGeneracion.sum() / NANOS_POR_MS_CLAVE,
+            servicio.metricas.msGeneracion(),
+        )
+        assertEquals(
+            servicio.metricas.nanosProteccion.sum() / NANOS_POR_MS_CLAVE,
+            servicio.metricas.msProteccion(),
+        )
+        assertTrue("proteccion en ms, no en ns", servicio.metricas.msProteccion() < 60_000)
     }
 }

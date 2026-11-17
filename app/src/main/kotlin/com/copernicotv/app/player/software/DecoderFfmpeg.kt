@@ -168,6 +168,15 @@ class DecoderFfmpeg(private val codecName: String) :
     private companion object {
         const val NUM_BUFFERS = 4
 
+        init {
+            // La librería nativa se carga una vez por proceso, al primer uso
+            // del decoder. El `.so` va en el APK para cada `abiFilters`
+            // (arm64-v8a, armeabi-v7a, x86_64), de modo que cargarlo aquí es
+            // seguro; si faltara, la construcción del decoder falla con
+            // UnsatisfiedLinkError y Media3 degrada a error de pista.
+            System.loadLibrary("decoder_software")
+        }
+
         @Suppress("UNCHECKED_CAST")
         fun buffersEntrada(cantidad: Int): Array<DecoderInputBuffer> =
             arrayOfNulls<DecoderInputBuffer>(cantidad) as Array<DecoderInputBuffer>

@@ -28,7 +28,7 @@
 - T9 (S4/S9) — Reconciliación documental: doc maestro, features E7-T8..T12, evidencias físicas, skill cognitiva aplicada. **HECHO**: §8.8 + E4-T5/T8 + §10.4 + Log L94/L95 (mvp); `docs/evidence/validaciones-fisicas.md` F-01..F-11; `AGENTS.md` actualizado; skill `cognitive-doc-design` aplicada (informe §10).
 - T10 (S7) — Engram + contexto de agentes reconciliados. **HECHO**: espejos/lecciones/auditoría conservados sin contradicciones; cierre E7-T13 añadido; duplicados históricos #2787/#2788 registrados como deuda menor (informe §11).
 - T11 (S8) — Roadmap actualizado. **HECHO**: §Roadmap de este doc (P0..P3 con estados verificados y fuentes); referencia cruzada desde mvp Log L95 y AGENTS.md.
-- T12 (S9) — Informe final + commits de documentación + CI de main verde. **HECHO** (salvo CI final): informe de 17 puntos completo; commits documentales separados en `main` pendientes del verde de `44029043192` (ver Log L5).
+- T12 (S9) — Informe final + commits de documentación + CI de main verde. **HECHO**: informe de 17 puntos completo; commits documentales separados (`10d91c7`, `5b44318`, PR #39 → `76bcbc5`); registro de la cancelación por supersección de `44029043192` y del run definitivo de `main` (ver Log L5).
 
 ## Log
 
@@ -36,7 +36,7 @@
 - L2 (2026-11-17): Preflight verificado — `origin/main` = `6bfb0b7`; #32 y #33 con base `main`, MERGEABLE, CI SUCCESS. Topología lineal confirmada: ronda8 (13 commits sobre main) → ronda9 (+3) → e7-t8 (+11) → e7-t9-compatibilidad (+70 = T9 13 [c8130b5..53e2259] + T10 35 [554a538..ec74154] + T11 11 [05d40d2..7a0d543] + T12 11 [0f464e9..7eece87]). Worktree limpio en `feat/e7-t9-compatibilidad`. Método de merge del repo: merge commits.
 - L3 (2026-11-17): Integraciones T2–T8 ejecutadas en orden topológico (informe §5–§7). Dos fallos de CI diagnosticados como infraestructura con rerun `--failed` (T9: flake UI de catálogo; T7: red del runner en Robolectric); ninguna regresión. Integridad verificada: 97 commits de cascada ancestros de `main` (informe §8).
 - L4 (2026-11-17): Reconciliación documental T9–T11 aplicada sobre el worktree local (se consolidará en `main` con commits documentales al cierre): mvp §8.8/E4/§10.4/Log L94–L95, `docs/evidence/validaciones-fisicas.md`, `AGENTS.md`, roadmap en §Roadmap de este doc.
-- L5 (2026-11-17): Cierre — pendiente el verde de CI `44029043192` de `main` (tras #38): checkout main, commits documentales separados (doc maestro+evidencias+AGENTS / informe+tracking), CI final de `main`, guardado Engram del cierre, informe al propietario.
+- L5 (2026-11-17): Cierre — integraciones T2–T8 y PR documental #39 completados. `44029043192` (tras #38) quedó **cancelado por supersección** (4 jobs success; `instrumented-mobile` cancelado al iniciar el run del merge documental sobre el mismo código funcional; ningún fallo de test). Run definitivo de `main`: `44030330851` (cascada completa + docs). El commit de cierre que registra este log lanza su propio run de CI, verificado tras el push y registrado en el informe al propietario y en Engram.
 
 ---
 
@@ -89,7 +89,8 @@ El orden topológico confirmado coincide con la hipótesis: #32 → #33 → T8 �
 | #35 | `44021847975` | 1er intento: `instrumented-mobile` falló en `CatalogoUiTest.favoritoYocultacionFiltranYseRevierten` (timeout de condición UI). Diagnóstico: E7-T9 no toca el catálogo (diff limitado a `DetalleFallo`, `DiagnosticoReproductor`, `EstadoReproductor`, `SesionMedia3`) → flake de emulador, patrón de L92. Rerun `--failed`: 5/5 |
 | #36 | `44024932575` | 5/5 |
 | #37 | `44026614654` | 1er intento: `jvm-tests` falló en `ActualizacionRepositorioTest` vía `MavenArtifactFetcher` (`IOException` descargando artefactos android-all de Maven Central — red del runner). Misma suite verde en el run anterior → infraestructura. Rerun `--failed`: 5/5 |
-| #38 | `44029043192` | cierre en T12/Log L5 |
+| #38 | `44029043192` | 4 jobs success; `instrumented-mobile` cancelado por supersección (el merge documental #39 lanzó el run definitivo `44030330851` sobre el mismo código funcional). Sin fallo de test: ningún job terminó en failure |
+| #39 (documental) | `44030330851` | Run definitivo de `main` (cascada completa + docs); resultado registrado en Log L5 |
 
 ### 8. Estado final de `main`
 

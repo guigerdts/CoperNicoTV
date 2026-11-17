@@ -32,6 +32,13 @@ enum class EstadoReproductor {
  * `limiteRedirecciones`, `fuenteMedia` y `agenteUsuario`) también solo tienen
  * contenido en [EstadoReproductor.ERROR]: provienen de la [TrazadoraRed] de la
  * sesión y son evidencia segura para mostrar (esquemas, códigos y contadores).
+ *
+ * Los campos de formato de E7-T9 (`formatoEsperado`, `formatoObservado`,
+ * `formatoObservadoMime` y `reSeleccionMedia`) también solo tienen contenido
+ * en [EstadoReproductor.ERROR]: provienen de la sonda acotada de contenedor
+ * que observó la respuesta real tras el fallo (S3/S5). `reSeleccionMedia`
+ * contiene el MIME con que se re-seleccionó la fuente una sola vez (S4), o
+ * `null` cuando no hubo alternativa plausible.
  */
 data class EstadoSesion(
     val estado: EstadoReproductor = EstadoReproductor.CARGANDO,
@@ -58,6 +65,10 @@ data class EstadoSesion(
     val limiteRedirecciones: Boolean = false,
     val fuenteMedia: String? = null,
     val agenteUsuario: String? = null,
+    val formatoEsperado: String? = null,
+    val formatoObservado: String? = null,
+    val formatoObservadoMime: String? = null,
+    val reSeleccionMedia: String? = null,
 )
 
 /**

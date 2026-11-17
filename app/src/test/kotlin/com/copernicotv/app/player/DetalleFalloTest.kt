@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.exoplayer.source.UnrecognizedInputFormatException
 import com.copernicotv.core.player.ProtocoloStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -116,6 +117,21 @@ class DetalleFalloTest {
 
         assertEquals(null as Int?, detalle.estadoHttp)
         assertEquals("otro", clasificacionTecnica(detalle))
+    }
+
+    @Test
+    fun `un contenedor no reconocido se clasifica como tal (E7-T9)`() {
+        val causa =
+            UnrecognizedInputFormatException(
+                "ningun-extractor-reconoce-el-contenido",
+                Uri.parse("http://127.0.0.1:8080/f19/1"),
+            )
+        val error = PlaybackException(null, causa, PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED)
+        val detalle = capturarDetalleFallo(error)
+
+        assertEquals(null as Int?, detalle.estadoHttp)
+        assertEquals("contenedor_no_reconocido", clasificacionTecnica(detalle))
+        assertEquals("UnrecognizedInputFormatException", detalle.claseExcepcion)
     }
 
     @Test

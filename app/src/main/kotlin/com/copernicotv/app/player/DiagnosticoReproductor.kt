@@ -42,6 +42,10 @@ data class DiagnosticoReproductor(
     val limiteRedirecciones: Boolean = false,
     val fuenteMedia: String? = null,
     val agenteUsuario: String? = null,
+    val formatoEsperado: String? = null,
+    val formatoObservado: String? = null,
+    val formatoObservadoMime: String? = null,
+    val reSeleccionMedia: String? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -95,6 +99,10 @@ fun construirDiagnostico(
         limiteRedirecciones = estado.limiteRedirecciones,
         fuenteMedia = estado.fuenteMedia,
         agenteUsuario = estado.agenteUsuario,
+        formatoEsperado = estado.formatoEsperado,
+        formatoObservado = estado.formatoObservado,
+        formatoObservadoMime = estado.formatoObservadoMime,
+        reSeleccionMedia = estado.reSeleccionMedia,
     )
 
 /**
@@ -200,6 +208,9 @@ private fun lineasTrazadoRed(diagnostico: DiagnosticoReproductor): String =
         appendLine("Esquema inicial: ${diagnostico.esquemaInicial ?: SIN_DATO}")
         appendLine("Esquema final: ${diagnostico.esquemaFinal ?: SIN_DATO}")
         appendLine("MediaSource: ${diagnostico.fuenteMedia ?: SIN_DATO}")
+        appendLine("Formato esperado: ${diagnostico.formatoEsperado ?: SIN_DATO}")
+        appendLine("Formato observado: ${formatoObservadoTexto(diagnostico)}")
+        appendLine("Re-selección: ${diagnostico.reSeleccionMedia ?: SIN_DATO}")
         appendLine("User-Agent: ${diagnostico.agenteUsuario ?: SIN_DATO}")
         appendLine("Intentos: ${diagnostico.intentosFallo}")
         appendLine(
@@ -223,6 +234,13 @@ internal fun redireccionesTexto(
         )
     val numero = redirecciones.toString()
     return if (avisos.isEmpty()) numero else "$numero (${avisos.joinToString("; ")})"
+}
+
+/** Texto del formato observado por la sonda con su MIME declarado (E7-T9). */
+internal fun formatoObservadoTexto(diagnostico: DiagnosticoReproductor): String {
+    val observado = diagnostico.formatoObservado ?: return SIN_DATO
+    val mime = diagnostico.formatoObservadoMime ?: return observado
+    return "$observado (MIME $mime)"
 }
 
 private fun dividirHostPuerto(hostPuerto: String): Pair<String, String>? {

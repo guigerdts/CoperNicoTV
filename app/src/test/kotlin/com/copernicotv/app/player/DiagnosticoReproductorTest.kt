@@ -272,4 +272,48 @@ class DiagnosticoReproductorTest {
         assertEquals("2", redireccionesTexto(2, false, false))
         assertEquals("no disponible", redireccionesTexto(null, false, false))
     }
+
+    @Test
+    fun `el formato observado por la sonda se proyecta con su MIME (E7-T9)`() {
+        val diagnostico =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = "http://127.0.0.1:8080/live/1274",
+                estado =
+                    EstadoSesion(
+                        estado = EstadoReproductor.ERROR,
+                        formatoEsperado = "progresivo",
+                        formatoObservado = "HLS",
+                        formatoObservadoMime = "application/octet-stream",
+                        reSeleccionMedia = "application/vnd.apple.mpegurl",
+                    ),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(diagnostico)
+        assertTrue(texto.contains("Formato esperado: progresivo"))
+        assertTrue(texto.contains("Formato observado: HLS (MIME application/octet-stream)"))
+        assertTrue(texto.contains("Re-selección: application/vnd.apple.mpegurl"))
+    }
+
+    @Test
+    fun `sin sonda el formato observado queda no disponible`() {
+        val diagnostico =
+            construirDiagnostico(
+                protocolo = ProtocoloStream.PROGRESIVO,
+                url = null,
+                estado = EstadoSesion(estado = EstadoReproductor.ERROR),
+                pistas = EstadoPistas(),
+            )
+
+        val texto = textoDiagnostico(diagnostico)
+        assertTrue(texto.contains("Formato observado: no disponible"))
+        assertFalse(texto.contains("Formato observado: HLS"))
+    }
+
+    @Test
+    fun `el formato observado sin MIME se muestra solo con la etiqueta`() {
+        assertEquals("HTML", formatoObservadoTexto(DiagnosticoReproductor(formatoObservado = "HTML")))
+        assertEquals("no disponible", formatoObservadoTexto(DiagnosticoReproductor()))
+    }
 }

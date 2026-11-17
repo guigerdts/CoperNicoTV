@@ -91,6 +91,7 @@ internal fun clasificacionTecnica(detalle: DetalleFallo): String {
         }
     }
     if (detalle.clasesCausa.contains("InvalidContentTypeException")) return "formato_incompatible"
+    if (detalle.clasesCausa.contains("UnrecognizedInputFormatException")) return "contenedor_no_reconocido"
     return when (detalle.claseExcepcion) {
         "UnknownHostException" -> "dns"
         "ConnectException" -> "conexion"

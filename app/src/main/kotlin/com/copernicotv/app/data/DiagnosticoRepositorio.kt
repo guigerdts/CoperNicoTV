@@ -56,6 +56,16 @@ class DiagnosticoRepositorio
         private var estadoPrevio: EstadoSesion? = null
         private var ultimoEvento: Pair<String?, String?>? = null
 
+        /**
+         * Recuperación de red pendiente (E7-T10): fase de espera observada y
+         * reintento vigente en ese momento. Sobrevive a los estados intermedios
+         * CARGANDO/BUFFERING que la recuperación publica antes de volver a
+         * REPRODUCIENDO, y se consume al registrar el evento para evitar dobles
+         * conteos. Solo la toca el consumidor de [ordenes].
+         */
+        private var esperaRecuperacionPendiente: EstadoReproductor? = null
+        private var reintentoPendiente: String? = null
+
         init {
             alcance.launch {
                 for (orden in ordenes) orden()
@@ -79,6 +89,8 @@ class DiagnosticoRepositorio
                 fila = filaNueva
                 estadoPrevio = null
                 ultimoEvento = null
+                esperaRecuperacionPendiente = null
+                reintentoPendiente = null
                 fila = filaNueva.copy(id = dao.insertarSesion(filaNueva))
             }
         }
@@ -111,6 +123,9 @@ class DiagnosticoRepositorio
                     }
                 val cerrada = vigente.copy(fin = Instant.now(), resultado = resultado)
                 fila = cerrada
+                // El ciclo de vida de la sesión limpia el indicador pendiente.
+                esperaRecuperacionPendiente = null
+                reintentoPendiente = null
                 dao.actualizarSesion(cerrada)
                 dao.insertarEvento(
                     EventoDiagnosticoEntity(
@@ -145,14 +160,24 @@ class DiagnosticoRepositorio
             var nueva = vigente.actualizadaCon(estado, pistas)
             val previo = estadoPrevio
             if (previo != null) {
-                if (previo.estado in ESTADOS_ESPERA_RED && estado.estado == EstadoReproductor.REPRODUCIENDO) {
+                // La recuperación de red se marca cuando se observa una fase de
+                // espera y se consume en el primer REPRODUCIENDO posterior,
+                // aunque la secuencia pase por CARGANDO o BUFFERING (E7-T10).
+                if (previo.estado in ESTADOS_ESPERA_RED) {
+                    esperaRecuperacionPendiente = previo.estado
+                    reintentoPendiente = "reintentos=${previo.reintento}/${previo.reintentosMaximos}"
+                }
+                val espera = esperaRecuperacionPendiente
+                if (espera != null && estado.estado == EstadoReproductor.REPRODUCIENDO) {
                     nueva = nueva.copy(recuperacionesRed = nueva.recuperacionesRed + 1)
                     registrarEvento(
                         nueva.id,
                         TIPO_RECUPERACION_RED,
-                        detalle = "reintentos=${estado.reintento}/${estado.reintentosMaximos}",
-                        codigo = previo.estado.name,
+                        detalle = reintentoPendiente ?: "reintentos=${estado.reintento}/${estado.reintentosMaximos}",
+                        codigo = espera.name,
                     )
+                    esperaRecuperacionPendiente = null
+                    reintentoPendiente = null
                 }
                 val imagenPrevio = previo.estadoImagen
                 if (
@@ -170,6 +195,9 @@ class DiagnosticoRepositorio
                 }
             }
             if (estado.estado == EstadoReproductor.ERROR) {
+                // Una recuperación que terminó en error no cuenta (E7-T10).
+                esperaRecuperacionPendiente = null
+                reintentoPendiente = null
                 val clave = estado.codigoError to estado.clasificacionTecnica
                 if (clave != ultimoEvento && estado.codigoError != null) {
                     registrarEvento(

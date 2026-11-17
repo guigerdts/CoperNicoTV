@@ -111,6 +111,32 @@ class DetalleFalloTest {
     }
 
     @Test
+    fun `una causa dns anidada con gai exception se clasifica como dns (E7-T10)`() {
+        // Cadena real de libcore/OkHttp: la clase más profunda es GaiException,
+        // con UnknownHostException como causa intermedia. En la JVM de pruebas
+        // unitarias GaiException no existe, así que se simula con el mismo
+        // nombre de clase simple (DetalleFallo clasifica por nombre).
+        val causa = UnknownHostException("sin-resolver")
+        causa.initCause(GaiException("getaddrinfo-fallo"))
+        val error = PlaybackException(null, causa, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED)
+        val detalle = capturarDetalleFallo(error)
+
+        assertEquals("GaiException", detalle.claseExcepcion)
+        assertEquals("dns", clasificacionTecnica(detalle))
+    }
+
+    @Test
+    fun `un unknown host en posicion intermedia tambien se clasifica como dns`() {
+        val causa = UnknownHostException("sin-resolver")
+        causa.initCause(OtraCausaProfunda("inesperada"))
+        val error = PlaybackException(null, causa, PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED)
+        val detalle = capturarDetalleFallo(error)
+
+        assertEquals("OtraCausaProfunda", detalle.claseExcepcion)
+        assertEquals("dns", clasificacionTecnica(detalle))
+    }
+
+    @Test
     fun `sin evidencia especifica queda otro`() {
         val error = PlaybackException(null, IOException("inespecifico"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED)
         val detalle = capturarDetalleFallo(error)
@@ -208,4 +234,10 @@ class DetalleFalloTest {
         assertTrue(texto.contains("Excepción: no disponible"))
         assertTrue(texto.contains("Duración hasta el fallo: no disponible"))
     }
+
+    /** Simula libcore.io.GaiException, ausente en la JVM de pruebas unitarias. */
+    private class GaiException(mensaje: String) : IOException(mensaje)
+
+    /** Causa profunda no reconocida: deja UnknownHostException en posición intermedia. */
+    private class OtraCausaProfunda(mensaje: String) : IOException(mensaje)
 }

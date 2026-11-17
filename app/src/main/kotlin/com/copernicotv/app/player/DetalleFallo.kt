@@ -90,8 +90,7 @@ internal fun clasificacionTecnica(detalle: DetalleFallo): String {
             else -> "http"
         }
     }
-    if (detalle.clasesCausa.contains("InvalidContentTypeException")) return "formato_incompatible"
-    if (detalle.clasesCausa.contains("UnrecognizedInputFormatException")) return "contenedor_no_reconocido"
+    clasificacionPorCadena(detalle)?.let { return it }
     return when (detalle.claseExcepcion) {
         "UnknownHostException" -> "dns"
         "ConnectException" -> "conexion"
@@ -99,6 +98,20 @@ internal fun clasificacionTecnica(detalle: DetalleFallo): String {
         else -> "otro"
     }
 }
+
+/**
+ * Clasificación por presencia de una clase conocida en cualquier posición de
+ * la cadena de causas (E7-T10): el fallo DNS real de libcore/OkHttp anida
+ * `UnknownHostException` bajo la clase más profunda (p. ej. `GaiException`),
+ * y el `when` por clase profunda no lo alcanza.
+ */
+private fun clasificacionPorCadena(detalle: DetalleFallo): String? =
+    when {
+        detalle.clasesCausa.contains("InvalidContentTypeException") -> "formato_incompatible"
+        detalle.clasesCausa.contains("UnrecognizedInputFormatException") -> "contenedor_no_reconocido"
+        detalle.clasesCausa.contains("UnknownHostException") -> "dns"
+        else -> null
+    }
 
 internal const val PROFUNDIDAD_MAXIMA_CAUSA = 8
 private const val LONGITUD_MAXIMA_MIME = 64

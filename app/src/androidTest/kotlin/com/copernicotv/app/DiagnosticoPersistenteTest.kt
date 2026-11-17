@@ -88,7 +88,9 @@ class DiagnosticoPersistenteTest {
             assertEquals(1, eventos.size)
             assertEquals("ERROR", eventos.single().tipo)
             assertEquals("error_http", eventos.single().codigo)
-            assertTrue(eventos.single().detalle!!.contains("fallo_servidor"))
+            val detalle = eventos.single().detalle
+            assertNotNull(detalle)
+            assertTrue(detalle.orEmpty().contains("fallo_servidor"))
             assertEquals(500, fila.estadoHttp)
         }
     }
@@ -250,6 +252,117 @@ class DiagnosticoPersistenteTest {
     }
 
     @Test
+    fun laRecuperacionDeRedSeRegistraATravesDeCargandoYBuffering() {
+        runBlocking {
+            repositorio.abrir(3L, "Canal Tres", "http://servidor.tv/tres")
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REINTENTANDO, reintento = 2, reintentosMaximos = 6),
+                EstadoPistas(),
+            )
+            // Secuencia real de SesionMedia3.programarRecuperacion: entre la
+            // espera y REPRODUCIENDO siempre se publica CARGANDO (antes de
+            // prepare) y luego BUFFERING.
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.CARGANDO, reintento = 2),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.BUFFERING),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                EstadoPistas(),
+            )
+            repositorio.drenar()
+            val fila = dao.recientes(1).single()
+            assertEquals(1, fila.recuperacionesRed)
+            val eventos = dao.eventosDeSesion(fila.id).filter { it.tipo == "RECUPERACION_RED" }
+            assertEquals(1, eventos.size)
+            assertEquals("REINTENTANDO", eventos.single().codigo)
+        }
+    }
+
+    @Test
+    fun laRecuperacionFallidaNoSeCuenta() {
+        runBlocking {
+            repositorio.abrir(5L, "Canal Cinco", "http://servidor.tv/cinco")
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REINTENTANDO, reintento = 6, reintentosMaximos = 6),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.CARGANDO, reintento = 6),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(
+                    estado = EstadoReproductor.ERROR,
+                    codigoError = "sin_conexion",
+                    codigoMotor = "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED",
+                ),
+                EstadoPistas(),
+            )
+            repositorio.drenar()
+            val fila = dao.recientes(1).single()
+            assertEquals(0, fila.recuperacionesRed)
+            assertTrue(dao.eventosDeSesion(fila.id).none { it.tipo == "RECUPERACION_RED" })
+        }
+    }
+
+    @Test
+    fun laRecuperacionDeRedNoSeCuentaDosVeces() {
+        runBlocking {
+            repositorio.abrir(6L, "Canal Seis", "http://servidor.tv/seis")
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REINTENTANDO, reintento = 1, reintentosMaximos = 3),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                EstadoPistas(),
+            )
+            // PAUSADO y un nuevo REPRODUCIENDO sin reintento previo no cuentan.
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.PAUSADO),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                EstadoPistas(),
+            )
+            repositorio.drenar()
+            val fila = dao.recientes(1).single()
+            assertEquals(1, fila.recuperacionesRed)
+            val eventos = dao.eventosDeSesion(fila.id).filter { it.tipo == "RECUPERACION_RED" }
+            assertEquals(1, eventos.size)
+        }
+    }
+
+    @Test
+    fun unaSesionSinReintentoNoCuentaRecuperacion() {
+        runBlocking {
+            repositorio.abrir(7L, "Canal Siete", "http://servidor.tv/siete")
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.CARGANDO),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.BUFFERING),
+                EstadoPistas(),
+            )
+            repositorio.observar(
+                EstadoSesion(estado = EstadoReproductor.REPRODUCIENDO),
+                EstadoPistas(),
+            )
+            repositorio.drenar()
+            val fila = dao.recientes(1).single()
+            assertEquals(0, fila.recuperacionesRed)
+            assertTrue(dao.eventosDeSesion(fila.id).none { it.tipo == "RECUPERACION_RED" })
+        }
+    }
+
+    @Test
     fun laRecuperacionDeImagenSeRegistra() {
         runBlocking {
             repositorio.abrir(4L, "Canal Cuatro", "http://servidor.tv/cuatro")
@@ -301,10 +414,11 @@ class DiagnosticoPersistenteTest {
             )
             repositorio.cerrar()
             repositorio.drenar()
-            val trasTardia = dao.porId(cerrada.id)!!
-            assertEquals(cerrada.fin, trasTardia.fin)
-            assertEquals(cerrada.faseFinal, trasTardia.faseFinal)
-            assertEquals(1_000L, trasTardia.posicionMs)
+            val trasTardia = dao.porId(cerrada.id)
+            assertNotNull(trasTardia)
+            assertEquals(cerrada.fin, trasTardia?.fin)
+            assertEquals(cerrada.faseFinal, trasTardia?.faseFinal)
+            assertEquals(1_000L, trasTardia?.posicionMs)
         }
     }
 

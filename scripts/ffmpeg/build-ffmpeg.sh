@@ -55,6 +55,11 @@ find_ndk() {
 
 NDK_DIR="$(find_ndk)"
 TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin"
+SYSROOT="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+[[ -d "$SYSROOT" ]] || {
+    echo "ERROR: sysroot ausente en $SYSROOT" >&2
+    exit 1
+}
 echo "== NDK: $NDK_DIR"
 
 # --- Source -----------------------------------------------------------------
@@ -110,7 +115,7 @@ build_abi() {
             --cpu="$cpu" \
             --cc="$cc" \
             --enable-cross-compile \
-            --sysroot="$TOOLCHAIN/sysroot" \
+            --sysroot="$SYSROOT" \
             --enable-static \
             --disable-shared \
             --disable-everything \
@@ -134,7 +139,7 @@ build_abi() {
             --enable-small \
             --extra-cflags="-ffunction-sections -fdata-sections" || {
             echo "ERROR: configure falló para $abi; config.log:" >&2
-            tail -60 config.log >&2 || true
+            tail -60 ffbuild/config.log >&2 || true
             exit 1
         }
         # LGPL effective configuration check BEFORE compiling (S6/Fase F):

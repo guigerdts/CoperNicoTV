@@ -1,6 +1,6 @@
 # ADR-0008 — Decodificación de video ampliada: inventario en fase 1 y ruta LGPL para MPEG-2
 
-Status: accepted
+Status: accepted (fase 2 ejecutada en E7-T12)
 
 ## Contexto
 
@@ -37,10 +37,18 @@ v4) y punto de integración `DecoderVideoExterno` (`:core`) para la fase 2. La s
 consulta por formato detectado (memoizada) y **no** altera la selección real de Media3 ni la
 clasificación `VIDEO_NO_ELEGIBLE`.
 
-**Fase 2 (propuesta, sin implementar):** decodificación software real bajo LGPL, por la vía
-principal descrita abajo, integrada por `RenderersFactory` propio en `ExoPlayer.Builder` y
-registrada como `DecoderVideoExterno`. La fase 1 no declara soporte que no exista: el veredicto
-del inventario es diagnóstico, no una promesa de reproducción.
+**Fase 2 (ejecutada, E7-T12):** decodificación software real bajo LGPL por la ruta C: subconjunto
+FFmpeg 7.1.1 (decoders `mpeg2video`, `mpeg4`, `h263`) compilado estáticamente desde el tarball
+oficial con SHA-256 verificado (`scripts/ffmpeg/build-ffmpeg.sh`), enlazado en JNI propio
+(`app/src/main/cpp/`) y expuesto con `DecoderFfmpeg` + `RendererVideoSoftware`, un
+`DecoderVideoRenderer` sobre la API pública de Media3 1.5.0, registrado al final de la política por
+`FabricaRenderersSoftware` en `SesionMedia3`. El build declara GPL y nonfree desactivados y el
+script **falla** si la `config.h` generada no lo declara (`CONFIG_GPL 0`, `CONFIG_NONFREE 0`); los
+avisos de redistribución viven en `THIRD_PARTY_NOTICES.md`. La fase 1 queda intacta: los decoders
+externos siguen entrando **al final** de la política y solo cubren MIME sin decoder nativo; el
+H.264 del dispositivo no cambia de camino (regresión instrumentada incluida). El soporte MPEG-2
+solo se declara con imagen real en Surface (S9); la validación física en dispositivo queda
+registrada en el informe de cierre.
 
 ## Alternativas para MPEG-2 (y codecs no soportados por el dispositivo)
 
@@ -60,6 +68,15 @@ Decisión de ruta LGPL (fase 2): **C como principal** cuando el objetivo sea cub
 completa (MPEG-2, MPEG-4 Part 2, H.263) con una sola cadena de build; **D como opción mínima**
 si el objetivo real es solo MPEG-2, evitando toda la cadena FFmpeg. B queda descartada por la
 restricción no-GPL, no por capacidad técnica.
+
+## Resultado de la ruta C (E7-T12)
+
+La ruta C fue ejecutada: el subconjunto LGPL de FFmpeg se compila para las tres ABIs del APK
+(`arm64-v8a`, `armeabi-v7a`, `x86_64`) en el paso de CI dedicado, con caché por hash del script.
+El H.264 sigue en hardware; los fixtures instrumentados (`app/src/androidTest/assets/e7t12/`)
+validan MPEG-2, MPEG-4 Part 2 y H.263 end-to-end, y la regresión H.264 verifica que el decoder
+externo no interviene. El veredicto final de la matriz queda supeditado a la CI verde y a la
+validación física pendiente (S9).
 
 ## Consecuencias
 

@@ -81,6 +81,10 @@ data class DiagnosticoReproductor(
     val tipoDecoderVideo: TipoDecoder? = null,
     val motivoSoporteVideo: MotivoSoporteVideo? = null,
     val perfilNivelVideo: String? = null,
+    // E7-T12 T7: diagnóstico del decoder software (runtime, fuera del
+    // snapshot persistido).
+    val msInicializacionDecoderVideo: Long? = null,
+    val errorDecodificacionVideo: String? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -164,6 +168,8 @@ fun construirDiagnostico(
         tipoDecoderVideo = estado.tipoDecoderVideo,
         motivoSoporteVideo = estado.motivoSoporteVideo,
         perfilNivelVideo = estado.perfilNivelVideo,
+        msInicializacionDecoderVideo = estado.msInicializacionDecoderVideo,
+        errorDecodificacionVideo = estado.errorDecodificacionVideo,
     )
 
 /**
@@ -270,6 +276,8 @@ private fun lineasAudiovisual(diagnostico: DiagnosticoReproductor): String =
         "Tipo decoder video" to valorTexto(diagnostico.tipoDecoderVideo?.name),
         "Motivo soporte video" to valorTexto(diagnostico.motivoSoporteVideo?.name),
         "Perfil/nivel video" to valorTexto(diagnostico.perfilNivelVideo),
+        "Init decoder video (ms)" to valorTexto(diagnostico.msInicializacionDecoderVideo),
+        "Error decodificación video" to valorTexto(diagnostico.errorDecodificacionVideo),
     ).joinToString(separator = "\n", postfix = "\n") { "${it.first}: ${it.second}" }
 
 /** Valor observable como texto; nulo significa «no disponible» (S6). */

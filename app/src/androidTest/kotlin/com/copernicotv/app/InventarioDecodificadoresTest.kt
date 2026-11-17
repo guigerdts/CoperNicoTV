@@ -8,6 +8,7 @@ import com.copernicotv.app.player.PreferenciasPista
 import com.copernicotv.app.player.SesionMedia3
 import com.copernicotv.core.player.ConfiguracionImagen
 import com.copernicotv.core.player.DeclaracionFormatoVideo
+import com.copernicotv.core.player.DecoderSoftwareVideo
 import com.copernicotv.core.player.MotivoSoporteVideo
 import com.copernicotv.core.player.ProtocoloStream
 import com.copernicotv.core.player.TipoDecoder
@@ -71,19 +72,36 @@ class InventarioDecodificadoresTest {
 
     @Test
     fun elVeredictoConservaLaConsistenciaConElInventario() {
-        val inventario = InventarioDecodificadores()
+        // E7-T12: el inventario de la sesión registra el decoder externo
+        // software FFmpeg, así que MPEG-2 pasa de MIME_NO_SOPORTADO
+        // (E7-T11) a SOPORTADO con fallback software; el veredicto sigue
+        // dependiendo solo del inventario y del externo, no del dispositivo.
+        val inventario = InventarioDecodificadores(externos = listOf(DecoderSoftwareVideo()))
 
-        val mpeg2Disponible = inventario.decoders().any { it.mime == "video/mpeg2" }
+        val mpeg2Nativo = inventario.decoders().any { it.mime == "video/mpeg2" }
         val veredicto = inventario.seleccionar(DeclaracionFormatoVideo(mime = "video/mpeg2"))
         assertEquals(
-            if (mpeg2Disponible) MotivoSoporteVideo.SOPORTADO else MotivoSoporteVideo.MIME_NO_SOPORTADO,
+            "Con el externo registrado, MPEG-2 siempre queda soportado",
+            MotivoSoporteVideo.SOPORTADO,
             veredicto.motivo,
         )
+        if (!mpeg2Nativo) {
+            assertEquals(
+                "Sin decoder nativo, el externo software es el seleccionado",
+                "ffmpeg:mpeg2video",
+                veredicto.decoder,
+            )
+            assertEquals(TipoDecoder.SOFTWARE, veredicto.tipo)
+        }
 
         val veredictoAvc = inventario.seleccionar(DeclaracionFormatoVideo(mime = "video/avc"))
         assertEquals(MotivoSoporteVideo.SOPORTADO, veredictoAvc.motivo)
         assertNotNull(veredictoAvc.decoder)
         assertNotNull(veredictoAvc.tipo)
+        assertTrue(
+            "H.264 nunca recae en el decoder externo software",
+            veredictoAvc.decoder?.startsWith("ffmpeg:") != true,
+        )
     }
 
     @Test

@@ -30,6 +30,22 @@ soporte por sí misma. El veredicto de una sesión (`MotivoSoporteVideo`) sale d
 - Perfil/nivel «no disponible»: el formato no declara codec string parseable (p. ej. MPEG-2 en
   TS); la política no finge rechazo de perfil con datos inexistentes.
 
+## Estado de decodificación software (E7-T12)
+
+Con el decoder externo FFmpeg (LGPL, ADR-0008 fase 2) registrado en la sesión:
+
+- **MPEG-2** (`video/mpeg2`): soportado por software (`ffmpeg:mpeg2video`) en dispositivos sin
+  decoder nativo. Validado en el emulador de CI (primer frame real en Surface, audio, liberación
+  estable) con `ReproductorDecoderSoftwareTest`; la validación en dispositivo físico queda
+  **pendiente** (protocolo: reproducir un canal MPEG-2 real, p. ej. Telecaribe 2719, y verificar
+  imagen, audio y diagnóstico en el panel).
+- **MPEG-4 Part 2** y **H.263**: soportados por software cuando el dispositivo no declara decoder;
+  en el emulador de CI MediaCodec software nativo suele cubrirlos y la política lo prefiere.
+- **H.264**: nunca sale por el decoder software; sigue en MediaCodec del dispositivo (regresión
+  instrumentada). El caso Caracol 2704 (`avc1.640028`) permanece como validación física pendiente.
+
+Licencias y avisos: ver `THIRD_PARTY_NOTICES.md` y `scripts/ffmpeg/build-ffmpeg.sh`.
+
 Limitaciones declaradas de la fase 1: la evaluación es de disponibilidad (datos de
 `MediaCodecList`); un `SOPORTADO` no garantiza decodificación ante streams corruptos o perfiles no
 declarados, y el «fallo de inicialización» real queda para la fase 2 (ADR-0008).

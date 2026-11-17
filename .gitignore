@@ -33,3 +33,5 @@ captures/
 # Python
 __pycache__/
 *.pyc
+# FFmpeg nativo E7-T12: fuentes y artefactos de build (solo CI)
+native/ffmpeg/

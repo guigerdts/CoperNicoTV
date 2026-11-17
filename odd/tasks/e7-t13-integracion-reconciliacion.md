@@ -90,7 +90,8 @@ El orden topológico confirmado coincide con la hipótesis: #32 → #33 → T8 �
 | #36 | `44024932575` | 5/5 |
 | #37 | `44026614654` | 1er intento: `jvm-tests` falló en `ActualizacionRepositorioTest` vía `MavenArtifactFetcher` (`IOException` descargando artefactos android-all de Maven Central — red del runner). Misma suite verde en el run anterior → infraestructura. Rerun `--failed`: 5/5 |
 | #38 | `44029043192` | 4 jobs success; `instrumented-mobile` cancelado por supersección (el merge documental #39 lanzó el run definitivo `44030330851` sobre el mismo código funcional). Sin fallo de test: ningún job terminó en failure |
-| #39 (documental) | `44030330851` | Run definitivo de `main` (cascada completa + docs); resultado registrado en Log L5 |
+| #39 (documental) | `44030330851` | Cancelado por supersección (el push del commit de cierre `48e8192` lanzó `44030776388` sobre el mismo código + registro de cierre); sin fallo de test |
+| Cierre | `44030776388` y el run del push de este registro | Run definitivo de `main`; verificado tras el push y registrado en Engram/informe al propietario |
 
 ### 8. Estado final de `main`
 

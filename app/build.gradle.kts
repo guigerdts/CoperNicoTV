@@ -1,4 +1,34 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
+
+/**
+ * Build nativo del decoder software (E7-T12) activado solo con NDK real.
+ *
+ * Termux no puede ejecutar el NDK oficial (x86_64-only; ADR-0005): el stub
+ * en la ruta del SDK no tiene `source.properties` y AGP aborta la
+ * configuración de `:app`. El gate detecta un NDK funcional; en CI
+ * (ubuntu-latest, NDK preinstalado) se activa y en local se omite, de modo
+ * que la batería JVM (ktlint/detekt/test) no dependa del NDK.
+ */
+fun hayNdkValido(): Boolean {
+    val raicesSdk = mutableListOf<String?>()
+    raicesSdk.add(System.getenv("ANDROID_HOME"))
+    raicesSdk.add(System.getenv("ANDROID_SDK_ROOT"))
+    val archivoLocal = rootProject.file("local.properties")
+    if (archivoLocal.isFile) {
+        archivoLocal.readLines().firstOrNull { it.startsWith("sdk.dir=") }?.let { linea ->
+            raicesSdk.add(linea.removePrefix("sdk.dir="))
+        }
+    }
+    return raicesSdk.any { raiz ->
+        val ndk = File(raiz, "ndk")
+        ndk.isDirectory &&
+            (ndk.listFiles() ?: emptyArray())
+                .any { sub -> File(sub, "source.properties").isFile }
+    }
+}
+
+val buildNativo = hayNdkValido()
 
 plugins {
     alias(libs.plugins.android.application)
@@ -22,6 +52,14 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "com.copernicotv.app.HiltTestRunner"
+
+        if (buildNativo) {
+            ndk {
+                // ABIs del APK con el decoder software (E7-T12); x86_64 cubre
+                // los emuladores de la CI instrumentada.
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            }
+        }
     }
 
     buildTypes {
@@ -37,6 +75,15 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    if (buildNativo) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
+        }
     }
 
     testOptions {
@@ -145,6 +192,7 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.media3.exoplayer)
+    implementation(libs.media3.decoder)
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.exoplayer.dash)
     implementation(libs.media3.exoplayer.rtsp)

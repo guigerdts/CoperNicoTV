@@ -13,8 +13,10 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.copernicotv.app.player.software.FabricaRenderersSoftware
 import com.copernicotv.core.player.ConfiguracionImagen
 import com.copernicotv.core.player.DecisionReintento
+import com.copernicotv.core.player.DecoderSoftwareVideo
 import com.copernicotv.core.player.DetectarContenedor
 import com.copernicotv.core.player.FalloVisto
 import com.copernicotv.core.player.FaseBase
@@ -93,15 +95,27 @@ class SesionMedia3(
     private val sonda = SondaContenedor(cabeceras = mapOf("User-Agent" to AGENTE_REPRODUCCION))
 
     /**
+     * Inventario de la sesión con el decoder externo software FFmpeg al
+     * final (E7-T12, S2): el mismo inventario alimenta el veredicto del
+     * diagnóstico y la decisión de soporte del renderer, de modo que ambos
+     * dicen lo mismo sobre cada pista.
+     */
+    private val inventarioDecodificadores =
+        InventarioDecodificadores(externos = listOf(DecoderSoftwareVideo()))
+
+    /**
      * Selección de decoder por formato memoizada (E7-T11, T3): el inventario
      * del dispositivo no cambia en runtime, así que la misma declaración de
      * formato siempre produce el mismo veredicto.
      */
-    private val selectorVideo = SelectorVideoSesion()
+    private val selectorVideo = SelectorVideoSesion(inventarioDecodificadores)
 
     /** Motor de reproducción; la interfaz solo lo conecta a su superficie. */
     val reproductor: ExoPlayer =
         ExoPlayer.Builder(contexto)
+            .setRenderersFactory(
+                FabricaRenderersSoftware(contexto, inventarioDecodificadores::decoders),
+            )
             .setMediaSourceFactory(
                 FabricaMediaSourcesGrabadora(
                     DefaultMediaSourceFactory(FabricaFuenteSeguimiento(trazadora))

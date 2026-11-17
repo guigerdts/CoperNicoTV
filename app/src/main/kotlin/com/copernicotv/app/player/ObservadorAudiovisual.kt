@@ -5,6 +5,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.DecoderCounters
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import com.copernicotv.core.player.EvidenciaImagen
 import com.copernicotv.core.player.FaseBase
@@ -48,6 +49,18 @@ data class ObservacionAudiovisual(
     val framesOmitidosVideo: Int?,
     val decoderVideo: String?,
     val decoderAudio: String?,
+    /**
+     * Tiempo que Media3 reportó de inicialización del último decoder de
+     * video (E7-T12, T7): `null` mientras ningún decoder se inicializó.
+     */
+    val msInicializacionDecoderVideo: Long? = null,
+    /**
+     * Código seguro del último error de codec de video observado (E7-T12,
+     * T7): nombre de código `PlaybackException` cuando llega por
+     * `ExoPlaybackException`, o la clase del error; nunca el mensaje del
+     * error, que puede contener detalles del stream. `null` sin error.
+     */
+    val errorDecodificacionVideo: String? = null,
     val pistaVideo: InfoPista?,
     val pistaAudio: InfoPista?,
     val hayGrupoVideo: Boolean,
@@ -98,6 +111,8 @@ class ObservadorAudiovisual(
     private var framesOmitidosVideo: Int? = null
     private var decoderVideo: String? = null
     private var decoderAudio: String? = null
+    private var msInicializacionDecoderVideo: Long? = null
+    private var errorDecodificacionVideo: String? = null
     private var pistaVideo: InfoPista? = null
     private var pistaAudio: InfoPista? = null
     private var hayGrupoVideo = false
@@ -128,6 +143,8 @@ class ObservadorAudiovisual(
             framesOmitidosVideo = framesOmitidosVideo,
             decoderVideo = decoderVideo,
             decoderAudio = decoderAudio,
+            msInicializacionDecoderVideo = msInicializacionDecoderVideo,
+            errorDecodificacionVideo = errorDecodificacionVideo,
             pistaVideo = pistaVideo,
             pistaAudio = pistaAudio,
             hayGrupoVideo = hayGrupoVideo,
@@ -215,6 +232,7 @@ class ObservadorAudiovisual(
         initializationDurationMs: Long,
     ) {
         decoderVideo = decoderName
+        msInicializacionDecoderVideo = initializationDurationMs.coerceAtLeast(0L)
     }
 
     override fun onAudioDecoderInitialized(
@@ -231,6 +249,20 @@ class ObservadorAudiovisual(
         decoderName: String,
     ) {
         if (decoderVideo == decoderName) decoderVideo = null
+    }
+
+    /** Último error de codec de video como código seguro (E7-T12, T7). */
+    override fun onVideoCodecError(
+        eventTime: AnalyticsListener.EventTime,
+        videoCodecError: Exception,
+    ) {
+        val exo = videoCodecError as? ExoPlaybackException
+        errorDecodificacionVideo =
+            if (exo != null) {
+                "exo:${exo.errorCodeName}"
+            } else {
+                "codec:${videoCodecError.javaClass.simpleName}"
+            }
     }
 
     override fun onRenderedFirstFrame(

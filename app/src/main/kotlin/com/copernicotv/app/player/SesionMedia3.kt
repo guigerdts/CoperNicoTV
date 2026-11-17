@@ -593,6 +593,9 @@ class SesionMedia3(
                 tipoDecoderVideo = seleccion?.tipo,
                 motivoSoporteVideo = seleccion?.motivo,
                 perfilNivelVideo = selectorVideo.perfilNivelTexto(observacion.formatoVideoDetectado?.codec),
+                // E7-T12 T7: diagnóstico del decoder software.
+                msInicializacionDecoderVideo = observacion.msInicializacionDecoderVideo,
+                errorDecodificacionVideo = observacion.errorDecodificacionVideo,
             )
         gestionarEstabilidad(fasePublicada, observacion)
         escaleraImagen.gestionar(faseBaseDe(fasePublicada))

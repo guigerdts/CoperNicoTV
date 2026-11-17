@@ -9,6 +9,8 @@ import android.os.Handler
 import android.view.Surface
 import androidx.media3.common.C
 import androidx.media3.common.Format
+import androidx.media3.decoder.CryptoConfig
+import androidx.media3.decoder.Decoder
 import androidx.media3.decoder.DecoderInputBuffer
 import androidx.media3.decoder.VideoDecoderOutputBuffer
 import androidx.media3.exoplayer.RendererCapabilities
@@ -52,8 +54,8 @@ class RendererVideoSoftware(
 
     override fun getName(): String = NOMBRE
 
-    override fun supportsFormatInternal(format: Format): Int {
-        if (format.drmConfiguration != null) {
+    override fun supportsFormat(format: Format): Int {
+        if (format.drmInitData != null) {
             return RendererCapabilities.create(C.FORMAT_UNSUPPORTED_DRM)
         }
         val mime = format.sampleMimeType
@@ -81,7 +83,7 @@ class RendererVideoSoftware(
 
     override fun createDecoder(
         format: Format,
-        cryptoConfig: androidx.media3.decoder.CryptoConfig?,
+        cryptoConfig: CryptoConfig?,
     ): Decoder<DecoderInputBuffer, VideoDecoderOutputBuffer, DecoderExcepcionFfmpeg> {
         if (cryptoConfig != null) {
             throw DecoderExcepcionFfmpeg("ffmpeg_drm_no_soportado")

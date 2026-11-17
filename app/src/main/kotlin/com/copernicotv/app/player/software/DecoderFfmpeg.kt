@@ -3,6 +3,7 @@ package com.copernicotv.app.player.software
 import androidx.media3.common.C
 import androidx.media3.decoder.DecoderException
 import androidx.media3.decoder.DecoderInputBuffer
+import androidx.media3.decoder.DecoderOutputBuffer
 import androidx.media3.decoder.SimpleDecoder
 import androidx.media3.decoder.VideoDecoderOutputBuffer
 import com.copernicotv.core.player.DecodersSoftware
@@ -33,7 +34,7 @@ class DecoderFfmpeg(private val codecName: String) :
         buffersEntrada(NUM_BUFFERS),
         buffersSalida(NUM_BUFFERS),
     ),
-    VideoDecoderOutputBuffer.Owner<VideoDecoderOutputBuffer> {
+    DecoderOutputBuffer.Owner<VideoDecoderOutputBuffer> {
     private var handle: Long = 0L
     private var modoSalida: Int = C.VIDEO_OUTPUT_MODE_YUV
 
@@ -106,13 +107,15 @@ class DecoderFfmpeg(private val codecName: String) :
                 if (!salida.initForYuvFrame(ancho, alto, ancho, (ancho + 1) / 2, espacio)) {
                     return DecoderExcepcionFfmpeg("ffmpeg_salida_yuv_inaceptable")
                 }
-                val planos =
-                    arrayOf(
-                        salida.yuvPlanes[0],
-                        salida.yuvPlanes[1],
-                        salida.yuvPlanes[2],
+                val planos = salida.yuvPlanes
+                if (planos == null) {
+                    return DecoderExcepcionFfmpeg("ffmpeg_planos_ausentes")
+                }
+                val copia =
+                    nativeCopyFrame(
+                        manejador,
+                        arrayOf(planos[0], planos[1], planos[2]),
                     )
-                val copia = nativeCopyFrame(manejador, planos)
                 if (copia != 0) {
                     return DecoderExcepcionFfmpeg("ffmpeg_error_copia_planos:$copia")
                 }

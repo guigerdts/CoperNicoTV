@@ -122,6 +122,10 @@ data class EstadoSesion(
     val tipoDecoderVideo: TipoDecoder? = null,
     val motivoSoporteVideo: MotivoSoporteVideo? = null,
     val perfilNivelVideo: String? = null,
+    // E7-T12 T7: diagnóstico del decoder software. Runtime-only: no viajan
+    // al snapshot persistido de Room (DiagnosticoRepositorio intacto).
+    val msInicializacionDecoderVideo: Long? = null,
+    val errorDecodificacionVideo: String? = null,
     // E7-T10 S5/F7: estado de la imagen. `null` = sin aviso (reproducción
     // normal); los valores del enum los publica la máquina de imagen y la UI
     // los traduce a mensajes comprensibles solo en reproducción.

@@ -70,6 +70,15 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Cache de FFmpeg compilado
+        uses: actions/cache@v4
+        with:
+          path: native/ffmpeg/install
+          key: ffmpeg-7.1.1-${{ runner.os }}-${{ hashFiles('scripts/ffmpeg/build-ffmpeg.sh') }}
+      - name: Compilar subconjunto FFmpeg (LGPL)
+        run: |
+          [ -f native/ffmpeg/install/arm64-v8a/lib/libavcodec.a ] || \
+            bash scripts/ffmpeg/build-ffmpeg.sh
       - name: Ensamblar APK de depuración
         run: ./gradlew :app:assembleDebug --stacktrace
       - name: Publicar APK
@@ -96,6 +105,15 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Cache de FFmpeg compilado
+        uses: actions/cache@v4
+        with:
+          path: native/ffmpeg/install
+          key: ffmpeg-7.1.1-${{ runner.os }}-${{ hashFiles('scripts/ffmpeg/build-ffmpeg.sh') }}
+      - name: Compilar subconjunto FFmpeg (LGPL)
+        run: |
+          [ -f native/ffmpeg/install/arm64-v8a/lib/libavcodec.a ] || \
+            bash scripts/ffmpeg/build-ffmpeg.sh
       - name: Habilitar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -169,6 +187,15 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      - name: Cache de FFmpeg compilado
+        uses: actions/cache@v4
+        with:
+          path: native/ffmpeg/install
+          key: ffmpeg-7.1.1-${{ runner.os }}-${{ hashFiles('scripts/ffmpeg/build-ffmpeg.sh') }}
+      - name: Compilar subconjunto FFmpeg (LGPL)
+        run: |
+          [ -f native/ffmpeg/install/arm64-v8a/lib/libavcodec.a ] || \
+            bash scripts/ffmpeg/build-ffmpeg.sh
       - name: Habilitar KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \

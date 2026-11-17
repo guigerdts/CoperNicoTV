@@ -9,6 +9,7 @@ import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
 import com.copernicotv.app.ui.ReproductorUiState
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ERROR
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_INTENTOS
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_REINTENTO
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -31,7 +32,7 @@ import javax.inject.Inject
  * E6-T4 en emulador móvil: recuperación y reintentos de S20.
  *
  * La espera entre reintentos se sustituye por [PuertaReintentos]: cada intento
- * queda suspendido hasta que la prueba lo libera. Así se observan los tres
+ * queda suspendido hasta que la prueba lo libera. Así se observan los seis
  * reintentos, el agotamiento, la cancelación y el error definitivo sin dormir y
  * sin depender del reloj. El motor es Media3 real y el servidor HTTP local
  * responde 500 o 404 según la prueba.
@@ -81,9 +82,9 @@ class ReproductorReintentosTest {
 
         val reintento = esperarSesion("primer reintento") { it.estado == EstadoReproductor.REINTENTANDO }
         assertEquals(1, reintento.reintento)
-        assertEquals(3, reintento.reintentosMaximos)
+        assertEquals(6, reintento.reintentosMaximos)
         composeRule.esperarTag(TAG_REPRODUCTOR_REINTENTO)
-        assertTrue(composeRule.textoDeTag(TAG_REPRODUCTOR_REINTENTO).contains("1 de 3"))
+        assertTrue(composeRule.textoDeTag(TAG_REPRODUCTOR_REINTENTO).contains("1 de 6"))
         val sesion = requireNotNull(composeRule.viewModelReproductor().sesionActual())
 
         fallar.set(false)
@@ -113,21 +114,21 @@ class ReproductorReintentosTest {
     }
 
     @Test
-    fun losTresReintentosSeVenEnLaInterfazYTerminanEnErrorDefinitivo() {
+    fun losSeisReintentosSeVenEnLaInterfazYTerminanEnErrorDefinitivo() {
         servidor = servidorConFallos { ruta, _ -> if (ruta == FixturesF15.MP4) 500 else null }
         sembrarCanal(catalogo, FixturesF15.url(servidor, FixturesF15.MP4))
 
         composeRule.abrirReproductor()
 
-        repeat(3) { indice ->
+        repeat(6) { indice ->
             val numero = indice + 1
-            esperarSesion("reintento $numero de 3") {
+            esperarSesion("reintento $numero de 6") {
                 it.estado == EstadoReproductor.REINTENTANDO && it.reintento == numero
             }
             composeRule.esperarTag(TAG_REPRODUCTOR_REINTENTO)
             assertTrue(
                 "El aviso debe numerar el reintento $numero",
-                composeRule.textoDeTag(TAG_REPRODUCTOR_REINTENTO).contains("$numero de 3"),
+                composeRule.textoDeTag(TAG_REPRODUCTOR_REINTENTO).contains("$numero de 6"),
             )
             PuertaReintentos.liberar()
         }
@@ -136,8 +137,14 @@ class ReproductorReintentosTest {
         composeRule.esperarTagAusente(TAG_REPRODUCTOR_REINTENTO)
         val texto = composeRule.textoDeTag(TAG_REPRODUCTOR_ERROR)
         assertTrue("El error definitivo debe tipar el 5xx: $texto", texto.contains("http_servidor"))
-        // Un intento por cada prepare: el inicial más los tres de S20.
-        assertEquals(4, servidor.peticionesDe(FixturesF15.MP4))
+        // La línea de intentos agotados (S4): 1 intento inicial + 6 reintentos.
+        composeRule.esperarTag(TAG_REPRODUCTOR_INTENTOS)
+        assertTrue(
+            "La línea de intentos debe nombrar los 7 intentos",
+            composeRule.textoDeTag(TAG_REPRODUCTOR_INTENTOS).contains("7 intentos"),
+        )
+        // Un intento por cada prepare: el inicial más los seis de S4.
+        assertEquals(7, servidor.peticionesDe(FixturesF15.MP4))
         assertNull(composeRule.viewModelReproductor().sesionActual())
     }
 

@@ -1,6 +1,9 @@
 package com.copernicotv.app.player
 
-/** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4). */
+import com.copernicotv.core.player.CondicionReproduccion
+import com.copernicotv.core.player.EstadoImagen
+
+/** Fase observable de la sesión de reproducción (E6-T2, ampliada en E6-T4 y E7-T10). */
 enum class EstadoReproductor {
     CARGANDO,
     BUFFERING,
@@ -8,6 +11,7 @@ enum class EstadoReproductor {
     PAUSADO,
     TERMINADO,
     REINTENTANDO,
+    ESPERANDO_CONEXION,
     ERROR,
 }
 
@@ -69,6 +73,49 @@ data class EstadoSesion(
     val formatoObservado: String? = null,
     val formatoObservadoMime: String? = null,
     val reSeleccionMedia: String? = null,
+    // E7-T10 S4: recuperación de reproducción. `esperaRecuperacionMs` solo
+    // tiene sentido en REINTENTANDO/ESPERANDO_CONEXION: es la espera de
+    // backoff vigente del reintento en curso (cero en ESPERANDO_CONEXION y
+    // fuera de esas fases). `recuperadoRecientemente` queda en `true` desde
+    // que una recuperación vuelve a dejar la reproducción estable hasta que
+    // el periodo de estabilidad la repone: alimenta el aviso "recuperada".
+    val esperaRecuperacionMs: Long = 0L,
+    val recuperadoRecientemente: Boolean = false,
+    // E7-T10 S3: observabilidad audiovisual vía AnalyticsListener. Los
+    // campos son de sesión y se proyectan del [ObservadorAudiovisual];
+    // solo contienen datos que Media3 entrega realmente. `condicion`
+    // distingue un READY con audio y video de uno con audio sin imagen.
+    val condicion: CondicionReproduccion? = null,
+    val pistaVideoMime: String? = null,
+    val pistaVideoCodec: String? = null,
+    val pistaVideoResolucion: String? = null,
+    val pistaVideoFrameRate: Float? = null,
+    val pistaVideoBitrate: Int? = null,
+    val pistaAudioMime: String? = null,
+    val pistaAudioCodec: String? = null,
+    val pistaAudioBitrate: Int? = null,
+    val decoderVideo: String? = null,
+    val decoderAudio: String? = null,
+    val msHastaPrimerFrameVideo: Long? = null,
+    val framesPerdidosVideo: Int? = null,
+    val framesRenderidosVideo: Int? = null,
+    val framesOmitidosVideo: Int? = null,
+    val videoRendererActivo: Boolean? = null,
+    val audioRendererActivo: Boolean? = null,
+    val pistaVideoDetectada: Boolean? = null,
+    val pistaAudioDetectada: Boolean? = null,
+    // E7-T10 T7: pista de video detectada en el contenedor aunque no se haya
+    // seleccionado. El MIME y el códec declarados más el soporte observado
+    // (`Tracks.Group.isTrackSupported`) distinguen una fuente con video que
+    // el dispositivo no puede decodificar de una fuente solo-audio, y una
+    // pista deshabilitada de un decoder ausente.
+    val pistaVideoDetectadaMime: String? = null,
+    val pistaVideoDetectadaCodec: String? = null,
+    val pistaVideoSoportada: Boolean? = null,
+    // E7-T10 S5/F7: estado de la imagen. `null` = sin aviso (reproducción
+    // normal); los valores del enum los publica la máquina de imagen y la UI
+    // los traduce a mensajes comprensibles solo en reproducción.
+    val estadoImagen: EstadoImagen? = null,
 )
 
 /**
@@ -81,6 +128,7 @@ fun nombreEstadoMotor(fase: EstadoReproductor): String =
     when (fase) {
         EstadoReproductor.CARGANDO,
         EstadoReproductor.REINTENTANDO,
+        EstadoReproductor.ESPERANDO_CONEXION,
         EstadoReproductor.ERROR,
         -> "IDLE"
         EstadoReproductor.BUFFERING -> "BUFFERING"

@@ -1,5 +1,6 @@
 package com.copernicotv.app.player
 
+import com.copernicotv.core.player.CondicionReproduccion
 import com.copernicotv.core.player.ProtocoloStream
 import java.util.Locale
 
@@ -46,6 +47,32 @@ data class DiagnosticoReproductor(
     val formatoObservado: String? = null,
     val formatoObservadoMime: String? = null,
     val reSeleccionMedia: String? = null,
+    // E7-T10 S3/S6: observabilidad audiovisual (AnalyticsListener) y
+    // condición de sesión. Solo datos que Media3 entrega realmente.
+    val condicion: CondicionReproduccion? = null,
+    val pistaVideoMime: String? = null,
+    val pistaVideoCodec: String? = null,
+    val pistaVideoResolucion: String? = null,
+    val pistaVideoFrameRate: Float? = null,
+    val pistaVideoBitrate: Int? = null,
+    val pistaAudioMime: String? = null,
+    val pistaAudioCodec: String? = null,
+    val pistaAudioBitrate: Int? = null,
+    val decoderVideo: String? = null,
+    val decoderAudio: String? = null,
+    val msHastaPrimerFrameVideo: Long? = null,
+    val framesPerdidosVideo: Int? = null,
+    val framesRenderidosVideo: Int? = null,
+    val framesOmitidosVideo: Int? = null,
+    val videoRendererActivo: Boolean? = null,
+    val audioRendererActivo: Boolean? = null,
+    val pistaVideoDetectada: Boolean? = null,
+    val pistaAudioDetectada: Boolean? = null,
+    // E7-T10 T7: la pista de video que el contenedor declara aunque no se
+    // haya seleccionado, con su soporte observado en el dispositivo.
+    val pistaVideoDetectadaMime: String? = null,
+    val pistaVideoDetectadaCodec: String? = null,
+    val pistaVideoSoportada: Boolean? = null,
 ) {
     /** Pista de audio que el motor tiene activa, si el contenido la publica. */
     val audioSeleccionado: PistaDisponible? get() = audio.firstOrNull { it.activa }
@@ -103,6 +130,28 @@ fun construirDiagnostico(
         formatoObservado = estado.formatoObservado,
         formatoObservadoMime = estado.formatoObservadoMime,
         reSeleccionMedia = estado.reSeleccionMedia,
+        condicion = estado.condicion,
+        pistaVideoMime = estado.pistaVideoMime,
+        pistaVideoCodec = estado.pistaVideoCodec,
+        pistaVideoResolucion = estado.pistaVideoResolucion,
+        pistaVideoFrameRate = estado.pistaVideoFrameRate,
+        pistaVideoBitrate = estado.pistaVideoBitrate,
+        pistaAudioMime = estado.pistaAudioMime,
+        pistaAudioCodec = estado.pistaAudioCodec,
+        pistaAudioBitrate = estado.pistaAudioBitrate,
+        decoderVideo = estado.decoderVideo,
+        decoderAudio = estado.decoderAudio,
+        msHastaPrimerFrameVideo = estado.msHastaPrimerFrameVideo,
+        framesPerdidosVideo = estado.framesPerdidosVideo,
+        framesRenderidosVideo = estado.framesRenderidosVideo,
+        framesOmitidosVideo = estado.framesOmitidosVideo,
+        videoRendererActivo = estado.videoRendererActivo,
+        audioRendererActivo = estado.audioRendererActivo,
+        pistaVideoDetectada = estado.pistaVideoDetectada,
+        pistaAudioDetectada = estado.pistaAudioDetectada,
+        pistaVideoDetectadaMime = estado.pistaVideoDetectadaMime,
+        pistaVideoDetectadaCodec = estado.pistaVideoDetectadaCodec,
+        pistaVideoSoportada = estado.pistaVideoSoportada,
     )
 
 /**
@@ -172,7 +221,50 @@ fun textoDiagnostico(diagnostico: DiagnosticoReproductor): String =
         appendLine("Identificador de canal: ${diagnostico.canalId?.toString() ?: SIN_DATO}")
         append(lineasDetalleMotor(diagnostico))
         append(lineasTrazadoRed(diagnostico))
+        append(lineasAudiovisual(diagnostico))
     }
+
+/**
+ * Líneas de la observación audiovisual (E7-T10, S3/S6): condición real de
+ * la sesión, pistas, códecs, decoders, primer frame y contadores. Cada
+ * campo muestra el valor observado o «no disponible»; nada se infiere de
+ * métricas que Media3 no entregue.
+ */
+private fun lineasAudiovisual(diagnostico: DiagnosticoReproductor): String =
+    listOf(
+        "Condición" to valorTexto(diagnostico.condicion?.name),
+        "Video MIME" to valorTexto(diagnostico.pistaVideoMime),
+        "Video códec" to valorTexto(diagnostico.pistaVideoCodec),
+        "Video resolución" to valorTexto(diagnostico.pistaVideoResolucion),
+        "Video fps" to valorTexto(diagnostico.pistaVideoFrameRate),
+        "Video bitrate" to valorTexto(diagnostico.pistaVideoBitrate),
+        "Audio MIME" to valorTexto(diagnostico.pistaAudioMime),
+        "Audio códec" to valorTexto(diagnostico.pistaAudioCodec),
+        "Audio bitrate" to valorTexto(diagnostico.pistaAudioBitrate),
+        "Decoder video" to valorTexto(diagnostico.decoderVideo),
+        "Decoder audio" to valorTexto(diagnostico.decoderAudio),
+        "Primer frame de video" to valorTexto(primerFrameTexto(diagnostico)),
+        "Frames perdidos" to valorTexto(diagnostico.framesPerdidosVideo),
+        "Frames renderizados" to valorTexto(diagnostico.framesRenderidosVideo),
+        "Frames omitidos" to valorTexto(diagnostico.framesOmitidosVideo),
+        "Renderer video activo" to valorTexto(booleanoTexto(diagnostico.videoRendererActivo)),
+        "Renderer audio activo" to valorTexto(booleanoTexto(diagnostico.audioRendererActivo)),
+        "Video detectado" to valorTexto(booleanoTexto(diagnostico.pistaVideoDetectada)),
+        "Audio detectado" to valorTexto(booleanoTexto(diagnostico.pistaAudioDetectada)),
+        "Video MIME detectado" to valorTexto(diagnostico.pistaVideoDetectadaMime),
+        "Video códec detectado" to valorTexto(diagnostico.pistaVideoDetectadaCodec),
+        "Pista video soportada" to valorTexto(booleanoTexto(diagnostico.pistaVideoSoportada)),
+    ).joinToString(separator = "\n", postfix = "\n") { "${it.first}: ${it.second}" }
+
+/** Valor observable como texto; nulo significa «no disponible» (S6). */
+internal fun valorTexto(valor: Any?): String = valor?.toString() ?: SIN_DATO
+
+/** Duración hasta el primer frame de video, en formato de tiempo. */
+private fun primerFrameTexto(diagnostico: DiagnosticoReproductor): String? =
+    diagnostico.msHastaPrimerFrameVideo?.let { formatearTiempo(it) }
+
+/** Texto estable para booleanos observables, con «no disponible» si es nulo. */
+internal fun booleanoTexto(valor: Boolean?): String = valor?.let { if (it) "sí" else "no" } ?: SIN_DATO
 
 /**
  * Líneas del detalle técnico del fallo observado por Media3: códigos, MIME,

@@ -247,4 +247,66 @@ class SondaContenedorTest {
         assertEquals(0, sondeo.redirecciones)
         assertTrue(abridor.solicitudes.isEmpty())
     }
+
+    /**
+     * Conexión falsa que reproduce la semántica real de la plataforma: la
+     * desconexión cierra el stream subyacente, así que un cuerpo no leído
+     * antes del `disconnect` se pierde (en Android, `HttpURLConnection`
+     * sobre OkHttp aborta la lectura). Es el escenario que la sonda vivió
+     * en el emulador con CI 43744031037: cabeceras leídas, cuerpo perdido
+     * tras el cierre, `DESCONOCIDO` en la evidencia de la re-selección.
+     */
+    @Suppress("EmptyFunctionBlock") // los no-ops de la conexión falsa son intencionales
+    private class ConexionQueSeInvalida(
+        url: URL,
+        private val codigo: Int,
+        private val tipoMime: String?,
+        contenido: ByteArray,
+    ) : HttpURLConnection(url) {
+        private var desconectada = false
+        private val cuerpo = ByteArrayInputStream(contenido)
+
+        override fun connect() {
+            connected = true
+        }
+
+        override fun disconnect() {
+            desconectada = true
+        }
+
+        private fun cuerpoInvalidado(): InputStream =
+            object : InputStream() {
+                override fun read(): Int =
+                    if (desconectada) {
+                        throw java.io.IOException("conexión cerrada antes de leer el cuerpo")
+                    } else {
+                        this@ConexionQueSeInvalida.cuerpo.read()
+                    }
+            }
+
+        override fun usingProxy(): Boolean = false
+
+        override fun getResponseCode(): Int = codigo
+
+        override fun getHeaderField(nombre: String): String? = if (nombre.equals("Content-Type", ignoreCase = true)) tipoMime else null
+
+        override fun getInputStream(): InputStream = cuerpoInvalidado()
+    }
+
+    @Test
+    fun `el cuerpo de la respuesta final se lee antes de cerrar la conexion`() {
+        // El `disconnect` debe llegar DESPUÉS de la lectura del cuerpo: si
+        // llega antes, la evidencia del contenedor se pierde y la re-selección
+        // (S4/S5) ve un sondeo vacío en lugar del contenido real.
+        val conexion =
+            ConexionQueSeInvalida(
+                URL("http://origen.invalid/live/1274"),
+                200,
+                "application/octet-stream",
+                "#EXTM3U\nmaster.m3u8".toByteArray(),
+            )
+        val sondeo = sonda({ _ -> conexion }).sondear("http://origen.invalid/live/1274")
+        assertEquals("#EXTM3U\nmaster.m3u8", String(sondeo.bytes, Charsets.UTF_8))
+        assertEquals(FormatoObservado.HLS, sondeo.observado)
+    }
 }

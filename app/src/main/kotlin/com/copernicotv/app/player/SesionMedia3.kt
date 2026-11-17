@@ -1,6 +1,7 @@
 package com.copernicotv.app.player
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -12,9 +13,15 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.copernicotv.core.player.ConfiguracionImagen
+import com.copernicotv.core.player.DecisionReintento
 import com.copernicotv.core.player.DetectarContenedor
+import com.copernicotv.core.player.FalloVisto
+import com.copernicotv.core.player.FaseBase
 import com.copernicotv.core.player.ProtocoloStream
 import com.copernicotv.core.player.SondaContenedor
+import com.copernicotv.core.player.clasificarCondicion
+import com.copernicotv.core.player.hayEvidenciaEstable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -28,6 +35,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.coroutineContext
 
 /**
  * Única sesión Media3 de la pantalla de reproducción (E6-T2, ampliada en E6-T4).
@@ -58,6 +66,11 @@ class SesionMedia3(
     private val preferenciasIniciales: PreferenciasPista = PreferenciasPista(),
     private val intervaloMs: Long = INTERVALO_SONDEO_MS,
     private val politica: PoliticaReintentos = PoliticaReintentos(),
+    conectividad: ObservadorConectividad = ConectividadAndroid(contexto),
+    private val configuracionImagen: ConfiguracionImagen = ConfiguracionImagen(),
+    private val permitirReconstruccion: Boolean = true,
+    private val posicionInicialMs: Long = 0L,
+    private val accionesImagen: AccionesImagen = AccionesImagenNula,
 ) {
     private val _estado = MutableStateFlow(EstadoSesion())
     val estado: StateFlow<EstadoSesion> = _estado.asStateFlow()
@@ -94,10 +107,14 @@ class SesionMedia3(
     private val alcance = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private val liberada = AtomicBoolean(false)
     private val reintentos = politica.maquina()
-    private var trabajoReintento: Job? = null
+    private var trabajoRecuperacion: Job? = null
+    private var trabajoEstabilidad: Job? = null
     private var preferencias = preferenciasIniciales
     private var grupos: List<Tracks.Group> = emptyList()
     private var firmaGrupos = ""
+
+    /** Observador de conectividad de esta sesión; se libera con la sesión. */
+    private val conectividadSesion = conectividad
 
     /** URL de la sesión; los métodos del oyente la necesitan en el fallo. */
     private val urlSesion: String = url
@@ -113,10 +130,47 @@ class SesionMedia3(
 
     /** Marca de apertura de la sesión: base de «duración hasta el fallo». */
     private val inicioAperturaMs = android.os.SystemClock.elapsedRealtime()
+
+    /** `true` desde que se programa una recuperación hasta que vuelve a sonar la reproducción (S4). */
+    private var recuperandoAhora = false
+
+    /** Observador audiovisual oficial de Media3 (E7-T10, S3). */
+    private val observadorAudiovisual = ObservadorAudiovisual(inicioAperturaMs)
+
+    /**
+     * Detección de audio-sin-imagen y escalera de recuperación de imagen
+     * (E7-T10, S5). Vive en [EscaleraImagen]; la sesión le presta el motor,
+     * el observador y el estado de publicación.
+     *
+     * Visible para las pruebas instrumentadas: permiten abrir un caso de
+     * imagen real vía [EscaleraImagen.forzarCaso] sin esperar la detección.
+     */
+    @VisibleForTesting
+    internal val escaleraImagen =
+        EscaleraImagen(
+            ventanaMs = configuracionImagen.ventanaConfirmacionMs,
+            permitirReconstruccion = permitirReconstruccion,
+            acciones = accionesImagen,
+            observador = observadorAudiovisual,
+            liberada = { liberada.get() },
+            reproductor = { reproductor },
+            grupos = { grupos },
+            reiniciarPrimerFrame = { observadorAudiovisual.reiniciarPrimerFrame() },
+            publicar = { visible ->
+                _estado.value = _estado.value.copy(estadoImagen = visible)
+            },
+        )
+
+    /** Clase del último fallo visto: transporte o decodificación (S3/S4). */
+    private var falloVistoSesion = FalloVisto.NINGUNO
     private val oyente =
         object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
                 if (liberada.get()) return
+                // Un nuevo fallo aborta la ventana de estabilidad en curso (S4).
+                trabajoEstabilidad?.cancel()
+                trabajoEstabilidad = null
+                falloVistoSesion = falloVistoDe(error.errorCode)
                 val detalle = capturarDetalleFallo(error)
                 if (candidatoReSeleccion(protocolo, error.errorCode, reSeleccionEnMarcha)) {
                     reSeleccionEnMarcha = true
@@ -124,7 +178,7 @@ class SesionMedia3(
                     return
                 }
                 when (val decision = reintentos.alFallar(clasificarFallo(error.errorCode, detalle.estadoHttp))) {
-                    is DecisionReintento.Reintentar -> programarReintento(decision)
+                    is DecisionReintento.Reintentar -> programarRecuperacion(decision)
                     DecisionReintento.Definitivo ->
                         terminarConError(
                             codigo = codigoDeError(error.errorCode, detalle.estadoHttp),
@@ -149,6 +203,7 @@ class SesionMedia3(
 
     init {
         reproductor.addListener(oyente)
+        reproductor.addAnalyticsListener(observadorAudiovisual)
         // S42a/S42b: el motor gestiona el foco de audio. Una pérdida de foco
         // (una llamada u otra app) pausa o atenúa la reproducción y, al
         // recuperar el foco transitorio, el motor la reanuda solo. Sin
@@ -161,7 +216,13 @@ class SesionMedia3(
             // S42a: el motor gestiona el foco de audio (handleAudioFocus).
             true,
         )
-        reproductor.setMediaItem(mediaItemDe(url, protocolo))
+        // La reconstrucción de sesión (E7-T10, S5) preserva la posición con
+        // el arranque inicial dado; sin ella, la apertura es la de siempre.
+        if (posicionInicialMs > 0L) {
+            reproductor.setMediaItem(mediaItemDe(url, protocolo), posicionInicialMs)
+        } else {
+            reproductor.setMediaItem(mediaItemDe(url, protocolo))
+        }
         reproductor.prepare()
         reproductor.playWhenReady = true
         alcance.launch {
@@ -319,9 +380,12 @@ class SesionMedia3(
      */
     fun liberar() {
         if (!liberada.compareAndSet(false, true)) return
-        trabajoReintento?.cancel()
-        trabajoReintento = null
+        trabajoRecuperacion?.cancel()
+        trabajoRecuperacion = null
+        trabajoEstabilidad?.cancel()
+        trabajoEstabilidad = null
         alcance.cancel()
+        conectividadSesion.cerrar()
         runCatching { reproductor.removeListener(oyente) }
         reproductor.release()
     }
@@ -330,36 +394,72 @@ class SesionMedia3(
     fun estaLiberada(): Boolean = liberada.get()
 
     /**
-     * Publica el reintento pendiente y lo ejecuta sobre la misma instancia.
+     * Publica la recuperación pendiente y la ejecuta sobre la misma instancia.
      *
-     * Existe una sola corrutina de reintento por sesión: la máquina ignora
+     * Existe una sola corrutina de recuperación por sesión: la máquina ignora
      * fallos duplicados y esta guarda evita duplicar el trabajo si el motor
      * notificara dos veces. La cancelación de la sesión cancela la espera, de
-     * modo que un reintento pendiente nunca sobrevive a un cambio de Canal o a
-     * la salida de la pantalla.
+     * modo que una recuperación pendiente nunca sobrevive a un cambio de Canal
+     * ni a la salida de la pantalla.
+     *
+     * Orden por S4: primero la conectividad (una desconexión NO consume
+     * reintentos y no genera peticiones), después la espera de backoff en la
+     * puerta, y una re-comprobación de conectividad antes de preparar por si
+     * la red fluctuó durante la espera. Tras esperar reconexión no se repite
+     * el backoff: la caída ya fue una espera más larga.
      */
-    private fun programarReintento(decision: DecisionReintento.Reintentar) {
-        if (trabajoReintento?.isActive == true) return
+    private fun programarRecuperacion(decision: DecisionReintento.Reintentar) {
+        if (trabajoRecuperacion?.isActive == true) return
+        recuperandoAhora = true
         _estado.value =
             _estado.value.copy(
                 estado = EstadoReproductor.REINTENTANDO,
                 codigoError = null,
                 reintento = decision.numero,
                 reintentosMaximos = reintentos.maximo,
+                esperaRecuperacionMs = decision.esperaMs,
             )
-        trabajoReintento =
+        trabajoRecuperacion =
             alcance.launch {
+                if (!conectividadSesion.hayConexion()) {
+                    if (esperarReconexion()) return@launch
+                }
                 politica.esperar(decision.esperaMs)
                 if (!isActive || liberada.get()) return@launch
+                if (!conectividadSesion.hayConexion()) {
+                    if (esperarReconexion()) return@launch
+                }
                 reintentos.alEjecutar()
                 _estado.value =
                     _estado.value.copy(
                         estado = EstadoReproductor.CARGANDO,
                         reintento = 0,
                         reintentosMaximos = 0,
+                        esperaRecuperacionMs = 0L,
                     )
                 reproductor.prepare()
             }
+    }
+
+    /**
+     * Espera a que vuelva la red publicando el estado visible (S4).
+     *
+     * Retorna `true` si la sesión se canceló durante la espera. Al volver la
+     * conexión vuelve a publicar REINTENTANDO y el flujo continúa hacia
+     * `prepare()` sin consumir reintentos ni repetir el backoff.
+     */
+    private suspend fun esperarReconexion(): Boolean {
+        _estado.value =
+            _estado.value.copy(
+                estado = EstadoReproductor.ESPERANDO_CONEXION,
+                esperaRecuperacionMs = 0L,
+            )
+        conectividadSesion.esperarConexion()
+        // El contexto suspend de la corrutina llamadora: si la sesión canceló
+        // su alcance, la espera vuelve con el contexto cancelado.
+        if (!coroutineContext.isActive || liberada.get()) return true
+        _estado.value = _estado.value.copy(estado = EstadoReproductor.REINTENTANDO)
+        return false
     }
 
     /** Cierra la recuperación con el error definitivo (S20) y su detalle técnico. */
@@ -369,8 +469,12 @@ class SesionMedia3(
         intentos: Int,
         msHastaFallo: Long,
     ) {
-        trabajoReintento?.cancel()
-        trabajoReintento = null
+        trabajoRecuperacion?.cancel()
+        trabajoRecuperacion = null
+        trabajoEstabilidad?.cancel()
+        trabajoEstabilidad = null
+        recuperandoAhora = false
+        escaleraImagen.vaciar()
         val traza = trazadora.traza
         _estado.value =
             _estado.value.copy(
@@ -378,6 +482,9 @@ class SesionMedia3(
                 codigoError = codigo,
                 reintento = 0,
                 reintentosMaximos = 0,
+                esperaRecuperacionMs = 0L,
+                recuperadoRecientemente = false,
+                estadoImagen = null,
                 codigoMotor = detalle.codigoMotor,
                 clasesCausa = detalle.clasesCausa,
                 estadoHttp = detalle.estadoHttp,
@@ -398,22 +505,135 @@ class SesionMedia3(
                 formatoObservado = formatoObservadoSesion?.first,
                 formatoObservadoMime = formatoObservadoSesion?.second,
                 reSeleccionMedia = mimeReSeleccionado,
+                condicion =
+                    clasificarCondicion(
+                        observadorAudiovisual
+                            .senal(FaseBase.ERROR)
+                            .copy(falloVisto = falloVistoSesion),
+                    ),
             )
     }
 
     private fun publicarEstado() {
         val fase = _estado.value.estado
-        if (fase == EstadoReproductor.ERROR || fase == EstadoReproductor.REINTENTANDO) return
+        if (
+            fase == EstadoReproductor.ERROR ||
+            fase == EstadoReproductor.REINTENTANDO ||
+            fase == EstadoReproductor.ESPERANDO_CONEXION
+        ) {
+            return
+        }
         val duracion = reproductor.duration.tomarSiConocida()
+        val fasePublicada = faseActual()
+        val observacion = observadorAudiovisual.observacion()
+        val pistaVideo = observacion.pistaVideo
+        val pistaAudio = observacion.pistaAudio
         _estado.value =
             EstadoSesion(
-                estado = faseActual(),
+                estado = fasePublicada,
                 posicionMs = reproductor.currentPosition.coerceAtLeast(0L),
                 duracionMs = duracion,
                 bufferMs = reproductor.bufferedPosition.coerceAtLeast(0L),
                 puedeBuscar = duracion > 0L && reproductor.isCurrentMediaItemSeekable,
+                // La marca de "recuperada" sobrevive al sondeo: el sondeo
+                // publica una instancia fresca, así que se la lleva consigo.
+                recuperadoRecientemente = _estado.value.recuperadoRecientemente,
+                condicion =
+                    clasificarCondicion(
+                        observadorAudiovisual
+                            .senal(faseBaseDe(fasePublicada))
+                            .copy(falloVisto = falloVistoSesion),
+                    ),
+                pistaVideoMime = pistaVideo?.mime,
+                pistaVideoCodec = pistaVideo?.codec,
+                pistaVideoResolucion = pistaVideo?.resolucion,
+                pistaVideoFrameRate = pistaVideo?.frameRate,
+                pistaVideoBitrate = pistaVideo?.bitrate,
+                pistaAudioMime = pistaAudio?.mime,
+                pistaAudioCodec = pistaAudio?.codec,
+                pistaAudioBitrate = pistaAudio?.bitrate,
+                decoderVideo = observacion.decoderVideo,
+                decoderAudio = observacion.decoderAudio,
+                msHastaPrimerFrameVideo = observacion.msHastaPrimerFrameVideo,
+                framesPerdidosVideo = observacion.framesPerdidosVideo,
+                framesRenderidosVideo = observacion.framesRenderidosVideo,
+                framesOmitidosVideo = observacion.framesOmitidosVideo,
+                videoRendererActivo = observacion.videoActivo,
+                audioRendererActivo = observacion.audioActivo,
+                pistaVideoDetectada = observacion.hayGrupoVideo,
+                pistaAudioDetectada = observacion.hayGrupoAudio,
+                pistaVideoDetectadaMime = observacion.formatoVideoDetectado?.mime,
+                pistaVideoDetectadaCodec = observacion.formatoVideoDetectado?.codec,
+                pistaVideoSoportada = observacion.pistaVideoSoportada,
             )
+        gestionarEstabilidad(fasePublicada, observacion)
+        escaleraImagen.gestionar(faseBaseDe(fasePublicada))
     }
+
+    /**
+     * Ventana de estabilidad que repone el presupuesto de reintentos (S4).
+     *
+     * Cuando la reproducción está sonando con evidencia estable (video exige
+     * primer frame renderizado; los streams sin video usan la evidencia de
+     * audio), arranca una cuenta de [ConfiguracionRecuperacion.periodoEstabilidadMs]
+     * cancelable por error, cierre o pérdida de evidencia. Al completarse la
+     * máquina repone su presupuesto y se retira la marca de "recuperada".
+     * Un READY sin evidencia no repone nada ni reinicia la cuenta.
+     */
+    private fun gestionarEstabilidad(
+        fase: EstadoReproductor,
+        observacion: ObservacionAudiovisual,
+    ) {
+        val estable =
+            fase == EstadoReproductor.REPRODUCIENDO &&
+                hayEvidenciaEstable(
+                    videoActivo = observacion.videoActivo,
+                    primerFrameVideoVisto = observacion.primerFrameVideoVisto,
+                    hayGrupoVideo = observacion.hayGrupoVideo,
+                    hayGrupoAudio = observacion.hayGrupoAudio,
+                    audioActivo = observacion.audioActivo,
+                )
+        if (estable) {
+            if (recuperandoAhora) {
+                recuperandoAhora = false
+                _estado.value = _estado.value.copy(recuperadoRecientemente = true)
+            }
+            if (trabajoEstabilidad?.isActive == true) return
+            trabajoEstabilidad =
+                alcance.launch {
+                    politica.esperarEstabilidad(politica.configuracion.periodoEstabilidadMs)
+                    if (!isActive || liberada.get()) return@launch
+                    reintentos.alEstabilizar()
+                    escaleraImagen.vaciar()
+                    _estado.value = _estado.value.copy(recuperadoRecientemente = false)
+                }
+        } else {
+            trabajoEstabilidad?.cancel()
+            trabajoEstabilidad = null
+        }
+    }
+
+    /** Traduce la fase publicada al vocabulario neutro del clasificador (S3). */
+    private fun faseBaseDe(fase: EstadoReproductor): FaseBase =
+        when (fase) {
+            EstadoReproductor.CARGANDO -> FaseBase.ESPERANDO
+            EstadoReproductor.BUFFERING -> FaseBase.BUFFERING
+            EstadoReproductor.REPRODUCIENDO -> FaseBase.REPRODUCIENDO
+            EstadoReproductor.PAUSADO,
+            EstadoReproductor.TERMINADO,
+            EstadoReproductor.REINTENTANDO,
+            EstadoReproductor.ESPERANDO_CONEXION,
+            -> FaseBase.DETENIDA
+            EstadoReproductor.ERROR -> FaseBase.ERROR
+        }
+
+    /**
+     * Separa fallos de decodificación de fallos de transporte (S3/S4): los
+     * primeros son un problema audiovisual, no de red, y la política de
+     * recuperación no debe tratarlos como pérdida de conectividad.
+     */
+    private fun falloVistoDe(codigo: Int): FalloVisto =
+        if (codigo in CODIGOS_DECODIFICACION) FalloVisto.DECODIFICACION else FalloVisto.TRANSPORTE
 
     private fun faseActual(): EstadoReproductor =
         when (reproductor.playbackState) {
@@ -562,6 +782,20 @@ class SesionMedia3(
 
     private companion object {
         const val INTERVALO_SONDEO_MS = 250L
+
+        /** Cuánto queda visible el aviso de «imagen recuperada» (E7-T10, S5). */
+        const val AVISO_IMAGEN_RECUPERADA_MS = 5_000L
+
+        /** Códigos Media3 que son un problema audiovisual, no de red (S3/S4). */
+        val CODIGOS_DECODIFICACION =
+            setOf(
+                PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FAILED,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+                PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+                PlaybackException.ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED,
+                PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED,
+            )
     }
 }
 

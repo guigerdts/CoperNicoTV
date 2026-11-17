@@ -79,11 +79,11 @@ class ReproductorReintentosTvTest {
 
         val reintento = esperarSesion("primer reintento en TV") { it.estado == EstadoReproductor.REINTENTANDO }
         assertEquals(1, reintento.reintento)
-        assertEquals(3, reintento.reintentosMaximos)
+        assertEquals(6, reintento.reintentosMaximos)
         composeRule.mostrarControlesConDpad()
         composeRule.esperarFase("Reintentando")
         composeRule.esperarTag(TAG_REPRODUCTOR_REINTENTO)
-        assertTrue(composeRule.textoDeTag(TAG_REPRODUCTOR_REINTENTO).contains("1 de 3"))
+        assertTrue(composeRule.textoDeTag(TAG_REPRODUCTOR_REINTENTO).contains("1 de 6"))
         composeRule.esperarFocoEnAlternar()
         val sesion = requireNotNull(composeRule.viewModelReproductor().sesionActual())
 

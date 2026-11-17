@@ -6,16 +6,19 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
 import com.copernicotv.app.data.BusquedaCatalogoRepositorio
+import com.copernicotv.app.data.DiagnosticoRepositorio
 import com.copernicotv.app.data.PreferenciasReproduccion
 import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
 import com.copernicotv.app.data.ReproductorRepositorio
 import com.copernicotv.app.data.ResultadoStream
+import com.copernicotv.app.player.AccionesImagen
 import com.copernicotv.app.player.DiagnosticoReproductor
 import com.copernicotv.app.player.DireccionZapeo
 import com.copernicotv.app.player.EstadoPistas
 import com.copernicotv.app.player.EstadoReproductor
 import com.copernicotv.app.player.EstadoSesion
+import com.copernicotv.app.player.FabricaConectividad
 import com.copernicotv.app.player.ModoAspecto
 import com.copernicotv.app.player.PASO_VOLUMEN
 import com.copernicotv.app.player.PistaDisponible
@@ -27,6 +30,7 @@ import com.copernicotv.app.player.canalVecino
 import com.copernicotv.app.player.construirDiagnostico
 import com.copernicotv.app.player.limitarVolumen
 import com.copernicotv.app.player.sanearUrl
+import com.copernicotv.core.player.ConfiguracionImagen
 import com.copernicotv.core.player.ProtocoloStream
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -89,6 +93,9 @@ class ReproductorViewModel
         private val preferenciasPista: RepositorioPreferenciasPista,
         private val preferenciasReproduccion: RepositorioPreferenciasReproduccion,
         private val politicaReintentos: PoliticaReintentos,
+        private val fabricaConectividad: FabricaConectividad,
+        private val configuracionImagen: ConfiguracionImagen,
+        private val registroDiagnosticos: DiagnosticoRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -112,6 +119,29 @@ class ReproductorViewModel
         private val _volumen = MutableStateFlow(VOLUMEN_INICIAL)
         val volumen: StateFlow<Float> = _volumen.asStateFlow()
 
+        /**
+         * Contador de solicitudes de re-attach de la superficie (E7-T10, S5).
+         *
+         * El nivel RESTAURAR_SUPERFICIE de la escalera lo incrementa; la
+         * pantalla observa el valor y, cuando cambia, desconecta y vuelve a
+         * conectar el reproductor en la vista. Un contador evita depender de
+         * instancias booleanas que ya estén en el valor objetivo.
+         */
+        private val _solicitudSuperficie = MutableStateFlow(0)
+        val solicitudSuperficie: StateFlow<Int> = _solicitudSuperficie.asStateFlow()
+
+        /** Acciones externas de la escalera de imagen que viven en la pantalla o aquí (S5). */
+        private val accionesImagen =
+            object : AccionesImagen {
+                override fun restaurarSuperficie() {
+                    _solicitudSuperficie.value += 1
+                }
+
+                override fun reconstruirSesion(posicionMs: Long) {
+                    reconstruir(posicionMs)
+                }
+            }
+
         /** Disponibilidad de zapeo del Canal activo (E6-T6). */
         private val _zapeo = MutableStateFlow(ZapeoEstado())
         val zapeo: StateFlow<ZapeoEstado> = _zapeo.asStateFlow()
@@ -127,6 +157,7 @@ class ReproductorViewModel
         private var recolectorPistas: Job? = null
         private var preferenciasActuales = PreferenciasPista()
         private var protocoloActual: ProtocoloStream? = null
+        private var urlReproduccionActual: String? = null
         private var urlSaneadaActual: String? = null
         private var ultimoError: String? = null
 
@@ -147,6 +178,7 @@ class ReproductorViewModel
                     when (val resultado = repositorio.resolver(canalId)) {
                         is ResultadoStream.Ok -> {
                             val urlSaneada = sanearUrl(resultado.stream.url)
+                            urlReproduccionActual = resultado.stream.url
                             protocoloActual = resultado.stream.protocolo
                             urlSaneadaActual = urlSaneada
                             ultimoError = null
@@ -171,6 +203,14 @@ class ReproductorViewModel
                             // El volumen vigente sobrevive al zapeo: la sesión
                             // nueva hereda el nivel actual (E6-T6).
                             nueva.fijarVolumen(_volumen.value)
+                            // La fila de diagnóstico persistente abre con la
+                            // sesión (E7-T10, S6a): sobrevive al cierre del
+                            // reproductor.
+                            registroDiagnosticos.abrir(
+                                resultado.stream.canalId,
+                                resultado.stream.nombre,
+                                resultado.stream.url,
+                            )
                             // Si la sesión falló antes de publicar el Canal, el
                             // error definitivo ya ganó: no lo pisamos con Listo.
                             if (sesion === nueva) {
@@ -333,6 +373,39 @@ class ReproductorViewModel
         @VisibleForTesting
         fun sesionActual(): SesionMedia3? = sesion
 
+        /**
+         * Reconstruye la sesión completa preservando la posición (E7-T10, S5).
+         *
+         * Es el último nivel de la escalera de imagen: cierra la sesión
+         * actual y abre una nueva con la misma URL y preferencias. Los datos
+         * de la sesión se capturan ANTES de cerrarla, porque `cerrarSesion`
+         * limpia las referencias; el canal cargado se olvida para que la
+         * nueva apertura no se detecte como carga repetida. La URL es la
+         * cruda de reproducción, no la saneada de diagnóstico: `sanearUrl`
+         * reduce la dirección a esquema/host/puerto para mostrarla en
+         * pantalla y una sesión reconstruida con ella no apuntaría al
+         * stream real.
+         */
+        fun reconstruir(posicionMs: Long) {
+            val url = urlReproduccionActual ?: return
+            val protocolo = protocoloActual ?: return
+            val preferencias = preferenciasActuales
+            val canalIdReconstruido = canalCargado
+            val nombreReconstruido = (_estado.value as? ReproductorUiState.Listo)?.nombre
+            cerrarSesion(conservarDiagnostico = true)
+            canalCargado = null
+            _estado.value = ReproductorUiState.Cargando
+            abrirSesion(url, protocolo, preferencias, posicionInicialMs = posicionMs)
+            // La sesión reconstruida tiene su propia fila de diagnóstico.
+            registroDiagnosticos.abrir(canalIdReconstruido, nombreReconstruido, url)
+        }
+
+        /** Solo para pruebas: fuerza la ruta de reconstrucción sin tocar la escalera. */
+        @VisibleForTesting
+        fun reconstruirSesionParaPruebas(posicionMs: Long) {
+            reconstruir(posicionMs)
+        }
+
         override fun onCleared() {
             carga?.cancel()
             cerrarSesion()
@@ -342,8 +415,20 @@ class ReproductorViewModel
             url: String,
             protocolo: ProtocoloStream,
             preferencias: PreferenciasPista,
+            posicionInicialMs: Long = 0L,
         ): SesionMedia3 {
-            val nueva = SesionMedia3(contexto, url, protocolo, preferencias, politica = politicaReintentos)
+            val nueva =
+                SesionMedia3(
+                    contexto,
+                    url,
+                    protocolo,
+                    preferencias,
+                    politica = politicaReintentos,
+                    conectividad = fabricaConectividad.crear(),
+                    configuracionImagen = configuracionImagen,
+                    posicionInicialMs = posicionInicialMs,
+                    accionesImagen = accionesImagen,
+                )
             sesion = nueva
             recolector?.cancel()
             recolector =
@@ -354,6 +439,11 @@ class ReproductorViewModel
                         _sesionEstado.value = estadoSesion
                         estadoSesion.codigoError?.let { ultimoError = it }
                         actualizarDiagnostico(estadoSesion, _estadoPistas.value)
+                        if (estadoSesion.estado == EstadoReproductor.TERMINADO) {
+                            // Fin de stream: la fila se cierra aunque la
+                            // sesión siga viva hasta el zapeo siguiente.
+                            registroDiagnosticos.cerrar()
+                        }
                         if (estadoSesion.estado == EstadoReproductor.ERROR) {
                             _estado.value =
                                 ReproductorUiState.Error(estadoSesion.codigoError ?: "error_reproduccion")
@@ -397,6 +487,7 @@ class ReproductorViewModel
             estadoSesion: EstadoSesion,
             pistas: EstadoPistas,
         ) {
+            registroDiagnosticos.observar(estadoSesion, pistas)
             _diagnostico.value =
                 construirDiagnostico(
                     protocolo = protocoloActual,
@@ -418,12 +509,17 @@ class ReproductorViewModel
             recolectorPistas?.cancel()
             recolectorPistas = null
             anterior?.liberar()
+            // La fila de la sesión cerrada termina aquí (E7-T10, S6a): zapeo,
+            // reconstrucción, abandono o error definitivo, cada cierre se
+            // registra una sola vez.
+            registroDiagnosticos.cerrar()
             _sesionEstado.value = EstadoSesion()
             _estadoPistas.value = EstadoPistas()
             if (!conservarDiagnostico) {
                 _diagnostico.value = DiagnosticoReproductor()
             }
             protocoloActual = null
+            urlReproduccionActual = null
             urlSaneadaActual = null
             ultimoError = null
         }

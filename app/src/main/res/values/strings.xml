@@ -161,8 +161,18 @@
     <string name="reproductor_fase_pausado">Pausado</string>
     <string name="reproductor_fase_terminado">Finalizado</string>
     <string name="reproductor_fase_reintentando">Reintentando</string>
+    <string name="reproductor_fase_esperando_conexion">Esperando conexión</string>
     <string name="reproductor_fase_error">Error</string>
-    <string name="reproductor_reintento">Sin conexión. Reintentando %1$d de %2$d…</string>
+    <string name="reproductor_reintento_espera">Sin conexión. Reintentando %1$d de %2$d · espera %3$d s</string>
+    <string name="reproductor_recuperacion_esperando">Sin conexión a Internet. La reproducción se reanudará cuando vuelva la conexión…</string>
+    <string name="reproductor_recuperada">Reproducción recuperada</string>
+    <string name="reproductor_recuperacion_fallida">No se pudo recuperar la reproducción tras %1$d intentos</string>
+
+    <!-- Escalera de imagen (E7-T10, S5/F7). -->
+    <string name="reproductor_imagen_recuperando">Restaurando la imagen…</string>
+    <string name="reproductor_imagen_error_decoder">La imagen no se pudo recuperar. El audio sigue disponible</string>
+    <string name="reproductor_imagen_error_renderizado">La imagen no se pudo recuperar. El audio sigue disponible</string>
+    <string name="reproductor_imagen_recuperada">Imagen restaurada</string>
     <string name="reproductor_diagnostico">Diagnóstico</string>
     <string name="reproductor_diagnostico_titulo">Diagnóstico técnico</string>
     <string name="reproductor_diagnostico_copiar">Copiar diagnóstico</string>

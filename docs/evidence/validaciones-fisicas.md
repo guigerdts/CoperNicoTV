@@ -19,6 +19,7 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 | F-09 | E7-T7 | Importación física (S33/S35/S36/S42, I-M) | Pendiente | sin evidencia recuperada | checklist E7-T7 |
 | F-10 | E7-T7 ronda 9 | Importación ~147k canales | Pendiente | medición aproximada sin confirmación | `e7-t7-ronda9-metricas-room.md` |
 | F-11 | E7-T6 | Duck de audio | Pendiente | atenuación no medible por API pública | matriz §L91 |
+| F-12 | E4-T7 (DC-07 punto 8) | Reinicio del dispositivo / force-stop: el trabajo periódico de WorkManager sobrevive y se reanuda en el próximo arranque, sin hora exacta | Pendiente | sin evidencia física recuperada; en CI queda cubierto por persistencia de plataforma y reconciliación idempotente (`ProgramadorWorkManagerTest`) | `odd/tasks/e4-t7-dc-07-implementacion-cierre.md` §D |
 
 ## Detalle
 

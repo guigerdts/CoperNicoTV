@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
@@ -40,6 +42,7 @@ class IndicadoresFuenteTest {
     private lateinit var actualizacion: ActualizacionRepositorio
     private lateinit var indicadores: IndicadoresFuenteRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private var fuenteId: Long = 0L
     private var listaId: Long = 0L
@@ -53,7 +56,7 @@ class IndicadoresFuenteTest {
                 .allowMainThreadQueries()
                 .build()
         val indice = IndiceHmacRepositorio(db, claves)
-        actualizacion = ActualizacionRepositorio(db, claves, indice, contexto)
+        actualizacion = ActualizacionRepositorio(db, claves, clavesDatos, indice, contexto)
         indicadores = IndicadoresFuenteRepositorioRoom(db)
         runBlocking {
             // Producción siembra la fila al crear la base y la guardia incorpora

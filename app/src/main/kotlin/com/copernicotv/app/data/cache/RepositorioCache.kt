@@ -1,7 +1,7 @@
 package com.copernicotv.app.data.cache
 
 import android.util.Log
-import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.CacheM3UEntity
@@ -97,7 +97,7 @@ class RepositorioCache(
     private val db: AppDatabase,
     private val almacen: AlmacenCache,
     private val descargador: Descargador,
-    private val claves: ClavesApp,
+    private val clavesDatos: ClavesDatos,
     private val indice: IndiceHmacRepositorio,
     private val presupuesto: PresupuestoCache = PresupuestoCache(),
 ) {
@@ -461,8 +461,8 @@ class RepositorioCache(
         tipo: TipoCache,
         url: String,
     ): ByteArray =
-        CifradoAes.cifrar(
-            claves.claveAes,
+        CifradoAes.cifrarDatos(
+            clavesDatos.clave(),
             aadUrl(tipo),
             url.toByteArray(Charsets.UTF_8),
         )

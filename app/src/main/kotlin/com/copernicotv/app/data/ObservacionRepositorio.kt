@@ -3,6 +3,7 @@ package com.copernicotv.app.data
 import android.database.sqlite.SQLiteConstraintException
 import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -60,6 +61,7 @@ class ObservacionRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
     ) {
         private val escritorCanales = CanalEscritor(db)
         private val escritorApariencias = AparienciaEscritor(db)
@@ -281,10 +283,10 @@ class ObservacionRepositorio
             aadOrigen: String,
             aadDestino: String,
         ): ByteArray? {
-            val claro =
-                (CifradoAes.descifrar(claves.claveAes, aadOrigen, sobre) as? ResultadoDescifrado.Ok)?.bytes
-                    ?: return null
-            return CifradoAes.cifrar(claves.claveAes, aadDestino, claro)
+            val descifrado =
+                CifradoAes.descifrarSobre(claves.claveAes, clavesDatos.clave(), aadOrigen, sobre)
+            val claro = (descifrado as? ResultadoDescifrado.Ok)?.bytes ?: return null
+            return CifradoAes.cifrarDatos(clavesDatos.clave(), aadDestino, claro)
         }
 
         private suspend fun resolverConConflicto(bloque: suspend () -> ResultadoResolucionObservacion): ResultadoResolucionObservacion =

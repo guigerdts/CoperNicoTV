@@ -1,6 +1,7 @@
 package com.copernicotv.app.data
 
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.crypto.ClavesOperativas
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
@@ -91,6 +92,7 @@ internal class ReconstructorIndiceHmac
         private val db: AppDatabase,
         private val indice: IndiceHmacRepositorio,
         private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
         private val operativas: ClavesOperativas = ClavesOperativas(),
         private val valores: ReconstruccionValorHmac,
     ) {
@@ -199,8 +201,8 @@ internal class ReconstructorIndiceHmac
                 // IV nuevo (misma clave AES, Q1) y sobre nuevo con la clave de
                 // la generación objetivo.
                 val cifrado =
-                    CifradoAes.cifrar(
-                        claves.claveAes,
+                    CifradoAes.cifrarDatos(
+                        clavesDatos.clave(),
                         definicion.aad,
                         canonica.urlCanonica.toByteArray(Charsets.UTF_8),
                     )

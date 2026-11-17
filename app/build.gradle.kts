@@ -84,6 +84,10 @@ tasks.withType<Test>().configureEach {
             includeTestsMatching("com.copernicotv.app.p1.MedicionP1BusquedaTest")
         }
         outputs.upToDateWhen { false }
+    } else if (name == "testDebugUnitTest") {
+        // La importación masiva de E7-T7 ronda 8 (146.762 canales) necesita
+        // más heap que el predeterminado de Gradle (512m).
+        maxHeapSize = "1536m"
     }
 }
 

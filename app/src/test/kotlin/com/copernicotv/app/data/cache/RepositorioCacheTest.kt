@@ -3,7 +3,9 @@ package com.copernicotv.app.data.cache
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.IndiceHmacRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
@@ -45,6 +47,7 @@ class RepositorioCacheTest {
     private lateinit var descargador: DescargadorContador
     private lateinit var repositorio: RepositorioCache
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
 
     private val t0: Instant = Instant.parse("2026-01-01T00:00:00Z")
 
@@ -60,7 +63,7 @@ class RepositorioCacheTest {
         almacen = AlmacenCache(directorio, claves)
         descargador = DescargadorContador()
         val indice = IndiceHmacRepositorio(db, claves)
-        repositorio = RepositorioCache(db, almacen, descargador, claves, indice)
+        repositorio = RepositorioCache(db, almacen, descargador, clavesDatos, indice)
         // Producción siembra la fila al crear la base y la guardia incorpora la
         // clave antes de aceptar datos protegidos. Estos fixtures usan
         // `inMemoryDatabaseBuilder` sin ese callback, así que inicializan el
@@ -185,7 +188,8 @@ class RepositorioCacheTest {
             assertFalse(crudo.toString(Charsets.ISO_8859_1).contains("PRIMERO"))
             assertFalse(fila.urlCifrada.contentEquals(URL_M3U.toByteArray()))
             assertEquals(
-                CifradoAes.VERSION.toInt(),
+                "el sobre de la URL de la copia es 0x02 con la clave de datos de la sesion",
+                CifradoAes.VERSION_DATOS.toInt(),
                 fila.urlCifrada[0].toInt(),
             )
         }
@@ -259,7 +263,7 @@ class RepositorioCacheTest {
                     db,
                     AlmacenCache(directorio, claves) { false },
                     descargador,
-                    claves,
+                    clavesDatos,
                     IndiceHmacRepositorio(db, claves),
                 )
 
@@ -295,7 +299,7 @@ class RepositorioCacheTest {
                     db,
                     almacen,
                     descargador,
-                    claves,
+                    clavesDatos,
                     IndiceHmacRepositorio(db, claves),
                     PresupuestoCache(m3uPorArchivo = 50, m3uPorLista = 1_000, m3uTotal = 1_000, global = 10_000),
                 )
@@ -320,7 +324,7 @@ class RepositorioCacheTest {
                     db,
                     almacen,
                     descargador,
-                    claves,
+                    clavesDatos,
                     IndiceHmacRepositorio(db, claves),
                     PresupuestoCache(
                         m3uTotal = 140,
@@ -355,7 +359,7 @@ class RepositorioCacheTest {
                     db,
                     almacen,
                     descargador,
-                    claves,
+                    clavesDatos,
                     IndiceHmacRepositorio(db, claves),
                     PresupuestoCache(
                         m3uTotal = 140,

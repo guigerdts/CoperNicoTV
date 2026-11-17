@@ -2,7 +2,7 @@
 
 Glosario del proyecto: reproductor y administrador de contenido IPTV para Android y Android TV. El usuario aporta las Fuentes; la aplicación importa, organiza y reproduce. Este documento solo define vocabulario de dominio; Las decisiones técnicas viven en `docs/adr/`.
 
-Vigencia L26 (2026-10-24): las definiciones de Fuente, Lista, Perfil, FuenteGuia, Canal, Clave de Canal, Apariencia, Asociación, Caché de transporte y Retención de EPG se actualizaron conforme a DC-01–DC-11; el resto del glosario se conserva. Actualización L27 (2026-10-25): Perfil precisa la normalización canónica, Apariencia precisa la clave v2 y se añade Índice HMAC; ver «Enmienda L27». Actualización L28 (2026-10-25): se precisan Canal, Clave de Canal, Favorito, Actualización y Asociación; se añade URL canónica y se registra la enmienda L28. Actualización L29 (2026-10-25): Clave de Canal precisa la versión Unicode 15.1.0 y la elegibilidad; URL canónica precisa el permiso SAF fuera de la identidad; ver «Enmienda L29». Actualización L30 (2026-10-25): Canal, Clave de Canal y URL canónica precisan el contrato versionado de PD-3, la separación entre URL original cifrada, URL canónica derivada y HMAC, y las clases HMAC `0x01`–`0x04`; ver «Enmienda L30». Actualización L31 (2026-10-26): se precisan Canal, Clave de Canal, URL canónica e Índice HMAC; se añaden Generación de clave HMAC y Versión de canonicalización URL; ver «Enmienda L31».
+Vigencia L26 (2026-10-24): las definiciones de Fuente, Lista, Perfil, FuenteGuia, Canal, Clave de Canal, Apariencia, Asociación, Caché de transporte y Retención de EPG se actualizaron conforme a DC-01–DC-11; el resto del glosario se conserva. Actualización L27 (2026-10-25): Perfil precisa la normalización canónica, Apariencia precisa la clave v2 y se añade Índice HMAC; ver «Enmienda L27». Actualización L28 (2026-10-25): se precisan Canal, Clave de Canal, Favorito, Actualización y Asociación; se añade URL canónica y se registra la enmienda L28. Actualización L29 (2026-10-25): Clave de Canal precisa la versión Unicode 15.1.0 y la elegibilidad; URL canónica precisa el permiso SAF fuera de la identidad; ver «Enmienda L29». Actualización L30 (2026-10-25): Canal, Clave de Canal y URL canónica precisan el contrato versionado de PD-3, la separación entre URL original cifrada, URL canónica derivada y HMAC, y las clases HMAC `0x01`–`0x04`; ver «Enmienda L30». Actualización L31 (2026-10-26): se precisan Canal, Clave de Canal, URL canónica e Índice HMAC; se añaden Generación de clave HMAC y Versión de canonicalización URL; ver «Enmienda L31». Actualización L32 (2026-11-14): se añaden Sobre de datos, Envolvente 0x01, Envolvente 0x02, Clave de datos de sesión y Migración del catálogo (cifrado); ver «Enmienda L32».
 
 ## Language
 
@@ -55,6 +55,26 @@ _Avoid_: ocurrencia duplicada, canal repetido
 **Índice HMAC**:
 Índice de igualdad sobre valores cifrados, calculado con una clave HMAC independiente de la clave AES. Cada valor persistido lleva el sobre `hmac:vN:cvM:<base64>`: `vN` identifica la generación de la clave HMAC y `cvM` la versión de canonicalización URL usada para derivar la representación. `EstadoIndiceHmac.version_activa`/`version_objetivo` registran solo `vN`; `HmacPendiente.version_origen` registra `cvM` o `desconocida`, no `vN`. Si la clave HMAC se pierde, el índice queda en recuperación y las operaciones que dependen de igualdad HMAC se bloquean con `indice_hmac_no_operativo` hasta completar una reconstrucción explícita, idempotente y coherente que conserva el `cvM` de cada valor y solo cambia `vN`. Las filas no reconstruibles se conservan en `HmacPendiente`; un valor legacy `hmac:vN:` sin `cvM` no se asume `cv1`. No se comparan generaciones ni valores con `cvM` distinto, no se fusiona y no se borra automáticamente (DC-04).
 _Avoid_: hash de URL, caché de URL, clave AES
+
+**Sobre de datos**:
+Sobre AES-GCM que cifra un valor del catálogo. Primer byte: versión de envolvente. Luego: IV único de 12 bytes, ciphertext y tag GCM. El AAD separa dominios por campo (`CifradoAes.aad(...)`), de modo que un sobre de un campo no es reutilizable en otro.
+_Avoid_: blob cifrado, payload
+
+**Envolvente 0x01**:
+Envolvente legacy: cada registro se cifra directamente con la clave de Keystore del catálogo. Los datos existentes en 0x01 permanecen legibles por despacho de versión; no se escriben registros nuevos en 0x01. Es también la envolvente usada para proteger la clave de datos de sesión con la raíz.
+_Avoid_: formato viejo, cifrado directo
+
+**Envolvente 0x02**:
+Envolvente actual: cada registro se cifra con la Clave de datos de sesión, no con la raíz de Keystore. Reduce las operaciones de Keystore por importación a O(1) (protección/desprotección de la clave de datos), independientes del número de canales. Toda escritura nueva de datos del catálogo usa 0x02.
+_Avoid_: versión nueva, sobre de sesión
+
+**Clave de datos de sesión**:
+Clave AES-256 generada por CSPRNG, en memoria solo durante la sesión del proceso. Se protege (envuelve) una vez con la clave raíz de Keystore y solo la envuelta se persiste, en un archivo dentro de `noBackupFilesDir` con escritura atómica. Si la desprotección falla (raíz inválida, envuelta corrupta), se regenera: los datos previos quedan ilegibles hasta la reimportación, con recuperación pendiente; nunca se borran datos. Los buffers de material intermedio se ponen a cero; no se registra en logs ni informes.
+_Avoid_: clave de sesión, session key sin contexto
+
+**Migración del catálogo (cifrado)**:
+La importación **es** la migración: la escritura del catálogo reescribe todos los datos en una única transacción Room, idempotente, atómica y no destructiva. Los datos 0x01 permanecen legibles hasta que una reimportación los reescriba en 0x02. No existe migración en línea durante lecturas ni job en segundo plano.
+_Avoid_: conversión en caliente, migración lazy
 
 **Catálogo**:
 Conjunto de canales visibles para el usuario en un momento dado, producto de las Listas importadas y de las selecciones del usuario (Favoritos, Ocultaciones, Colecciones, orden).
@@ -154,3 +174,7 @@ Actualizadas las definiciones de Canal, Clave de Canal y URL canónica para cerr
 ## Enmienda L31 (2026-10-26)
 
 Actualizadas las definiciones de Canal, Clave de Canal, URL canónica e Índice HMAC, y añadidas las de Generación de clave HMAC y Versión de canonicalización URL para cerrar documentalmente el bloqueo residual de PD-4. El sobre HMAC pasa a `hmac:vN:cvM:<base64>`: `vN` es la generación de clave y `cvM` la versión de canonicalización; `cv1` es la actual y se asocia a `canon:v2`. `EstadoIndiceHmac` sigue registrando solo la generación de clave; `HmacPendiente.version_origen` es `cvM` o `desconocida`, nunca `vN`. La reconstrucción conserva el `cvM` de cada valor y solo cambia `vN`; un valor legacy sin `cvM` no se asume `cv1` y requiere reimportación o migración explícita. La migración de canonicalización es un proceso explícito distinto de la recuperación de clave. `H_icono` de EPG no usa este sobre; su versión va con `huella:v2`/`huella_version=2`. No se declara implementación ni validación funcional. No se modificó `docs/evidence/u0-manifest.md`.
+
+## Enmienda L32 (2026-11-14)
+
+Añadidas las definiciones de Sobre de datos, Envolvente 0x01, Envolvente 0x02, Clave de datos de sesión y Migración del catálogo (cifrado) para documentar E7-T7 ronda 8 (ADR-0007). El sobre de datos lleva el byte de versión de envolvente como primer byte; 0x01 cifra por registro con la clave de Keystore (legacy, legible, sin escrituras nuevas) y 0x02 cifra con la clave de datos de sesión protegida por la raíz (escritura nueva, O(1) en operaciones de Keystore por importación). La desprotección fallida regenera la clave de datos con recuperación pendiente, sin borrar datos. La importación es la migración: reescritura completa en una transacción, idempotente y no destructiva. No se declara rendimiento validado: la medición en dispositivo físico de la ronda 8 queda pendiente (S8). No se modificó `docs/evidence/u0-manifest.md`.

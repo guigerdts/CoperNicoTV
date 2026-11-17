@@ -3,8 +3,10 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.actualizacion.EstadoSolicitud
 import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
 import com.copernicotv.app.data.db.AppDatabase
@@ -50,6 +52,7 @@ class CatalogoPersistenciaTest {
     private lateinit var db: AppDatabase
     private lateinit var repositorio: CatalogoRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -57,7 +60,7 @@ class CatalogoPersistenciaTest {
         Dispatchers.setMain(UnconfinedTestDispatcher())
         contexto.deleteDatabase(NOMBRE_BD)
         db = abrirBase()
-        repositorio = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+        repositorio = CatalogoRepositorio(db, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
     }
 
     @After
@@ -101,13 +104,13 @@ class CatalogoPersistenciaTest {
 
             db.close()
             db = abrirBase()
-            val repositorioNuevo = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+            val repositorioNuevo = CatalogoRepositorio(db, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
             val preferencias = PreferenciasOrdenEnMemoria()
             val viewModel =
                 CatalogoViewModel(
                     repositorioNuevo,
                     BusquedaCatalogoRepositorio(db),
-                    CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias),
+                    CatalogoCrudRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), preferencias),
                     preferencias,
                     ColeccionRepositorio(db),
                     PerfilRepositorio(db.perfilDao(), db.listaDao(), CaseFolderCompleto),
@@ -181,7 +184,8 @@ class CatalogoPersistenciaTest {
             val fallo =
                 runCatching {
                     val sinAes = ClavesQueFallanAlCifrar(claves)
-                    CatalogoRepositorio(db, sinAes, IndiceHmacRepositorio(db, sinAes), contexto)
+                    val sinDatos = ClavesDatos(sinAes, AlmacenClaveDatosEnMemoria())
+                    CatalogoRepositorio(db, sinDatos, IndiceHmacRepositorio(db, sinAes), contexto)
                         .importar(texto, OTRA_FUENTE, OTRA_UBICACION)
                 }.exceptionOrNull()
 
@@ -207,7 +211,7 @@ class CatalogoPersistenciaTest {
         aad: String,
         sobre: ByteArray,
     ): String {
-        val resultado = CifradoAes.descifrar(clave, aad, sobre)
+        val resultado = CifradoAes.descifrarSobre(clave, clavesDatos.clave(), aad, sobre)
         assertTrue("esperaba descifrado ok", resultado is ResultadoDescifrado.Ok)
         return String((resultado as ResultadoDescifrado.Ok).bytes, Charsets.UTF_8)
     }

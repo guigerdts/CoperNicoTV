@@ -4,6 +4,7 @@ import android.database.sqlite.SQLiteConstraintException
 import android.util.Log
 import androidx.room.withTransaction
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -57,6 +58,7 @@ class CatalogoCrudRepositorio
     constructor(
         private val db: AppDatabase,
         private val claves: ClavesApp,
+        private val clavesDatos: ClavesDatos,
         private val indice: IndiceHmacRepositorio,
         private val preferencias: PreferenciasOrden,
     ) {
@@ -103,8 +105,8 @@ class CatalogoCrudRepositorio
                                 fuenteId = fuenteId,
                                 nombre = limpio,
                                 ubicacionCifrada =
-                                    CifradoAes.cifrar(
-                                        claves.claveAes,
+                                    CifradoAes.cifrarDatos(
+                                        clavesDatos.clave(),
                                         CifradoAes.aad("Lista", "ubicacion_cifrada"),
                                         ubicacion.toByteArray(Charsets.UTF_8),
                                     ),
@@ -232,8 +234,8 @@ class CatalogoCrudRepositorio
                                     fuenteId = lista.fuenteId,
                                     nombre = nombrePersistido,
                                     urlStreamCifrada =
-                                        CifradoAes.cifrar(
-                                            claves.claveAes,
+                                        CifradoAes.cifrarDatos(
+                                            clavesDatos.clave(),
                                             CifradoAes.aad("Canal", "url_stream_cifrada"),
                                             url.trim().toByteArray(Charsets.UTF_8),
                                         ),
@@ -296,8 +298,9 @@ class CatalogoCrudRepositorio
                 val urlOriginal =
                     when (
                         val descifrado =
-                            CifradoAes.descifrar(
+                            CifradoAes.descifrarSobre(
                                 claves.claveAes,
+                                clavesDatos.clave(),
                                 CifradoAes.aad("Canal", "url_stream_cifrada"),
                                 canal.urlStreamCifrada,
                             )

@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
@@ -45,6 +47,7 @@ import java.util.concurrent.TimeUnit
 class ColeccionRepositorioTest {
     private lateinit var db: AppDatabase
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val preferencias = PreferenciasOrdenEnMemoria()
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private var lista1: Long = 0L
@@ -97,7 +100,7 @@ class ColeccionRepositorioTest {
     fun `el orden de la coleccion no toca el orden de las listas y viceversa`() {
         runBlocking {
             val colecciones = ColeccionRepositorio(db)
-            val crud = CatalogoCrudRepositorio(db, claves, IndiceHmacRepositorio(db, claves), preferencias)
+            val crud = CatalogoCrudRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), preferencias)
             assertEquals(listOf("C1", "C2", "C3"), nombresLista(lista1))
             assertEquals(listOf("C3", "C2", "C1"), nombresLista(lista2))
 

@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.crypto.CifradoAes
 import com.copernicotv.core.player.ProtocoloStream
@@ -28,6 +30,7 @@ class ReproductorRepositorioTest {
     private lateinit var catalogo: CatalogoRepositorio
     private lateinit var reproductor: ReproductorRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
 
     @Before
@@ -37,8 +40,8 @@ class ReproductorRepositorioTest {
                 .inMemoryDatabaseBuilder(contexto, AppDatabase::class.java)
                 .allowMainThreadQueries()
                 .build()
-        catalogo = CatalogoRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
-        reproductor = ReproductorRepositorio(db, claves)
+        catalogo = CatalogoRepositorio(db, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
+        reproductor = ReproductorRepositorio(db, claves, clavesDatos)
     }
 
     @After

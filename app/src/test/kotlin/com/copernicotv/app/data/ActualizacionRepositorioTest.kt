@@ -3,7 +3,9 @@ package com.copernicotv.app.data
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.copernicotv.app.AlmacenClaveDatosEnMemoria
 import com.copernicotv.app.ClavesEnMemoria
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.data.actualizacion.CausasActualizacion
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.ColeccionCanalEntity
@@ -52,6 +54,7 @@ class ActualizacionRepositorioTest {
     private lateinit var repositorio: ActualizacionRepositorio
     private lateinit var indice: IndiceHmacRepositorio
     private val claves = ClavesEnMemoria()
+    private val clavesDatos = ClavesDatos(claves, AlmacenClaveDatosEnMemoria())
     private val contexto: Context = ApplicationProvider.getApplicationContext()
     private var fuenteId: Long = 0L
     private var listaId: Long = 0L
@@ -65,7 +68,7 @@ class ActualizacionRepositorioTest {
                 .allowMainThreadQueries()
                 .build()
         indice = IndiceHmacRepositorio(db, claves)
-        repositorio = ActualizacionRepositorio(db, claves, indice, contexto)
+        repositorio = ActualizacionRepositorio(db, claves, clavesDatos, indice, contexto)
         runBlocking {
             // Producción siembra la fila del índice al crear la base; este
             // fixture usa `databaseBuilder` sin ese callback. El índice debe
@@ -399,7 +402,7 @@ class ActualizacionRepositorioTest {
                     .databaseBuilder(contexto, AppDatabase::class.java, NOMBRE_BD)
                     .allowMainThreadQueries()
                     .build()
-            repositorio = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto)
+            repositorio = ActualizacionRepositorio(db, claves, clavesDatos, IndiceHmacRepositorio(db, claves), contexto)
 
             val actualizado = requireNotNull(db.canalDao().porId(original.id))
             assertEquals(original.id, actualizado.id)
@@ -444,7 +447,15 @@ class ActualizacionRepositorioTest {
         runBlocking {
             conServidorConCuerpo(TEXTO_UNO) { url ->
                 val listaHttp = sembrarListaHttp(url)
-                val http = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, verificaCleartext = { true })
+                val http =
+                    ActualizacionRepositorio(
+                        db,
+                        claves,
+                        clavesDatos,
+                        IndiceHmacRepositorio(db, claves),
+                        contexto,
+                        verificaCleartext = { true },
+                    )
 
                 val resumen = http.actualizarLista(listaHttp)
 
@@ -459,7 +470,15 @@ class ActualizacionRepositorioTest {
     fun `un dominio que no resuelve devuelve dns tipado`() {
         runBlocking {
             val listaHttp = sembrarListaHttp("http://lista.prueba.invalid/lista.m3u")
-            val http = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, verificaCleartext = { true })
+            val http =
+                ActualizacionRepositorio(
+                    db,
+                    claves,
+                    clavesDatos,
+                    IndiceHmacRepositorio(db, claves),
+                    contexto,
+                    verificaCleartext = { true },
+                )
 
             val resumen = http.actualizarLista(listaHttp)
 
@@ -476,7 +495,15 @@ class ActualizacionRepositorioTest {
             val url = "http://127.0.0.1:${servidor.localPort}/lista.m3u"
             servidor.close()
             val listaHttp = sembrarListaHttp(url)
-            val http = ActualizacionRepositorio(db, claves, IndiceHmacRepositorio(db, claves), contexto, verificaCleartext = { true })
+            val http =
+                ActualizacionRepositorio(
+                    db,
+                    claves,
+                    clavesDatos,
+                    IndiceHmacRepositorio(db, claves),
+                    contexto,
+                    verificaCleartext = { true },
+                )
 
             val resumen = http.actualizarLista(listaHttp)
 
@@ -500,6 +527,7 @@ class ActualizacionRepositorioTest {
                     ActualizacionRepositorio(
                         db,
                         claves,
+                        clavesDatos,
                         IndiceHmacRepositorio(db, claves),
                         contexto,
                         verificaCleartext = { false },
@@ -605,8 +633,9 @@ class ActualizacionRepositorioTest {
 
     private fun descifrar(cifrado: ByteArray): String {
         val resultado =
-            CifradoAes.descifrar(
+            CifradoAes.descifrarSobre(
                 claves.claveAes,
+                clavesDatos.clave(),
                 CifradoAes.aad("Canal", "url_stream_cifrada"),
                 cifrado,
             )

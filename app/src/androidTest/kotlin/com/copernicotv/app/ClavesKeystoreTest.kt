@@ -4,7 +4,9 @@ import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.test.platform.app.InstrumentationRegistry
+import com.copernicotv.app.crypto.AlmacenClaveDatosArchivo
 import com.copernicotv.app.crypto.ClavesApp
+import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.IndiceHmacRepositorio
@@ -32,6 +34,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.io.File
 import java.security.InvalidAlgorithmParameterException
 import java.security.KeyStore
 import java.time.Instant
@@ -70,6 +73,9 @@ class ClavesKeystoreTest {
 
     @Inject
     lateinit var claves: ClavesApp
+
+    @Inject
+    lateinit var clavesDatos: ClavesDatos
 
     @Before
     fun preparar() {
@@ -152,7 +158,9 @@ class ClavesKeystoreTest {
         assertNull("La importación reportó el código ${resumen.error}", resumen.error)
 
         val clavesNuevas = ClavesKeystore()
-        val repositorioNuevo = CatalogoRepositorio(db, clavesNuevas, IndiceHmacRepositorio(db, clavesNuevas), contexto())
+        val clavesDatosNuevas =
+            ClavesDatos(clavesNuevas, AlmacenClaveDatosArchivo(File(contexto().noBackupFilesDir, "clave_datos")))
+        val repositorioNuevo = CatalogoRepositorio(db, clavesDatosNuevas, IndiceHmacRepositorio(db, clavesNuevas), contexto())
 
         val nombres = runBlocking { repositorioNuevo.canalesDeListaActiva().first() }
         assertEquals(listOf("Canario Uno", "Canario Dos", "Canario Tres"), nombres)
@@ -160,8 +168,9 @@ class ClavesKeystoreTest {
         val fuente = runBlocking { db.fuenteDao().todas().single() }
         val canal = runBlocking { db.canalDao().porFuente(fuente.id) }.first()
         val descifrado =
-            CifradoAes.descifrar(
+            CifradoAes.descifrarSobre(
                 clavesNuevas.claveAes,
+                clavesDatosNuevas.clave(),
                 CifradoAes.aad("Canal", "url_stream_cifrada"),
                 canal.urlStreamCifrada,
             )
@@ -277,8 +286,9 @@ class ClavesKeystoreTest {
         val canalTrasPerdida = runBlocking { db.canalDao().porFuente(fuente.id) }.first()
         assertArrayEquals(sobreOriginal, canalTrasPerdida.urlStreamCifrada)
         val descifrado =
-            CifradoAes.descifrar(
+            CifradoAes.descifrarSobre(
                 claves.claveAes,
+                clavesDatos.clave(),
                 CifradoAes.aad("Canal", "url_stream_cifrada"),
                 canalTrasPerdida.urlStreamCifrada,
             )

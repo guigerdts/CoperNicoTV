@@ -30,8 +30,9 @@ Cerrar las validaciones físicas pendientes del MVP (F-09, F-10, F-11, F-12, fí
 
 | Dato | Resultado |
 |---|---|
-| Commit | `c63d241` (`d4d23d6` en su historia; PR #40) |
-| CI run | `44083728034` (5/5 success) |
+| Commit funcional (código) | `c63d241` (PR #40) · CI run `44083728034` (5/5 success) |
+| Baseline documental de campaña | `fa7d0a9` (merge PR #41, 2026-11-17: solo añade estos 2 documentos; **el código funcional no cambió**) |
+| APK válido | El del commit `c63d241` (abajo): la campaña usa este APK, que no se regeneró por el merge documental |
 | Artefacto | `copernicotv-debug-apk` → `app-debug.apk` |
 | Variante | debug (build de `:app`) |
 | ABIs | arm64-v8a, armeabi-v7a, x86_64 (APK universal) |

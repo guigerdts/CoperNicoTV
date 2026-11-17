@@ -44,7 +44,7 @@
 
 ### 1. Resumen ejecutivo
 
-E7-T13 consolidó en `main` la cascada completa E7-T8..E7-T12 con sus dependencias (#32/#33): 7 integraciones secuenciales con CI 5/5 de `main` entre cada una, 97 commits de cascada incorporados sin pérdidas ni reescritura de historial, dos fallos de CI diagnosticados como infraestructura (ninguna regresión), documentación maestra reconciliada, registro central de evidencias físicas creado, Engram y contexto de agentes actualizados, roadmap P0..P3 publicado. **Lo único que separa al MVP declarable es la campaña de verificación física consolidada** (más la implementación/validación de la actualización automática WorkManager, E4-T7/DC-07).
+E7-T13 consolidó en `main` la cascada completa E7-T8..E7-T12 con sus dependencias (#32/#33): 7 integraciones secuenciales con CI 5/5 de `main` entre cada una, 97 commits de cascada incorporados sin pérdidas ni reescritura de historial, dos fallos de CI diagnosticados como infraestructura (ninguna regresión), documentación maestra reconciliada, registro central de evidencias físicas creado, Engram y contexto de agentes actualizados, roadmap P0..P3 publicado. **Corrección (2026-11-17):** E4-T7/DC-07 resultó ya implementado y validado (implementación en `f1f4ce2`/PR #4 con CI verde sobre `05caecd` — run `41333845199` — y sobre `f810de0` — run `44031110857`); el estado "pendiente" de esta sección derivaba de un doc maestro desactualizado, no de un hueco real de código. **Lo único que separa al MVP declarable es la campaña de verificación física consolidada** (más la verificación física de reinicio de DC-07, F-12).
 
 ### 2. Estado inicial verificado
 
@@ -134,7 +134,7 @@ Ver §Roadmap más abajo. Fuente de cada estado: doc maestro y registros citados
 
 ### 15. Estado del MVP
 
-**Toda la funcionalidad del MVP está implementada e integrada** (E1–E7, incluida la cascada E7-T8..T12 hoy) **excepto la actualización automática en segundo plano (E4-T7/DC-07: decisión aprobada, implementación/validación pendiente — `mvp:702`)**. La declaratoria formal del MVP exige además la campaña de verificación física consolidada (§10.4 + F-09..F-11 + físicas de E7-T8/T10/T12) y las verificaciones I-M con fuente real que el propio doc maestro exige (S16, S19, S24 en físico). El MVP NO se declara validado mientras existan esas verificaciones pendientes — coherente con la regla de §10.4.
+**Toda la funcionalidad del MVP está implementada, integrada y validada en CI** (E1–E7, incluida la actualización automática E4-T7/DC-07 — corrección 2026-11-17: `f1f4ce2`/PR #4, runs `41333845199` y `44031110857` verdes). La declaratoria formal del MVP exige además la campaña de verificación física consolidada (§10.4 + F-09..F-12 + físicas de E7-T8/T10/T12) y las verificaciones I-M con fuente real que el propio doc maestro exige (S16, S19, S24 en físico). El MVP NO se declara validado mientras existan esas verificaciones pendientes — coherente con la regla de §10.4.
 
 ### 16. Riesgos y deuda técnica restante
 
@@ -147,7 +147,7 @@ Ver §Roadmap más abajo. Fuente de cada estado: doc maestro y registros citados
 ### 17. Próximos pasos recomendados
 
 1. **Campaña de verificación física consolidada** con el APK del último CI de `main` (procedimientos ya escritos: §10.4, feature docs, F-09..F-11): importación física, I-M/DC-11, E7-T8 302/HLS, protocolo E7-T10 2719, E7-T6 duck, S16/S19 con fuente real.
-2. **E4-T7/DC-07**: implementar y validar la actualización automática WorkManager (`mvp:702`).
+2. ~~E4-T7/DC-07: implementar y validar la actualización automática WorkManager~~ — **Resuelto (2026-11-17)**: ya estaba implementado y validado (`f1f4ce2`/PR #4; CI verde `41333845199`, `44031110857`); la pendencia era del doc maestro, no del código. Queda su verificación física de reinicio (F-12) dentro de la campaña.
 3. **Búsqueda activa de fuente MPEG-2** real (`video/mpeg2`) para demostrar el fallback físico de E7-T12.
 4. **~147k canales**: confirmar el desglose físico del `tiempo_guardado_ms` con la próxima importación real (F-10).
 5. Tras la campaña: cierre formal de E7-T8..T12 y declaratoria del MVP con su evidencia.
@@ -164,7 +164,7 @@ Prioridades según el mandato (P0 imprescindible para declarar MVP · P1 versió
 |---|---|---|
 | Funcionalidad E1–E7 implementada e integrada (E7-T1..T12) | HECHO (2026-11-17): 97 commits de cascada en `main`, CI 5/5 por entrega | Log L94 (mvp), matriz §3 de este doc |
 | E4-T5/T8 (fusión, indicadores) | Implementados con pruebas JVM/instrumentada; verificación CI con fusión de E4 (PR #4) | Log L95 (mvp) |
-| E4-T7/DC-07 (actualización automática WorkManager) | Decisión aprobada; **implementación/validación pendiente** | `mvp:702`, DC-07 |
+| E4-T7/DC-07 (actualización automática WorkManager) | **HECHO (2026-11-17)**: implementado en `f1f4ce2` (PR #4) con pruebas S3b/S6b/S46b; CI verde en `05caecd` (run `41333845199`: `:core` 275, `:app` 230, instrumented 29+1) y en `f810de0` (run `44031110857`: 5 jobs). El estado "pendiente" era doc maestro desactualizado. Reinicio físico pendiente (F-12) | `mvp:702` y `mvp:1052` (corregidos), `odd/tasks/e4-t7-dc-07-implementacion-cierre.md` |
 | Campaña de verificación física consolidada | Pendiente: F-09, F-10, F-11, física E7-T8, protocolo `e7-t10:118`, I-M/DC-11 | §10.4 (mvp), `docs/evidence/validaciones-fisicas.md` |
 | Fallback MPEG-2 físico (E7-T12) | Pendiente de fuente real `video/mpeg2` (dependencia externa; no bloquea otras verificaciones) | F-04/F-07 |
 | Rendimiento importación ~147k (físico) | Pendiente de confirmación física (desglose CI existente) | F-10, `e7-t7-ronda9-metricas-room.md` |

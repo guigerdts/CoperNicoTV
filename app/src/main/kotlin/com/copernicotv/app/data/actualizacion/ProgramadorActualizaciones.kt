@@ -31,7 +31,16 @@ import javax.inject.Singleton
 /**
  * Estado observable de una Fuente según sus trabajos de Actualización.
  *
- * @property enCurso hay un trabajo `ENQUEUED`, `RUNNING` o `BLOCKED`.
+ * Distingue el trabajo periódico **programado** de una Actualización
+ * realmente activa (CAM-09-DEF-01):
+ *
+ * - Un trabajo en `RUNNING` (periódico o manual) es una ejecución real.
+ * - Una solicitud manual en `ENQUEUED` o `BLOCKED` está pendiente y no
+ *   admite otra solicitud manual.
+ * - El periódico en `ENQUEUED` o `BLOCKED` solo espera su próximo intervalo:
+ *   no es actividad y no deshabilita las operaciones manuales.
+ *
+ * @property enCurso hay una ejecución real o una solicitud manual pendiente.
  * @property resumenes último resultado publicado por Lista.
  */
 data class EstadoSolicitud(
@@ -189,7 +198,8 @@ class ProgramadorWorkManager
 
         private fun estadoDe(trabajos: List<WorkInfo>): EstadoSolicitud =
             EstadoSolicitud(
-                enCurso = trabajos.any { it.state in ESTADOS_ABIERTOS },
+                // CAM-09-DEF-01: solo bloquea una ejecución real o una solicitud manual pendiente.
+                enCurso = trabajos.any { actualizacionActiva(it.state, it.tags) },
                 resumenes =
                     trabajos
                         .flatMap { DatosActualizacion.resumenes(it.outputData) }
@@ -211,6 +221,7 @@ class ProgramadorWorkManager
                 .setInputData(DatosActualizacion.de(fuenteId, CausasActualizacion.MANUAL, emptyList()))
                 .addTag(TAG_ACTUALIZACION)
                 .addTag(tagFuente(fuenteId))
+                .addTag(TAG_MANUAL)
                 .build()
 
         private fun periodico(
@@ -229,11 +240,47 @@ class ProgramadorWorkManager
             /** Tag común a todo trabajo de Actualización. */
             const val TAG_ACTUALIZACION: String = "actualizacion"
 
+            /**
+             * Marca de las solicitudes manuales (CAM-09-DEF-01).
+             *
+             * Solo la lleva el trabajo manual; el periódico no, así que su
+             * ausencia basta para clasificarlo sin tocar su identidad, su
+             * intervalo ni su política.
+             */
+            const val TAG_MANUAL: String = "actualizacion-manual"
+
+            /** Estados de una solicitud manual que todavía no terminó. */
+            private val ESTADOS_MANUALES_PENDIENTES =
+                setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.BLOCKED)
+
+            /**
+             * Semántica de "Actualización activa" que consume la interfaz.
+             *
+             * `RUNNING` es una ejecución real, venga del trabajo periódico o
+             * del manual. `ENQUEUED` y `BLOCKED` solo cuentan cuando el
+             * trabajo es una solicitud manual ([TAG_MANUAL]): el periódico en
+             * esos estados solo espera su próximo intervalo.
+             */
+            internal fun actualizacionActiva(
+                estado: WorkInfo.State,
+                etiquetas: Set<String>,
+            ): Boolean =
+                estado == WorkInfo.State.RUNNING ||
+                    (estado in ESTADOS_MANUALES_PENDIENTES && TAG_MANUAL in etiquetas)
+
             private const val PREFIJO_TAG_FUENTE = "fuente:"
 
             /** DC-07 punto 4: retardo inicial del backoff exponencial. */
             const val RETARDO_INICIAL_SEGUNDOS: Long = 30L
 
+            /**
+             * Estados que mantienen abierto un reclamo (DC-07 punto 6).
+             *
+             * Incluye `ENQUEUED` a propósito: el periódico espera su intervalo
+             * y el reclamo debe sobrevivir hasta la próxima ejecución. No es
+             * la señal de "Actualización activa" de la interfaz; esa la define
+             * [actualizacionActiva].
+             */
             private val ESTADOS_ABIERTOS =
                 setOf(WorkInfo.State.ENQUEUED, WorkInfo.State.RUNNING, WorkInfo.State.BLOCKED)
 

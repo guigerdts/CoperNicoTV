@@ -193,6 +193,10 @@ class ProgramadorWorkManagerTest {
             assertEquals(WorkInfo.State.ENQUEUED, manual.single().state)
             assertTrue("La manual no reemplaza a la periódica", manual.single().tags.contains(ProgramadorWorkManager.tagFuente(fuente)))
             assertTrue(
+                "La solicitud manual lleva la marca que la distingue del periódico",
+                manual.single().tags.contains(ProgramadorWorkManager.TAG_MANUAL),
+            )
+            assertTrue(
                 "La periódica no se creó",
                 infos(ProgramadorWorkManager.nombrePeriodico(fuente)).isEmpty(),
             )
@@ -234,6 +238,101 @@ class ProgramadorWorkManagerTest {
             val estado = programador.observar().first()[fuente]
             assertTrue("La Fuente figura en curso", estado?.enCurso == true)
             assertTrue("Sin ejecución no hay resumen", estado?.resumenes.isNullOrEmpty())
+        }
+    }
+
+    @Test
+    fun `el trabajo periodico programado no marca la fuente en curso`() {
+        runBlocking {
+            val fuente = crearFuente("Fuente", usarGlobal = true, propio = null)
+            programador.reconciliar()
+            val antes = periodico(fuente)
+            val estadoAntes = checkNotNull(programador.observar().first()[fuente])
+
+            assertEquals("El periódico espera su intervalo", WorkInfo.State.ENQUEUED, antes.state)
+            assertFalse(
+                "El periódico no lleva la marca manual",
+                antes.tags.contains(ProgramadorWorkManager.TAG_MANUAL),
+            )
+            assertFalse(
+                "Un periódico en espera no es una actualización activa",
+                estadoAntes.enCurso,
+            )
+
+            programador.reconciliar()
+
+            assertEquals("La reconciliación conserva el trabajo", antes.id, periodico(fuente).id)
+            assertFalse(
+                "Sigue sin actualización activa tras reconciliar",
+                checkNotNull(programador.observar().first()[fuente]).enCurso,
+            )
+        }
+    }
+
+    @Test
+    fun `la semantica de actualizacion activa distingue periodico de manual`() {
+        val periodico =
+            setOf(ProgramadorWorkManager.TAG_ACTUALIZACION, ProgramadorWorkManager.tagFuente(1L))
+        val manual = periodico + ProgramadorWorkManager.TAG_MANUAL
+
+        fun activa(
+            estado: WorkInfo.State,
+            etiquetas: Set<String>,
+        ): Boolean = ProgramadorWorkManager.actualizacionActiva(estado, etiquetas)
+
+        assertFalse("Periódico ENQUEUED", activa(WorkInfo.State.ENQUEUED, periodico))
+        assertFalse("Periódico BLOCKED", activa(WorkInfo.State.BLOCKED, periodico))
+        assertTrue("Periódico RUNNING", activa(WorkInfo.State.RUNNING, periodico))
+
+        assertTrue("Manual ENQUEUED", activa(WorkInfo.State.ENQUEUED, manual))
+        assertTrue("Manual BLOCKED", activa(WorkInfo.State.BLOCKED, manual))
+        assertTrue("Manual RUNNING", activa(WorkInfo.State.RUNNING, manual))
+
+        listOf(
+            WorkInfo.State.SUCCEEDED,
+            WorkInfo.State.FAILED,
+            WorkInfo.State.CANCELLED,
+        ).forEach { estado ->
+            assertFalse("Manual $estado", activa(estado, manual))
+            assertFalse("Periódico $estado", activa(estado, periodico))
+        }
+
+        assertTrue(
+            "Periódico en espera con un manual en ejecución",
+            listOf(WorkInfo.State.ENQUEUED to periodico, WorkInfo.State.RUNNING to manual)
+                .any { (estado, etiquetas) -> activa(estado, etiquetas) },
+        )
+        assertFalse(
+            "Periódico en espera sin solicitud manual",
+            listOf(WorkInfo.State.ENQUEUED to periodico)
+                .any { (estado, etiquetas) -> activa(estado, etiquetas) },
+        )
+    }
+
+    @Test
+    fun `una actualizacion manual terminada no deja la fuente en curso`() {
+        runBlocking {
+            val fuente = crearFuente("Fuente", usarGlobal = true, propio = null)
+            programador.solicitarFuente(fuente)
+            val manual = infos(ProgramadorWorkManager.nombreManual(fuente)).single()
+            assertTrue(
+                "La solicitud manual se distingue del periódico",
+                manual.tags.contains(ProgramadorWorkManager.TAG_MANUAL),
+            )
+
+            val driver = checkNotNull(WorkManagerTestInitHelper.getTestDriver(contexto))
+            driver.setAllConstraintsMet(manual.id)
+
+            assertEquals(
+                "La ejecución termina en éxito",
+                WorkInfo.State.SUCCEEDED,
+                infos(ProgramadorWorkManager.nombreManual(fuente)).single().state,
+            )
+            val estado = programador.observar().first()[fuente]
+            assertFalse(
+                "Sin ejecución pendiente no hay actualización activa",
+                estado?.enCurso == true,
+            )
         }
     }
 

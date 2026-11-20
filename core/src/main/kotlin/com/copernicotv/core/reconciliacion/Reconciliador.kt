@@ -146,10 +146,12 @@ object Reconciliador {
         }
         for (fila in historicas) {
             if (fila.estado != EstadoCanal.A) continue
-            val clave = fila.identidad.claveUnicidad ?: continue
-            val candidata = porClave.primero(clave, usadas) ?: continue
-            asignadas[fila.id] = candidata
-            usadas += candidata.indice
+            val clave = fila.identidad.claveUnicidad
+            val candidata = clave?.let { porClave.primero(it, usadas) }
+            if (candidata != null) {
+                asignadas[fila.id] = candidata
+                usadas += candidata.indice
+            }
         }
 
         val superadas = HashSet<Long>()
@@ -189,24 +191,9 @@ object Reconciliador {
             val porCanonicaA = if (barridoDirecto) null else agruparPorCanonica(filasA)
             for (declaracion in noAsignadas) {
                 val clave = declaracion.identidad.claveCanonica ?: continue
-                val afectadas =
-                    if (porCanonicaA != null) {
-                        porCanonicaA[clave].orEmpty().filter { fila ->
-                            fila.id !in asignadas &&
-                                fila.identidad.claveUnicidad != declaracion.identidad.claveUnicidad
-                        }
-                    } else {
-                        filasA.filter { fila ->
-                            fila.id !in asignadas &&
-                                fila.identidad.claveCanonica == clave &&
-                                fila.identidad.claveUnicidad != declaracion.identidad.claveUnicidad
-                        }
-                    }
+                val afectadas = filasAfectadas(declaracion, clave, filasA, porCanonicaA, asignadas)
                 if (afectadas.size >= 2) {
-                    val ids = afectadas.map { it.id }
-                    convergentes[declaracion.indice] =
-                        ColisionIdentidad(clave = clave, filas = ids, declaraciones = listOf(declaracion.indice))
-                    for (id in ids) superadas += id
+                    registrarConvergencia(declaracion, clave, afectadas, convergentes, superadas)
                 }
             }
         }
@@ -295,9 +282,10 @@ object Reconciliador {
         colisiones.forEach { yaInformadas += it.clave }
         val porCanonicaB = linkedMapOf<String, MutableList<Long>>()
         for (fila in filasPlan) {
-            if (fila.estado != EstadoCanal.B) continue
-            val clave = fila.identidad.claveCanonica ?: continue
-            porCanonicaB.getOrPut(clave) { ArrayList(1) } += fila.historicoId
+            val clave = fila.identidad.claveCanonica
+            if (fila.estado == EstadoCanal.B && clave != null) {
+                porCanonicaB.getOrPut(clave) { ArrayList(1) } += fila.historicoId
+            }
         }
         for ((clave, ids) in porCanonicaB) {
             if (ids.size > 1 && yaInformadas.add(clave)) {
@@ -550,6 +538,34 @@ object Reconciliador {
         return declaraciones.filter { it.indice !in usadas && sonda.comparte(it.identidad) }
     }
 
+    private fun filasAfectadas(
+        declaracion: DeclaracionNueva,
+        clave: String,
+        filasA: List<FilaHistorica>,
+        porCanonicaA: Map<String, List<FilaHistorica>>?,
+        asignadas: Map<Long, DeclaracionNueva>,
+    ): List<FilaHistorica> {
+        val candidatas = if (porCanonicaA == null) filasA else porCanonicaA[clave].orEmpty()
+        return candidatas.filter { fila ->
+            fila.id !in asignadas &&
+                fila.identidad.claveCanonica == clave &&
+                fila.identidad.claveUnicidad != declaracion.identidad.claveUnicidad
+        }
+    }
+
+    private fun registrarConvergencia(
+        declaracion: DeclaracionNueva,
+        clave: String,
+        afectadas: List<FilaHistorica>,
+        convergentes: MutableMap<Int, ColisionIdentidad>,
+        superadas: MutableSet<Long>,
+    ) {
+        val ids = afectadas.map { it.id }
+        convergentes[declaracion.indice] =
+            ColisionIdentidad(clave = clave, filas = ids, declaraciones = listOf(declaracion.indice))
+        superadas.addAll(ids)
+    }
+
     private fun agruparPorCanonica(filas: List<FilaHistorica>): Map<String, List<FilaHistorica>> {
         val grupos = HashMap<String, MutableList<FilaHistorica>>()
         for (fila in filas) {
@@ -582,7 +598,10 @@ object Reconciliador {
         private val multiples = HashMap<String, MutableList<DeclaracionNueva>>()
         private val cursores = HashMap<String, Int>()
 
-        fun agregar(clave: String, declaracion: DeclaracionNueva) {
+        fun agregar(
+            clave: String,
+            declaracion: DeclaracionNueva,
+        ) {
             val existente = unicas[clave]
             if (existente == null) {
                 unicas[clave] = declaracion
@@ -591,7 +610,10 @@ object Reconciliador {
             }
         }
 
-        fun primero(clave: String, usadas: Set<Int>): DeclaracionNueva? {
+        fun primero(
+            clave: String,
+            usadas: Set<Int>,
+        ): DeclaracionNueva? {
             val lista = multiples[clave]
             if (lista != null) {
                 var posicion = cursores[clave] ?: 0

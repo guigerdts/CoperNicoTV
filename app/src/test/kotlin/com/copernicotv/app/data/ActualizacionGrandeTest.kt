@@ -71,15 +71,20 @@ class ActualizacionGrandeTest {
         db.close()
     }
 
-    @Test
+    @Test(timeout = 55 * 60 * 1000L)
     fun `147000 canales se actualizan completos y conservan identidad grupos e historial`() {
         runBlocking {
+            println("P0-PROGRESO seed inicio")
             sembrarCatalogo(TOTAL)
+            println("P0-PROGRESO seed fin")
             assertEquals(TOTAL, db.canalDao().contarPorFuente(fuenteId))
             assertEquals(TOTAL, db.aparienciaDao().contar(listaId))
             assertEquals(GRUPOS, db.grupoDao().contar(listaId))
 
-            val resumen = actualizar(m3u(TOTAL, mutar = true))
+            val texto = m3u(TOTAL, mutar = true)
+            println("P0-PROGRESO m3u fin (${texto.length} chars)")
+            val resumen = actualizar(texto)
+            println("P0-PROGRESO aplicar fin")
 
             assertEquals("completada", resumen.resultado)
             assertEquals(NUEVAS, resumen.nuevas)
@@ -121,7 +126,7 @@ class ActualizacionGrandeTest {
             db.grupoDao().insertarTodos(
                 (0 until GRUPOS).map { g -> GrupoEntity(listaId = listaId, nombre = grupo(g)) },
             )
-        for (lote in (0 until total).chunked(LOTE_SEED)) {
+        for ((indiceLote, lote) in (0 until total).chunked(LOTE_SEED).withIndex()) {
             val canales = lote.map { i -> canalSeed(i, ahora) }
             val ids = db.canalDao().insertarTodos(canales)
             val apariencias =
@@ -134,6 +139,9 @@ class ActualizacionGrandeTest {
                     )
                 }
             db.aparienciaDao().insertarTodas(apariencias)
+            if ((indiceLote + 1) % 20 == 0) {
+                println("P0-PROGRESO seed ${(indiceLote + 1) * LOTE_SEED}/$total")
+            }
         }
     }
 
@@ -204,7 +212,9 @@ class ActualizacionGrandeTest {
     private fun grupo(indice: Int): String = "G ${indice % GRUPOS}"
 
     private suspend fun actualizar(texto: String): ResumenActualizacion {
+        println("P0-PROGRESO importar inicio")
         val importado = ImportadorM3U.importar(texto, claves.crearClaveHmac(1))
+        println("P0-PROGRESO importar fin (${importado.canales.size} canales)")
         return repositorio.actualizarConImportado(listaId, importado, CausasActualizacion.MANUAL)
     }
 

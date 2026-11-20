@@ -26,7 +26,6 @@ import com.copernicotv.core.m3u.ResultadoImportacionM3U
 import com.copernicotv.core.reconciliacion.DeclaracionNueva
 import com.copernicotv.core.reconciliacion.DestinoDeclaracion
 import com.copernicotv.core.reconciliacion.FilaHistorica
-import com.copernicotv.core.reconciliacion.FilaPlan
 import com.copernicotv.core.reconciliacion.IdentidadReconciliacion
 import com.copernicotv.core.reconciliacion.Reconciliador
 import com.copernicotv.core.reconciliacion.ResultadoReconciliacion
@@ -83,6 +82,7 @@ class ActualizacionRepositorio
         private val io = Dispatchers.IO
         private val escritorCanales = CanalEscritor(db)
         private val escritorApariencias = AparienciaEscritor(db)
+        private val escritorLotes = ActualizacionLotesEscritor(db, clavesDatos)
 
         /**
          * Punto de fallo inyectable para probar el rollback de A→B con N filas.
@@ -177,25 +177,19 @@ class ActualizacionRepositorio
                                     inicio = ahora,
                                 ),
                             )
-                        val historicas = db.canalDao().porFuente(fuente.id)
-                        val porId = historicas.associateBy { it.id }
-                        val declaraciones =
-                            importado.canales.mapIndexed { indice, canal ->
-                                DeclaracionNueva(indice, identidadDe(canal))
-                            }
                         val plan =
                             Reconciliador.reconciliar(
-                                historicas = historicas.map(::filaHistorica),
-                                declaraciones = declaraciones,
+                                historicas = cargarFilasHistoricas(fuente.id),
+                                declaraciones =
+                                    importado.canales.mapIndexed { indice, canal ->
+                                        DeclaracionNueva(indice, identidadDe(canal))
+                                    },
                             )
-                        liberarClaves(plan, porId, ahora)
+                        liberarClaves(plan, ahora)
                         puntoDeFallo?.invoke(EtapaActualizacion.TRAS_LIBERAR_CLAVES)
-                        var actualizadas = 0
-                        for (fila in plan.filas) {
-                            val historica = porId[fila.historicoId] ?: continue
-                            val declaracion = fila.declaracionIndice?.let { importado.canales[it] }
-                            if (aplicarFila(fila, historica, declaracion, lista.id, ahora)) actualizadas += 1
-                        }
+                        val grupos = HashMap<String, Long>()
+                        val actualizadas =
+                            escritorLotes.aplicar(lista.id, plan, importado.canales, ahora, grupos)
                         var nuevas = 0
                         var observaciones = 0
                         for (destino in plan.declaraciones) {
@@ -206,6 +200,7 @@ class ActualizacionRepositorio
                                         listaId = lista.id,
                                         declaracion = importado.canales[destino.indice],
                                         ahora = ahora,
+                                        grupos = grupos,
                                     )
                                     nuevas += 1
                                 }
@@ -247,80 +242,47 @@ class ActualizacionRepositorio
             }
         }
 
+        /**
+         * Carga las identidades históricas de una Fuente en páginas *keyset*.
+         *
+         * No retiene entidades completas: cada página se convierte a
+         * `FilaHistorica` y se descarta. El motor recibe solo las identidades
+         * compactas que necesita.
+         */
+        private suspend fun cargarFilasHistoricas(fuenteId: Long): List<FilaHistorica> {
+            val filas = ArrayList<FilaHistorica>()
+            var ultimoId = 0L
+            while (true) {
+                val lote = db.canalDao().identidadesPorFuente(fuenteId, ultimoId, LOTE_LECTURA)
+                if (lote.isEmpty()) break
+                for (proyeccion in lote) {
+                    filas += proyeccion.aFilaHistorica()
+                }
+                ultimoId = lote.last().id
+            }
+            return filas
+        }
+
+        /**
+         * Libera en lotes las claves de las filas que pasan a B.
+         *
+         * El guard `claveUnicidad IS NOT NULL` de la sentencia hace innecesario
+         * conocer la entidad completa: solo las filas que aún tenían clave se
+         * actualizan. Todos los lotes se ejecutan antes de escribir evidencia.
+         */
         private suspend fun liberarClaves(
             plan: ResultadoReconciliacion,
-            porId: Map<Long, CanalEntity>,
             ahora: Instant,
         ) {
             val ids =
                 plan.filas
-                    .filter { fila ->
-                        fila.estado == EstadoCanal.B &&
-                            porId[fila.historicoId]?.claveUnicidad != null
-                    }.map { it.historicoId }
-            if (ids.isNotEmpty()) {
-                db.canalDao().liberarClaves(ids, ahora)
+                    .asSequence()
+                    .filter { it.estado == EstadoCanal.B }
+                    .map { it.historicoId }
+                    .toList()
+            for (lote in ids.chunked(LOTE_ESCRITURA)) {
+                db.canalDao().liberarClaves(lote, ahora)
             }
-        }
-
-        /**
-         * Aplica el plan de una fila. Devuelve `true` solo si la fila cambió.
-         *
-         * Una fila ausente o un C que sigue C no se toca: la ausencia conserva
-         * la fila y sus relaciones (ADR-0004:58(c)).
-         */
-        @Suppress("CyclomaticComplexMethod")
-        private suspend fun aplicarFila(
-            fila: FilaPlan,
-            historica: CanalEntity,
-            declaracion: CanalImportadoM3U?,
-            listaId: Long,
-            ahora: Instant,
-        ): Boolean {
-            val sinCambios =
-                declaracion == null &&
-                    fila.estado == historica.estado &&
-                    fila.identidad.claveUnicidad == historica.claveUnicidad &&
-                    fila.evidencia == historica.evidencia &&
-                    !fila.decisionSuperada
-            if (sinCambios) return false
-
-            val decision =
-                if (fila.decisionSuperada) {
-                    marcarSuperada(historica.decision)
-                } else {
-                    historica.decision
-                }
-            val fechaDecision =
-                if (fila.decisionSuperada) historica.fechaDecision ?: ahora else historica.fechaDecision
-            val actualizada =
-                historica.copy(
-                    nombre = fila.identidad.nombre,
-                    tvgId = fila.identidad.tvgId,
-                    claveCanonica = fila.identidad.claveCanonica,
-                    claveUnicidad = fila.identidad.claveUnicidad,
-                    claveDerivable = fila.identidad.claveDerivable,
-                    estado = fila.estado,
-                    evidencia = fila.evidencia,
-                    decision = decision,
-                    fechaDecision = fechaDecision,
-                    urlStreamCifrada =
-                        declaracion?.let { cifrar(it.urlOriginal, "Canal", "url_stream_cifrada") }
-                            ?: historica.urlStreamCifrada,
-                    urlStreamHmac = declaracion?.urlStreamHmac?.toByteArray(Charsets.UTF_8) ?: historica.urlStreamHmac,
-                    logoUrlCifrada =
-                        if (declaracion != null) cifrarLogo(declaracion.logoOriginal) else historica.logoUrlCifrada,
-                    logoUrlHmac = declaracion?.logoHmac?.toByteArray(Charsets.UTF_8) ?: historica.logoUrlHmac,
-                    atributosExtra =
-                        declaracion?.let { CodecAtributosExtra.codificar(it.atributosExtra) }
-                            ?: historica.atributosExtra,
-                    actualizadoEn = ahora,
-                )
-            escritorCanales.actualizar(actualizada, tvgIdUnico(declaracion))
-            if (declaracion != null) {
-                sincronizarApariencias(listaId, historica.id, declaracion, ahora)
-            }
-            return true
         }
 
         private suspend fun insertarCanal(
@@ -328,6 +290,7 @@ class ActualizacionRepositorio
             listaId: Long,
             declaracion: CanalImportadoM3U,
             ahora: Instant,
+            grupos: MutableMap<String, Long>,
         ): Long {
             val canalId =
                 escritorCanales.insertar(
@@ -350,7 +313,7 @@ class ActualizacionRepositorio
                 )
             var orden = db.aparienciaDao().maxOrden(listaId) + 1
             for (apariencia in declaracion.apariencias) {
-                val grupoId = apariencia.groupTitle?.let { insertarGrupo(listaId, it) }
+                val grupoId = apariencia.groupTitle?.let { insertarGrupo(listaId, it, grupos) }
                 val escritura =
                     escritorApariencias.upsert(
                         AparienciaEntity(
@@ -372,55 +335,6 @@ class ActualizacionRepositorio
                 }
             }
             return canalId
-        }
-
-        /**
-         * Sincroniza las Apariencias de un Canal existente.
-         *
-         * Conserva el `orden` manual de las filas que ya existían; una
-         * Apariencia que la Fuente deja de declarar se elimina, pero el Canal y
-         * sus Favoritos/Historial/Ocultaciones/Colecciones no se tocan
-         * (ADR-0004:58(c)).
-         */
-        private suspend fun sincronizarApariencias(
-            listaId: Long,
-            canalId: Long,
-            declaracion: CanalImportadoM3U,
-            ahora: Instant,
-        ) {
-            val existentes = db.aparienciaDao().porCanalEnLista(listaId, canalId)
-            val porClave = existentes.associateBy { it.clavePresentacion }
-            val declaradas = declaracion.apariencias.map { it.clavePresentacion }.toSet()
-            var siguiente = db.aparienciaDao().maxOrden(listaId) + 1
-            for (apariencia in declaracion.apariencias) {
-                val grupoId = apariencia.groupTitle?.let { insertarGrupo(listaId, it) }
-                val existente = porClave[apariencia.clavePresentacion]
-                val escritura =
-                    escritorApariencias.reconciliar(
-                        AparienciaEntity(
-                            id = existente?.id ?: 0,
-                            listaId = listaId,
-                            canalId = canalId,
-                            grupoId = grupoId,
-                            orden = existente?.orden ?: siguiente++,
-                            groupTitle = apariencia.groupTitle,
-                            tvgName = apariencia.tvgName,
-                            clavePresentacion = apariencia.clavePresentacion,
-                            repeticiones = apariencia.repeticiones,
-                            creadoEn = existente?.creadoEn ?: ahora,
-                            actualizadoEn = ahora,
-                        ),
-                        ahora,
-                    )
-                if (escritura is ResultadoUpsertApariencia.Rechazada) {
-                    throw ImportacionRechazada(escritura.codigo)
-                }
-            }
-            for (existente in existentes) {
-                if (existente.clavePresentacion !in declaradas) {
-                    db.aparienciaDao().eliminar(existente.id)
-                }
-            }
         }
 
         private suspend fun registrarEvidencias(
@@ -449,17 +363,19 @@ class ActualizacionRepositorio
             ahora: Instant,
         ) {
             if (plan.ausencias.isEmpty()) return
-            db.detalleAusenciaDao().insertarTodas(
-                plan.ausencias.map { canalId ->
-                    DetalleAusenciaEntity(
-                        estadoActualizacionId = estadoId,
-                        canalId = canalId,
-                        estado = ESTADO_AUSENTE,
-                        texto = TEXTO_AUSENTE,
-                        creadoEn = ahora,
-                    )
-                },
-            )
+            for (lote in plan.ausencias.chunked(LOTE_ESCRITURA)) {
+                db.detalleAusenciaDao().insertarTodas(
+                    lote.map { canalId ->
+                        DetalleAusenciaEntity(
+                            estadoActualizacionId = estadoId,
+                            canalId = canalId,
+                            estado = ESTADO_AUSENTE,
+                            texto = TEXTO_AUSENTE,
+                            creadoEn = ahora,
+                        )
+                    },
+                )
+            }
         }
 
         /**
@@ -617,23 +533,6 @@ class ActualizacionRepositorio
             }
         }
 
-        private fun filaHistorica(canal: CanalEntity): FilaHistorica =
-            FilaHistorica(
-                id = canal.id,
-                identidad =
-                    IdentidadReconciliacion(
-                        nombre = canal.nombre,
-                        tvgId = canal.tvgId,
-                        claveCanonica = canal.claveCanonica,
-                        claveUnicidad = canal.claveUnicidad,
-                        claveDerivable = canal.claveDerivable,
-                        urlStreamHmac = canal.urlStreamHmac.toString(Charsets.UTF_8),
-                    ),
-                estado = canal.estado,
-                evidencia = canal.evidencia,
-                decision = canal.decision,
-            )
-
         private fun identidadDe(canal: CanalImportadoM3U): IdentidadReconciliacion =
             IdentidadReconciliacion(
                 nombre = canal.nombre,
@@ -648,9 +547,6 @@ class ActualizacionRepositorio
             val tvg = canal?.tvgId ?: return false
             return canal.claveUnicidad == ClaveCanal.PREFIJO_TVG + tvg
         }
-
-        private fun marcarSuperada(decision: String?): String? =
-            decision?.let { if (it.endsWith(SUFIJO_SUPERADA)) it else it + SUFIJO_SUPERADA }
 
         private fun cifrar(
             valor: String,
@@ -683,9 +579,15 @@ class ActualizacionRepositorio
         private suspend fun insertarGrupo(
             listaId: Long,
             nombre: String,
-        ): Long =
-            db.grupoDao().porNombre(listaId, nombre)?.id
-                ?: db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = nombre))
+            grupos: MutableMap<String, Long>,
+        ): Long {
+            grupos[nombre]?.let { return it }
+            val id =
+                db.grupoDao().porNombre(listaId, nombre)?.id
+                    ?: db.grupoDao().insertar(GrupoEntity(listaId = listaId, nombre = nombre))
+            grupos[nombre] = id
+            return id
+        }
 
         /** Etapa observable por la prueba de rollback. */
         internal enum class EtapaActualizacion {
@@ -708,7 +610,12 @@ class ActualizacionRepositorio
             const val ESTADO_ACTIVA = "activa"
             const val ESTADO_AUSENTE = "ausente"
             const val TEXTO_AUSENTE = "La Fuente no declaró el Canal en esta Actualización"
-            const val SUFIJO_SUPERADA = ":superada"
+
+            /** Filas por página de la carga *keyset* de identidades históricas. */
+            const val LOTE_LECTURA = 500
+
+            /** Filas por lote de escritura y por `IN` de SQLite. */
+            const val LOTE_ESCRITURA = 500
 
             const val ERROR_LISTA_INEXISTENTE = "lista_inexistente"
             const val ERROR_FUENTE_INEXISTENTE = "fuente_inexistente"

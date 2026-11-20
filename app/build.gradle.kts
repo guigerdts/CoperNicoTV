@@ -135,6 +135,12 @@ tasks.withType<Test>().configureEach {
         // La importación masiva de E7-T7 ronda 8 (146.762 canales) necesita
         // más heap que el predeterminado de Gradle (512m).
         maxHeapSize = "1536m"
+        // El 147k de P0 instruye avance por fase; sin esto los `println` solo
+        // quedan en el XML y no se ve dónde se detiene la prueba en CI.
+        testLogging {
+            events("started", "passed", "failed")
+            showStandardStreams = true
+        }
     }
 }
 

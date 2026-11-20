@@ -10,6 +10,7 @@ import com.copernicotv.app.data.db.entities.CanalEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
+@Suppress("TooManyFunctions")
 @Dao
 interface CanalDao {
     @Insert
@@ -21,6 +22,10 @@ interface CanalDao {
     @Update
     suspend fun actualizar(canal: CanalEntity): Int
 
+    /** Actualización agrupada de canales de un lote, en una sola transacción. */
+    @Update
+    suspend fun actualizarTodos(canales: List<CanalEntity>)
+
     @Query("DELETE FROM Canal WHERE id = :id")
     suspend fun eliminar(id: Long): Int
 
@@ -29,6 +34,33 @@ interface CanalDao {
 
     @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId ORDER BY id")
     suspend fun porFuente(fuenteId: Long): List<CanalEntity>
+
+    /**
+     * Página de identidades de una Fuente para la reconciliación.
+     *
+     * Es una consulta *keyset*: usa `id > :ultimoId` para no repetir filas y
+     * no pagar el costo de `OFFSET` en catálogos grandes. El llamador avanza
+     * `ultimoId` con el `id` de la última fila de cada página.
+     */
+    @Query(
+        """
+        SELECT id, nombre, tvgId, claveCanonica, claveUnicidad, claveDerivable,
+            estado, evidencia, decision, urlStreamHmac
+        FROM Canal
+        WHERE fuenteId = :fuenteId AND id > :ultimoId
+        ORDER BY id
+        LIMIT :limite
+        """,
+    )
+    suspend fun identidadesPorFuente(
+        fuenteId: Long,
+        ultimoId: Long,
+        limite: Int,
+    ): List<CanalIdentidadProyeccion>
+
+    /** Entidades completas de un lote de ids, para escribir solo lo cambiado. */
+    @Query("SELECT * FROM Canal WHERE id IN (:ids)")
+    suspend fun porIds(ids: List<Long>): List<CanalEntity>
 
     @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId AND tvgId = :tvgId LIMIT 1")
     suspend fun porTvgId(
@@ -64,7 +96,13 @@ interface CanalDao {
      * escribir primero la evidencia o la nueva clave haría fallar la
      * transacción. La sentencia deja las N filas sin clave en una sola pasada.
      */
-    @Query("UPDATE Canal SET estado = 'B', claveUnicidad = NULL, actualizadoEn = :actualizadoEn WHERE id IN (:ids)")
+    @Query(
+        """
+        UPDATE Canal
+        SET estado = 'B', claveUnicidad = NULL, actualizadoEn = :actualizadoEn
+        WHERE id IN (:ids) AND claveUnicidad IS NOT NULL
+        """,
+    )
     suspend fun liberarClaves(
         ids: List<Long>,
         actualizadoEn: Instant,

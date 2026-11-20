@@ -28,6 +28,10 @@ tasks.test {
     useJUnitPlatform()
     // La prueba de conformidad Unicode lee los datos oficiales vendorizados.
     systemProperty("repoRoot", rootProject.projectDir.absolutePath)
+    filter {
+        // La prueba grande necesita un heap acotado y su tarea dedicada.
+        excludeTestsMatching("com.copernicotv.core.reconciliacion.ReconciliadorGrandeTest")
+    }
 }
 
 /**
@@ -72,6 +76,27 @@ val p1XmltvPerformance by tasks.registering(Test::class) {
     systemProperty("repoRoot", rootProject.projectDir.absolutePath)
     filter {
         includeTestsMatching("com.copernicotv.core.xmltv.MedicionP1XmltvTest")
+    }
+    outputs.upToDateWhen { false }
+}
+
+/**
+ * Reconciliación de un catálogo de 147 000 canales con `-Xmx256m`.
+ *
+ * Reproduce el límite de memoria del dispositivo y demuestra que el motor
+ * indexado no necesita más heap. Se ejecuta aparte de `test` porque el tamaño
+ * del catálogo hace que la prueba sea lenta para el ciclo normal de PR.
+ */
+val reconciliacionGrande by tasks.registering(Test::class) {
+    description = "Reconciliación de 147 000 canales con heap acotado"
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    useJUnitPlatform()
+    maxHeapSize = "256m"
+    systemProperty("repoRoot", rootProject.projectDir.absolutePath)
+    filter {
+        includeTestsMatching("com.copernicotv.core.reconciliacion.ReconciliadorGrandeTest")
     }
     outputs.upToDateWhen { false }
 }

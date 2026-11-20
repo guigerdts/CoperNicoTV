@@ -388,7 +388,7 @@ class ActualizacionRepositorio
             for (apariencia in declaracion.apariencias) {
                 val grupoId = apariencia.groupTitle?.let { insertarGrupo(listaId, it, grupos) }
                 val escritura =
-                    escritorApariencias.upsert(
+                    escritorApariencias.upsertInterno(
                         AparienciaEntity(
                             listaId = listaId,
                             canalId = canalId,
@@ -439,7 +439,7 @@ class ActualizacionRepositorio
                         base
                     }
                 val escritura =
-                    escritorApariencias.reconciliar(
+                    escritorApariencias.reconciliarInterno(
                         AparienciaEntity(
                             id = existente?.id ?: 0,
                             listaId = listaId,

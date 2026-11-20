@@ -29,6 +29,11 @@ sealed interface ResultadoUpsertApariencia {
  * verdad (DC-05:627) y rechaza la tupla con `apariencia_migracion_pendiente`
  * mientras exista una fila de migración sin resolver (DC-05:635), de modo que
  * nunca se crea una Apariencia v2 paralela a una fila pendiente.
+ *
+ * Las variantes `Interno` no abren transacción: están pensadas para el camino
+ * de Actualización, que ya envuelve todo el plan en una sola transacción. Abrir
+ * una transacción anidada por Apariencia multiplica el coste por fila sin
+ * aportar atomicidad (Room ya las anida dentro de la exterior).
  */
 class AparienciaEscritor(
     private val db: AppDatabase,
@@ -36,39 +41,42 @@ class AparienciaEscritor(
     suspend fun upsert(
         apariencia: AparienciaEntity,
         ahora: Instant = Instant.now(),
-    ): ResultadoUpsertApariencia =
-        db.withTransaction {
-            val dao = db.aparienciaDao()
-            val pendientes =
-                dao.pendientesSinResolverDeTupla(
-                    listaId = apariencia.listaId,
-                    canalId = apariencia.canalId,
-                    clavePresentacion = apariencia.clavePresentacion,
-                )
-            if (pendientes > 0) {
-                return@withTransaction ResultadoUpsertApariencia.Rechazada(
-                    codigo = CODIGO_PENDIENTE,
-                    listaId = apariencia.listaId,
-                    canalId = apariencia.canalId,
-                    clavePresentacion = apariencia.clavePresentacion,
-                )
-            }
-            val existente =
-                dao.porTupla(
-                    listaId = apariencia.listaId,
-                    canalId = apariencia.canalId,
-                    clavePresentacion = apariencia.clavePresentacion,
-                )
-            if (existente == null) {
-                ResultadoUpsertApariencia.Escrita(apariencia.copy(id = dao.insertar(apariencia)))
-            } else {
-                val repeticiones = existente.repeticiones + apariencia.repeticiones
-                dao.actualizarRepeticiones(existente.id, repeticiones, ahora)
-                ResultadoUpsertApariencia.Escrita(
-                    existente.copy(repeticiones = repeticiones, actualizadoEn = ahora),
-                )
-            }
+    ): ResultadoUpsertApariencia = db.withTransaction { upsertInterno(apariencia, ahora) }
+
+    internal suspend fun upsertInterno(
+        apariencia: AparienciaEntity,
+        ahora: Instant,
+    ): ResultadoUpsertApariencia {
+        val dao = db.aparienciaDao()
+        val pendientes =
+            dao.pendientesSinResolverDeTupla(
+                listaId = apariencia.listaId,
+                canalId = apariencia.canalId,
+                clavePresentacion = apariencia.clavePresentacion,
+            )
+        if (pendientes > 0) {
+            return ResultadoUpsertApariencia.Rechazada(
+                codigo = CODIGO_PENDIENTE,
+                listaId = apariencia.listaId,
+                canalId = apariencia.canalId,
+                clavePresentacion = apariencia.clavePresentacion,
+            )
         }
+        val existente =
+            dao.porTupla(
+                listaId = apariencia.listaId,
+                canalId = apariencia.canalId,
+                clavePresentacion = apariencia.clavePresentacion,
+            )
+        if (existente == null) {
+            return ResultadoUpsertApariencia.Escrita(apariencia.copy(id = dao.insertar(apariencia)))
+        }
+        val repeticiones = existente.repeticiones + apariencia.repeticiones
+        dao.actualizarRepeticiones(existente.id, repeticiones, ahora)
+        return ResultadoUpsertApariencia.Escrita(
+            existente.copy(repeticiones = repeticiones, actualizadoEn = ahora),
+        )
+    }
 
     /**
      * Reconciliación de una Apariencia declarada por una Actualización (E4-T1/T2).
@@ -81,51 +89,54 @@ class AparienciaEscritor(
     suspend fun reconciliar(
         apariencia: AparienciaEntity,
         ahora: Instant = Instant.now(),
-    ): ResultadoUpsertApariencia =
-        db.withTransaction {
-            val dao = db.aparienciaDao()
-            val pendientes =
-                dao.pendientesSinResolverDeTupla(
-                    listaId = apariencia.listaId,
-                    canalId = apariencia.canalId,
-                    clavePresentacion = apariencia.clavePresentacion,
-                )
-            if (pendientes > 0) {
-                return@withTransaction ResultadoUpsertApariencia.Rechazada(
-                    codigo = CODIGO_PENDIENTE,
-                    listaId = apariencia.listaId,
-                    canalId = apariencia.canalId,
-                    clavePresentacion = apariencia.clavePresentacion,
-                )
-            }
-            val existente =
-                dao.porTupla(
-                    listaId = apariencia.listaId,
-                    canalId = apariencia.canalId,
-                    clavePresentacion = apariencia.clavePresentacion,
-                )
-            if (existente == null) {
-                ResultadoUpsertApariencia.Escrita(apariencia.copy(id = dao.insertar(apariencia)))
-            } else {
-                dao.actualizarDatos(
-                    id = existente.id,
-                    grupoId = apariencia.grupoId,
-                    groupTitle = apariencia.groupTitle,
-                    tvgName = apariencia.tvgName,
-                    repeticiones = apariencia.repeticiones,
-                    actualizadoEn = ahora,
-                )
-                ResultadoUpsertApariencia.Escrita(
-                    existente.copy(
-                        grupoId = apariencia.grupoId,
-                        groupTitle = apariencia.groupTitle,
-                        tvgName = apariencia.tvgName,
-                        repeticiones = apariencia.repeticiones,
-                        actualizadoEn = ahora,
-                    ),
-                )
-            }
+    ): ResultadoUpsertApariencia = db.withTransaction { reconciliarInterno(apariencia, ahora) }
+
+    internal suspend fun reconciliarInterno(
+        apariencia: AparienciaEntity,
+        ahora: Instant,
+    ): ResultadoUpsertApariencia {
+        val dao = db.aparienciaDao()
+        val pendientes =
+            dao.pendientesSinResolverDeTupla(
+                listaId = apariencia.listaId,
+                canalId = apariencia.canalId,
+                clavePresentacion = apariencia.clavePresentacion,
+            )
+        if (pendientes > 0) {
+            return ResultadoUpsertApariencia.Rechazada(
+                codigo = CODIGO_PENDIENTE,
+                listaId = apariencia.listaId,
+                canalId = apariencia.canalId,
+                clavePresentacion = apariencia.clavePresentacion,
+            )
         }
+        val existente =
+            dao.porTupla(
+                listaId = apariencia.listaId,
+                canalId = apariencia.canalId,
+                clavePresentacion = apariencia.clavePresentacion,
+            )
+        if (existente == null) {
+            return ResultadoUpsertApariencia.Escrita(apariencia.copy(id = dao.insertar(apariencia)))
+        }
+        dao.actualizarDatos(
+            id = existente.id,
+            grupoId = apariencia.grupoId,
+            groupTitle = apariencia.groupTitle,
+            tvgName = apariencia.tvgName,
+            repeticiones = apariencia.repeticiones,
+            actualizadoEn = ahora,
+        )
+        return ResultadoUpsertApariencia.Escrita(
+            existente.copy(
+                grupoId = apariencia.grupoId,
+                groupTitle = apariencia.groupTitle,
+                tvgName = apariencia.tvgName,
+                repeticiones = apariencia.repeticiones,
+                actualizadoEn = ahora,
+            ),
+        )
+    }
 
     companion object {
         /** Código contractual de rechazo del upsert de una tupla con migración pendiente. */

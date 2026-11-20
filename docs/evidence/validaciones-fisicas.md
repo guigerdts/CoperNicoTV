@@ -64,6 +64,7 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 
 ### F-10 — E7-T7 ronda 9: importación ~147k canales — PENDIENTE
 - Desglose de `tiempo_guardado_ms` medido en CI (inserción 48,860 s sobre ~146.859 filas, 148 lotes); la confirmación en dispositivo con la próxima importación real de ~147.000 canales sigue abierta (`e7-t7-ronda9-metricas-room.md:27`). No declarar la optimización física resuelta.
+- Actualización P0 (2026-11-20): la **actualización** de 147.000 canales ya está validada en CI (`:app:testDebugUnitTest`, run `44741157641`, ~13 min, SHA integrado `526d897`); no sustituye a F-10, que sigue siendo la comprobación **física** en el Samsung. Sin ADB/Wi-Fi y sin autorización para instalar, desinstalar ni borrar datos. Ver `odd/tasks/p0-actualizacion-oom.md` §L7/L8.
 
 ### F-11 — E7-T6: atenuación del duck — PENDIENTE
 - El multiplicador de volumen del duck es interno del sink de Media3; la atenuación efectiva no es medible por API pública (`mvp:4862`). Verificación física de percepción pendiente en campaña consolidada.

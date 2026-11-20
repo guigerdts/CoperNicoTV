@@ -30,6 +30,20 @@ fun hayNdkValido(): Boolean {
 
 val buildNativo = hayNdkValido()
 
+/**
+ * Valor de `BuildConfig` a partir de una variable de entorno.
+ *
+ * El valor se escapa para que un error de configuración no rompa el script de
+ * build; si la variable falta, queda vacío y el OTA no verifica nada.
+ */
+fun cadenaBuildConfig(
+    nombre: String,
+    porDefecto: String = "",
+): String {
+    val valor = (System.getenv(nombre) ?: porDefecto).replace("\\", "\\\\").replace("\"", "\\\"")
+    return "\"$valor\""
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -50,6 +64,13 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        // Identidad del canal OTA. En release la inyecta el workflow; en debug
+        // quedan vacías y el comprobador falla cerrado (no hay actualizaciones
+        // sin firma verificable).
+        buildConfigField("String", "OTA_REPOSITORIO", cadenaBuildConfig("OTA_REPOSITORIO", "guigerdts/CoperNicoTV"))
+        buildConfigField("String", "OTA_MANIFIESTO_PUBKEY", cadenaBuildConfig("OTA_MANIFIESTO_PUBKEY"))
+        buildConfigField("String", "OTA_CERT_SHA256", cadenaBuildConfig("OTA_CERT_SHA256"))
 
         testInstrumentationRunner = "com.copernicotv.app.HiltTestRunner"
 
@@ -75,6 +96,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     if (buildNativo) {

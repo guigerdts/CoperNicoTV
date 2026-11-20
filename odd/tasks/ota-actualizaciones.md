@@ -19,8 +19,8 @@ Objetivo: actualizaciones in-app de GitHub Releases con descarga reanudable, ver
 
 ## Tasks
 
-- T1 — Dominio OTA en `:core` + pruebas JVM. S1, S2, S3, S4 (lógica pura). Estado: **completada** (36 tests, ktlint y detekt en verde local).
-- T2 — Infraestructura app: cliente HTTP, fuente GitHub, comprobador, descargador y verificador APK + pruebas. S1–S5. Estado: pendiente.
+- T1 — Dominio OTA en `:core` + pruebas JVM. S1, S2, S3, S4 (lógica pura). Estado: **completada** — commit `173bff1`; 42 tests en `:core` (incluye `PublicacionesGitHub`), ktlint y detekt en verde local.
+- T2 — Infraestructura app: cliente HTTP, fuente GitHub, comprobador, descargador y verificador APK + pruebas. S1–S5. Estado: implementada, pendiente de validación CI (`:app` no compila en Termux).
 - T3 — Instalador PackageInstaller, notificaciones, workers y programación aislada + pruebas. S6–S8. Estado: pendiente.
 - T4 — Pantalla Ajustes > Actualizaciones y navegación móvil/TV + pruebas. S9. Estado: pendiente.
 - T5 — Firma permanente, workflow de release, manifiesto y documentación de respaldo/recuperación. S10, S11. Estado: pendiente.
@@ -31,3 +31,5 @@ Objetivo: actualizaciones in-app de GitHub Releases con descarga reanudable, ver
 - L1 — Pedido del propietario (2026-11-20): sistema OTA integral con GitHub Releases, firma permanente, continuidad de datos y validación física; el sistema no se declara terminado por compilar.
 - L2 — El propietario elige estrategia de entrega `PRs apilados a main` para mantener revisiones acotadas.
 - L3 — T1 implementada en `:core`: `ManifiestoActualizacion` (parse estricto con motivos tipados), `CanalActualizacion`, `SeleccionActualizacion`, `FirmaManifiesto` (ECDSA P-256) e `Integridad` (SHA-256 streaming y comparación constante). Evidencia: `./gradlew :core:test --tests "com.copernicotv.core.ota.*"` con 36 tests, `:core:ktlintCheck` y `:core:detekt` en verde. Riesgo: item 3 (contrato entre workflow y app), cubierto con pruebas de rechazo.
+- L4 — T1 commiteada en `feat/ota-1-dominio` (`173bff1`) con la revisión GGA en verde por subsets. Al integrar T2 se sumó `PublicacionesGitHub` (6 tests) al dominio: el descubrimiento del release por `api.github.com` también es lógica pura y se prueba sin Android. Total `:core` ota: 42 tests.
+- L5 — T2 implementada en `:app`: `ClienteHttpOtaUrlConnection` (validación de esquema/host antes de abrir socket, redirecciones revalidadas, cuerpo acotado, descarga con `Range`), `DescargadorApk` (reanudación `.part`, progreso, limpieza), `VerificadorApk` (tamaño, SHA-256, paquete, versionCode, huella de certificado, minSdk), `FuenteManifiestosGitHub`, `ComprobadorActualizaciones`, `PreferenciasOta` y grafo Hilt. Tests contra servidor TLS local para el cliente real. Validación de compilación delegada a CI por ADR-0005.

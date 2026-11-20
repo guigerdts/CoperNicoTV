@@ -17,6 +17,9 @@ dependencies {
     // Parser XMLTV streaming (ADR-0003): XmlPullParser portable JVM/Android.
     implementation(libs.kxml2)
     implementation(libs.kotlinx.coroutines.core)
+    // Manifiesto OTA: solo se usa `parseToJsonElement`, sin plugin de
+    // serialización ni clases generadas.
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.kotlin.test)
     testImplementation(libs.junit.jupiter)

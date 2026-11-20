@@ -26,7 +26,6 @@ import com.copernicotv.core.m3u.ResultadoImportacionM3U
 import com.copernicotv.core.reconciliacion.DeclaracionNueva
 import com.copernicotv.core.reconciliacion.DestinoDeclaracion
 import com.copernicotv.core.reconciliacion.FilaHistorica
-import com.copernicotv.core.reconciliacion.FilaPlan
 import com.copernicotv.core.reconciliacion.IdentidadReconciliacion
 import com.copernicotv.core.reconciliacion.Reconciliador
 import com.copernicotv.core.reconciliacion.ResultadoReconciliacion
@@ -83,6 +82,7 @@ class ActualizacionRepositorio
         private val io = Dispatchers.IO
         private val escritorCanales = CanalEscritor(db)
         private val escritorApariencias = AparienciaEscritor(db)
+        private val escritorLotes = ActualizacionLotesEscritor(db, clavesDatos)
 
         /**
          * Punto de fallo inyectable para probar el rollback de A→B con N filas.
@@ -187,21 +187,9 @@ class ActualizacionRepositorio
                             )
                         liberarClaves(plan, ahora)
                         puntoDeFallo?.invoke(EtapaActualizacion.TRAS_LIBERAR_CLAVES)
-                        var actualizadas = 0
                         val grupos = HashMap<String, Long>()
-                        for (lote in plan.filas.chunked(LOTE_ESCRITURA)) {
-                            val entidades =
-                                db.canalDao()
-                                    .porIds(lote.map { it.historicoId })
-                                    .associateBy { it.id }
-                            for (fila in lote) {
-                                val historica = entidades[fila.historicoId] ?: continue
-                                val declaracion = fila.declaracionIndice?.let { importado.canales[it] }
-                                if (aplicarFila(fila, historica, declaracion, lista.id, ahora, grupos)) {
-                                    actualizadas += 1
-                                }
-                            }
-                        }
+                        val actualizadas =
+                            escritorLotes.aplicar(lista.id, plan, importado.canales, ahora, grupos)
                         var nuevas = 0
                         var observaciones = 0
                         for (destino in plan.declaraciones) {
@@ -297,67 +285,6 @@ class ActualizacionRepositorio
             }
         }
 
-        /**
-         * Aplica el plan de una fila. Devuelve `true` solo si la fila cambió.
-         *
-         * Una fila ausente o un C que sigue C no se toca: la ausencia conserva
-         * la fila y sus relaciones (ADR-0004:58(c)).
-         */
-        @Suppress("CyclomaticComplexMethod")
-        private suspend fun aplicarFila(
-            fila: FilaPlan,
-            historica: CanalEntity,
-            declaracion: CanalImportadoM3U?,
-            listaId: Long,
-            ahora: Instant,
-            grupos: MutableMap<String, Long>,
-        ): Boolean {
-            val sinCambios =
-                declaracion == null &&
-                    fila.estado == historica.estado &&
-                    fila.identidad.claveUnicidad == historica.claveUnicidad &&
-                    fila.evidencia == historica.evidencia &&
-                    !fila.decisionSuperada
-            if (sinCambios) return false
-
-            val decision =
-                if (fila.decisionSuperada) {
-                    marcarSuperada(historica.decision)
-                } else {
-                    historica.decision
-                }
-            val fechaDecision =
-                if (fila.decisionSuperada) historica.fechaDecision ?: ahora else historica.fechaDecision
-            val actualizada =
-                historica.copy(
-                    nombre = fila.identidad.nombre,
-                    tvgId = fila.identidad.tvgId,
-                    claveCanonica = fila.identidad.claveCanonica,
-                    claveUnicidad = fila.identidad.claveUnicidad,
-                    claveDerivable = fila.identidad.claveDerivable,
-                    estado = fila.estado,
-                    evidencia = fila.evidencia,
-                    decision = decision,
-                    fechaDecision = fechaDecision,
-                    urlStreamCifrada =
-                        declaracion?.let { cifrar(it.urlOriginal, "Canal", "url_stream_cifrada") }
-                            ?: historica.urlStreamCifrada,
-                    urlStreamHmac = declaracion?.urlStreamHmac?.toByteArray(Charsets.UTF_8) ?: historica.urlStreamHmac,
-                    logoUrlCifrada =
-                        if (declaracion != null) cifrarLogo(declaracion.logoOriginal) else historica.logoUrlCifrada,
-                    logoUrlHmac = declaracion?.logoHmac?.toByteArray(Charsets.UTF_8) ?: historica.logoUrlHmac,
-                    atributosExtra =
-                        declaracion?.let { CodecAtributosExtra.codificar(it.atributosExtra) }
-                            ?: historica.atributosExtra,
-                    actualizadoEn = ahora,
-                )
-            escritorCanales.actualizar(actualizada, tvgIdUnico(declaracion))
-            if (declaracion != null) {
-                sincronizarApariencias(listaId, historica.id, declaracion, ahora, grupos)
-            }
-            return true
-        }
-
         private suspend fun insertarCanal(
             fuenteId: Long,
             listaId: Long,
@@ -388,7 +315,7 @@ class ActualizacionRepositorio
             for (apariencia in declaracion.apariencias) {
                 val grupoId = apariencia.groupTitle?.let { insertarGrupo(listaId, it, grupos) }
                 val escritura =
-                    escritorApariencias.upsertInterno(
+                    escritorApariencias.upsert(
                         AparienciaEntity(
                             listaId = listaId,
                             canalId = canalId,
@@ -408,62 +335,6 @@ class ActualizacionRepositorio
                 }
             }
             return canalId
-        }
-
-        /**
-         * Sincroniza las Apariencias de un Canal existente.
-         *
-         * Conserva el `orden` manual de las filas que ya existían; una
-         * Apariencia que la Fuente deja de declarar se elimina, pero el Canal y
-         * sus Favoritos/Historial/Ocultaciones/Colecciones no se tocan
-         * (ADR-0004:58(c)).
-         */
-        private suspend fun sincronizarApariencias(
-            listaId: Long,
-            canalId: Long,
-            declaracion: CanalImportadoM3U,
-            ahora: Instant,
-            grupos: MutableMap<String, Long>,
-        ) {
-            val existentes = db.aparienciaDao().porCanalEnLista(listaId, canalId)
-            val porClave = existentes.associateBy { it.clavePresentacion }
-            val declaradas = declaracion.apariencias.map { it.clavePresentacion }.toSet()
-            var siguiente: Int? = null
-            for (apariencia in declaracion.apariencias) {
-                val grupoId = apariencia.groupTitle?.let { insertarGrupo(listaId, it, grupos) }
-                val existente = porClave[apariencia.clavePresentacion]
-                val orden =
-                    existente?.orden ?: run {
-                        val base = siguiente ?: (db.aparienciaDao().maxOrden(listaId) + 1)
-                        siguiente = base + 1
-                        base
-                    }
-                val escritura =
-                    escritorApariencias.reconciliarInterno(
-                        AparienciaEntity(
-                            id = existente?.id ?: 0,
-                            listaId = listaId,
-                            canalId = canalId,
-                            grupoId = grupoId,
-                            orden = orden,
-                            groupTitle = apariencia.groupTitle,
-                            tvgName = apariencia.tvgName,
-                            clavePresentacion = apariencia.clavePresentacion,
-                            repeticiones = apariencia.repeticiones,
-                            creadoEn = existente?.creadoEn ?: ahora,
-                            actualizadoEn = ahora,
-                        ),
-                        ahora,
-                    )
-                if (escritura is ResultadoUpsertApariencia.Rechazada) {
-                    throw ImportacionRechazada(escritura.codigo)
-                }
-            }
-            for (existente in existentes) {
-                if (existente.clavePresentacion !in declaradas) {
-                    db.aparienciaDao().eliminar(existente.id)
-                }
-            }
         }
 
         private suspend fun registrarEvidencias(
@@ -677,9 +548,6 @@ class ActualizacionRepositorio
             return canal.claveUnicidad == ClaveCanal.PREFIJO_TVG + tvg
         }
 
-        private fun marcarSuperada(decision: String?): String? =
-            decision?.let { if (it.endsWith(SUFIJO_SUPERADA)) it else it + SUFIJO_SUPERADA }
-
         private fun cifrar(
             valor: String,
             tabla: String,
@@ -742,7 +610,6 @@ class ActualizacionRepositorio
             const val ESTADO_ACTIVA = "activa"
             const val ESTADO_AUSENTE = "ausente"
             const val TEXTO_AUSENTE = "La Fuente no declaró el Canal en esta Actualización"
-            const val SUFIJO_SUPERADA = ":superada"
 
             /** Filas por página de la carga *keyset* de identidades históricas. */
             const val LOTE_LECTURA = 500

@@ -27,16 +27,16 @@ class CanalEscritor(
     private val db: AppDatabase,
 ) {
     /**
-     * Valida y persiste un Canal.
+     * Valida las invariantes sin persistir; lo usa el camino agrupado por lotes.
      *
      * @param tvgIdUnicoEnFuente `true` solo si el `tvg-id` es válido y único en
      *   la Fuente; determina la forma exigida de `clave_unicidad`.
      * @throws CanalRechazado si la fila incumple alguna invariante.
      */
-    suspend fun insertar(
+    fun validar(
         entidad: CanalEntity,
         tvgIdUnicoEnFuente: Boolean,
-    ): Long {
+    ) {
         val violaciones =
             InvariantesCanal.validar(
                 FilaCanal(
@@ -52,6 +52,13 @@ class CanalEscritor(
                 tvgIdUnicoEnFuente,
             )
         if (violaciones.isNotEmpty()) throw CanalRechazado(violaciones)
+    }
+
+    suspend fun insertar(
+        entidad: CanalEntity,
+        tvgIdUnicoEnFuente: Boolean,
+    ): Long {
+        validar(entidad, tvgIdUnicoEnFuente)
         return db.canalDao().insertar(entidad)
     }
 
@@ -65,21 +72,7 @@ class CanalEscritor(
         entidad: CanalEntity,
         tvgIdUnicoEnFuente: Boolean,
     ): Int {
-        val violaciones =
-            InvariantesCanal.validar(
-                FilaCanal(
-                    nombre = entidad.nombre,
-                    estado = entidad.estado,
-                    claveDerivable = entidad.claveDerivable,
-                    claveCanonica = entidad.claveCanonica,
-                    claveUnicidad = entidad.claveUnicidad,
-                    tvgId = entidad.tvgId,
-                    urlStreamCifradaPresente = entidad.urlStreamCifrada.isNotEmpty(),
-                    urlStreamHmacPresente = entidad.urlStreamHmac.isNotEmpty(),
-                ),
-                tvgIdUnicoEnFuente,
-            )
-        if (violaciones.isNotEmpty()) throw CanalRechazado(violaciones)
+        validar(entidad, tvgIdUnicoEnFuente)
         return db.canalDao().actualizar(entidad)
     }
 }

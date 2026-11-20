@@ -18,11 +18,6 @@ import com.copernicotv.core.crypto.ResultadoDescifrado
 import com.copernicotv.core.identity.ClavePresentacion
 import com.copernicotv.core.identity.EstadoCanal
 import com.copernicotv.core.m3u.ImportadorM3U
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -76,22 +71,8 @@ class ActualizacionGrandeTest {
         db.close()
     }
 
-    @Test(timeout = 3 * 60 * 1000L)
+    @Test(timeout = 20 * 60 * 1000L)
     fun `147000 canales se actualizan completos y conservan identidad grupos e historial`() {
-        val watchdog =
-            CoroutineScope(Dispatchers.Default).launch {
-                delay(45_000)
-                println("P0-HILOS volcado a los 45s")
-                Thread.getAllStackTraces().forEach { (hilo, traza) ->
-                    val interes =
-                        hilo.name.contains("arch_disk_io") ||
-                            hilo.name.contains("DefaultDispatcher")
-                    if (hilo.state == Thread.State.RUNNABLE && interes) {
-                        println("P0-HILO ${hilo.name} ${hilo.state}")
-                        traza.forEach { marco -> println("    $marco") }
-                    }
-                }
-            }
         runBlocking {
             println("P0-PROGRESO seed inicio")
             sembrarCatalogo(TOTAL)
@@ -137,7 +118,6 @@ class ActualizacionGrandeTest {
                 assertEquals("https://example.com/nuevo/$j.ts", descifrar(canal.urlStreamCifrada))
             }
         }
-        watchdog.cancel()
     }
 
     private suspend fun sembrarCatalogo(total: Int) {

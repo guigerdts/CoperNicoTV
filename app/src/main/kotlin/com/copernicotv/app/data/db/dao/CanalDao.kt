@@ -10,6 +10,7 @@ import com.copernicotv.app.data.db.entities.CanalEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
+@Suppress("TooManyFunctions")
 @Dao
 interface CanalDao {
     @Insert
@@ -20,6 +21,10 @@ interface CanalDao {
 
     @Update
     suspend fun actualizar(canal: CanalEntity): Int
+
+    /** Actualización agrupada de canales de un lote, en una sola transacción. */
+    @Update
+    suspend fun actualizarTodos(canales: List<CanalEntity>)
 
     @Query("DELETE FROM Canal WHERE id = :id")
     suspend fun eliminar(id: Long): Int

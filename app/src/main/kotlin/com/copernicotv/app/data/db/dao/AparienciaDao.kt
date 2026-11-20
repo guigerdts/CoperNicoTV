@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Update
 import com.copernicotv.app.data.db.entities.AparienciaClavePendienteEntity
 import com.copernicotv.app.data.db.entities.AparienciaEntity
 import kotlinx.coroutines.flow.Flow
@@ -26,6 +27,36 @@ interface AparienciaDao {
         listaId: Long,
         canalId: Long,
     ): List<AparienciaEntity>
+
+    /**
+     * Apariencias de todos los canales de un lote en una sola consulta.
+     *
+     * Sustituye a `porCanalEnLista` invocada por fila en la actualización: con
+     * 147 000 canales, un viaje DAO por fila hace que la prueba JVM tarde ~55
+     * minutos por el coste de cada llamada de Room, aunque el índice existe.
+     */
+    @Query(
+        "SELECT * FROM Apariencia WHERE listaId = :listaId AND canalId IN (:canalIds) " +
+            "ORDER BY canalId, orden, id",
+    )
+    suspend fun porCanalesEnLista(
+        listaId: Long,
+        canalIds: List<Long>,
+    ): List<AparienciaEntity>
+
+    /** Tuplas con migración pendiente de los canales de un lote, en una sola consulta. */
+    @Query(
+        """
+        SELECT a.canalId AS canalId, p.clavePresentacionV2 AS clavePresentacion
+        FROM Apariencia a
+        INNER JOIN AparienciaClavePendiente p ON p.aparienciaId = a.id
+        WHERE a.listaId = :listaId AND a.canalId IN (:canalIds) AND p.resueltaEn IS NULL
+        """,
+    )
+    suspend fun pendientesSinResolverDeCanales(
+        listaId: Long,
+        canalIds: List<Long>,
+    ): List<TuplaPendienteLote>
 
     /** Todas las Apariencias de un Canal, de cualquier Lista (fusión de Canales). */
     @Query("SELECT * FROM Apariencia WHERE canalId = :canalId ORDER BY listaId, clavePresentacion, id")
@@ -59,6 +90,14 @@ interface AparienciaDao {
         repeticiones: Int,
         actualizadoEn: Instant,
     ): Int
+
+    /** Actualización agrupada de Apariencias existentes, en una sola transacción. */
+    @Update
+    suspend fun actualizarTodas(apariencias: List<AparienciaEntity>)
+
+    /** Borrado agrupado de Apariencias que la Fuente dejó de declarar. */
+    @Query("DELETE FROM Apariencia WHERE id IN (:ids)")
+    suspend fun eliminarPorIds(ids: List<Long>)
 
     @Query("SELECT COUNT(*) FROM Apariencia WHERE listaId = :listaId")
     suspend fun contar(listaId: Long): Int
@@ -170,3 +209,9 @@ interface AparienciaDao {
         clavePresentacion: String,
     ): Int
 }
+
+/** Tupla `(canal, clave)` con migración pendiente, para la consulta agrupada del lote. */
+data class TuplaPendienteLote(
+    val canalId: Long,
+    val clavePresentacion: String,
+)

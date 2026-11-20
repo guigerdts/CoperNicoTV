@@ -80,12 +80,15 @@ class ActualizacionGrandeTest {
     fun `147000 canales se actualizan completos y conservan identidad grupos e historial`() {
         val watchdog =
             CoroutineScope(Dispatchers.Default).launch {
-                delay(90_000)
-                println("P0-HILOS volcado a los 90s")
+                delay(45_000)
+                println("P0-HILOS volcado a los 45s")
                 Thread.getAllStackTraces().forEach { (hilo, traza) ->
-                    if (hilo.state != Thread.State.TERMINATED) {
+                    val interes =
+                        hilo.name.contains("arch_disk_io") ||
+                            hilo.name.contains("DefaultDispatcher")
+                    if (hilo.state == Thread.State.RUNNABLE && interes) {
                         println("P0-HILO ${hilo.name} ${hilo.state}")
-                        traza.take(18).forEach { marco -> println("    $marco") }
+                        traza.forEach { marco -> println("    $marco") }
                     }
                 }
             }

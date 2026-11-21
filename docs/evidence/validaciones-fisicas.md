@@ -20,6 +20,10 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 | F-10 | E7-T7 ronda 9 | Importación ~147k canales | Pendiente | medición aproximada sin confirmación | `e7-t7-ronda9-metricas-room.md` |
 | F-11 | E7-T6 | Duck de audio | Pendiente | atenuación no medible por API pública | matriz §L91 |
 | F-12 | E4-T7 (DC-07 punto 8) | Reinicio del dispositivo / force-stop: el trabajo periódico de WorkManager sobrevive y se reanuda en el próximo arranque, sin hora exacta | Pendiente | sin evidencia física recuperada; en CI queda cubierto por persistencia de plataforma y reconciliación idempotente (`ProgramadorWorkManagerTest`) | `odd/tasks/e4-t7-dc-07-implementacion-cierre.md` §D |
+| F-13 | OTA T6 | Instalación limpia del primer APK release firmado + importación M3U | Pendiente | requiere APK release y desinstalar la versión de pruebas | `odd/tasks/ota-actualizaciones.md` |
+| F-14 | OTA T6 | Publicación de una segunda versión: detección, notificación y descarga verificada | Pendiente | requiere un release posterior al instalado | mismo doc |
+| F-15 | OTA T6 | Instalación sobre la versión anterior, retorno a la app y conservación de datos | Pendiente | requiere F-13 y F-14 | mismo doc |
+| F-16 | OTA T6 | Caminos de error en dispositivo: manifiesto inválido, firma incompatible, hash incorrecto, APK corrupto, descarga interrumpida y duplicada | Pendiente | requiere un canal de pruebas controlable | mismo doc |
 
 ## Detalle
 
@@ -68,3 +72,24 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 
 ### F-11 — E7-T6: atenuación del duck — PENDIENTE
 - El multiplicador de volumen del duck es interno del sink de Media3; la atenuación efectiva no es medible por API pública (`mvp:4862`). Verificación física de percepción pendiente en campaña consolidada.
+
+### F-13 — OTA: instalación limpia release + importación — PENDIENTE
+- **Procedimiento**: desinstalar la versión de pruebas (pierde datos, aceptado y autorizado); instalar el APK release publicado; abrir la app; importar una Lista M3U real; confirmar catálogo y reproducción.
+- **Resultado esperado**: la app arranca, la Lista importa con su informe, el canal OTA informa la versión instalada y el canal elegido en Ajustes > Actualizaciones.
+- **Estado**: pendiente. Requiere un APK release firmado con el keystore de producción, que a su vez requiere las claves de T5.
+- **Bloqueo**: ADB y Wi-Fi del dispositivo deshabilitados; no se repiten CAM-09-D/E mientras sigan así.
+
+### F-14 — OTA: segunda versión detectada, notificada y descargada — PENDIENTE
+- **Procedimiento**: instalar la versión N; publicar la versión N+1 con `versionCode` mayor; esperar la comprobación periódica o usar "Buscar" en Ajustes; observar notificación de disponibilidad; descargar.
+- **Resultado esperado**: notificación `actualizaciones_app` con la versión nueva; descarga con progreso; verificación de tamaño, SHA-256, `versionCode` y certificado antes de ofrecer instalar; sin re-descarga si se vuelve a comprobar.
+- **Estado**: pendiente. Requiere F-13 y un segundo release.
+
+### F-15 — OTA: instalación sobre la anterior y conservación de datos — PENDIENTE
+- **Procedimiento**: desde F-14, aceptar el diálogo del sistema; volver a la app; revisar Listas, URL de cada Lista, favoritos, ocultaciones, historial, ajustes de reproducción y canal OTA.
+- **Resultado esperado**: la app queda en la versión N+1 sin diálogo de desinstalación; todos los datos anteriores siguen presentes y las URL se descifran correctamente; la comprobación posterior informa "al día".
+- **Estado**: pendiente. Requiere F-14. **Es el criterio que decide si el OTA está terminado**: compilar no lo demuestra.
+
+### F-16 — OTA: caminos de error en dispositivo — PENDIENTE
+- **Procedimiento**: con un canal de pruebas controlable, provocar en orden: manifiesto con un campo faltante, firma modificada, hash de APK alterado, APK truncado, y corte de red a mitad de descarga seguido de reanudación.
+- **Resultado esperado**: cada caso se rechaza con el motivo tipado, no se ofrece instalar, no se corrompe el estado guardado y la descarga interrumpida se reanuda en vez de repetirse desde cero. Una comprobación duplicada no descarga dos veces.
+- **Estado**: pendiente. Requiere un release de pruebas que se pueda alterar sin afectar el canal real.

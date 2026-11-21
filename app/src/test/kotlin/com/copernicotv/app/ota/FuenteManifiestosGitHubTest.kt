@@ -129,9 +129,9 @@ class FuenteManifiestosGitHubTest {
             ClienteMapa(
                 mapOf(
                     URL_API to publicaciones,
-                    URL_JSON to estable,
+                    URL_JSON to estable.encodeToByteArray(),
                     URL_FIRMA to firmaEstable,
-                    URL_JSON_BETA to beta,
+                    URL_JSON_BETA to beta.encodeToByteArray(),
                     URL_FIRMA_BETA to firmaBeta,
                 ),
             )

@@ -90,6 +90,6 @@ class ReglasVerificacionApkTest {
 
     private companion object {
         const val PAQUETE = "com.copernicotv.app"
-        const val HUELLA = "f".repeat(64)
+        val HUELLA = "f".repeat(64)
     }
 }

@@ -207,7 +207,7 @@ class ComprobadorActualizacionesTest {
 
     private companion object {
         const val PAQUETE = "com.copernicotv.app"
-        const val HUELLA = "c".repeat(64)
+        val HUELLA = "c".repeat(64)
         val CONFIGURACION = ConfiguracionOta("guigerdts/CoperNicoTV", PAQUETE, "clave", HUELLA)
     }
 }

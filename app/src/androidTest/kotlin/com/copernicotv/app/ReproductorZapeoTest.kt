@@ -1,15 +1,22 @@
 package com.copernicotv.app
 
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.printToString
 import androidx.test.platform.app.InstrumentationRegistry
 import com.copernicotv.app.data.CatalogoRepositorio
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.ui.ReproductorUiState
+import com.copernicotv.app.ui.TAG_REPRODUCTOR
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ANTERIOR
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_BUFFER
+import com.copernicotv.app.ui.TAG_REPRODUCTOR_CONTROLES
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_ERROR
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_SIGUIENTE
 import com.copernicotv.app.ui.TAG_REPRODUCTOR_VOLUMEN_BAJAR
@@ -22,6 +29,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -209,6 +217,78 @@ class ReproductorZapeoTest {
         val texto = composeRule.textoDeTag(TAG_REPRODUCTOR_ERROR)
         assertTrue("El error debe tipar el 4xx: $texto", texto.contains("http_cliente"))
         composeRule.esperarHasta { composeRule.viewModelReproductor().sesionActual() == null }
+    }
+
+    /**
+     * TEMPORAL — diagnóstico del flake de CI, opt-in y fuera de la suite normal.
+     *
+     * Solo se ejecuta cuando el runner recibe `diagZapeo=true`
+     * (`-Pandroid.testInstrumentationRunnerArguments.diagZapeo=true`); en la
+     * suite normal queda omitido y no altera el resultado de
+     * `instrumented-mobile`. Cuando se activa, reproduce el estado exacto en que
+     * `elZapeoRapidoConsecutivo…` intenta su segundo click y publica los árboles
+     * merged y unmerged más la cadena de ancestros del nodo
+     * `reproductor-siguiente`; falla a propósito para que ese informe quede en
+     * el artifact de CI. Se elimina al cerrar el diagnóstico.
+     */
+    @Test
+    fun diagnosticoTemporalSemanticaTrasPrimerZapeo() {
+        assumeTrue(
+            "Diagnóstico opt-in: requiere diagZapeo=true",
+            InstrumentationRegistry.getArguments().getString("diagZapeo") == "true",
+        )
+        sembrarTresCanales()
+        abrirPrimerCanal()
+        composeRule.mostrarControlesConToque()
+        val viewModel = composeRule.viewModelReproductor()
+        val informe = StringBuilder()
+
+        fun resumenNodo(nodo: SemanticsNode): String {
+            val texto = nodo.config.joinToString("; ") { "${it.key}=${it.value}" }
+            return if (texto.length <= 300) texto else texto.take(300) + "…"
+        }
+
+        fun volcar(momento: String) {
+            val sigMerged = composeRule.onAllNodesWithTag(TAG_REPRODUCTOR_SIGUIENTE).fetchSemanticsNodes()
+            val sigUnmerged =
+                composeRule
+                    .onAllNodesWithTag(TAG_REPRODUCTOR_SIGUIENTE, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+            val controlesMerged = composeRule.onAllNodesWithTag(TAG_REPRODUCTOR_CONTROLES).fetchSemanticsNodes().size
+            val controlesUnmerged =
+                composeRule
+                    .onAllNodesWithTag(TAG_REPRODUCTOR_CONTROLES, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .size
+            val carga = composeRule.onAllNodesWithTag(TAG_REPRODUCTOR_BUFFER).fetchSemanticsNodes().size
+            val raiz = composeRule.onAllNodesWithTag(TAG_REPRODUCTOR).fetchSemanticsNodes().size
+            informe.appendLine("=== $momento ===")
+            informe.appendLine("siguiente: merged=${sigMerged.size} unmerged=${sigUnmerged.size}")
+            informe.appendLine("controles: merged=$controlesMerged unmerged=$controlesUnmerged")
+            informe.appendLine("carga=$carga raiz=$raiz fase='${composeRule.faseActual()}'")
+            informe.appendLine("estado=${viewModel.estado.value}")
+            sigUnmerged.firstOrNull()?.let { nodo ->
+                informe.appendLine("nodo: id=${nodo.id} bounds=${nodo.boundsInRoot} config=[${resumenNodo(nodo)}]")
+                var padre = nodo.parent
+                var nivel = 0
+                while (padre != null && nivel < 10) {
+                    informe.appendLine("  padre[$nivel]: id=${padre.id} bounds=${padre.boundsInRoot} config=[${resumenNodo(padre)}]")
+                    padre = padre.parent
+                    nivel++
+                }
+            }
+            if (sigMerged.isEmpty()) {
+                val arbol =
+                    runCatching { composeRule.onRoot().printToString(maxDepth = 5) }
+                        .getOrElse { "sin árbol: $it" }
+                informe.appendLine("ARBOL MERGED:\n" + arbol.take(4000))
+            }
+        }
+
+        volcar("A: antes del primer click")
+        composeRule.onNodeWithTag(TAG_REPRODUCTOR_SIGUIENTE).performClick()
+        volcar("B: inmediatamente después del primer click")
+        throw AssertionError("DIAGNOSTICO SEMANTICA ZAPEO\n$informe")
     }
 
     private fun abrirPrimerCanal() {

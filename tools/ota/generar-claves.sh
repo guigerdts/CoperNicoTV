@@ -75,8 +75,11 @@ keytool -genkeypair \
   -validity 10000 \
   -storepass "$CLAVE_KEYSTORE" \
   -keypass "$CLAVE_CLAVE" \
-  -dname "CN=CoperNicoTV, OU=Distribucion, O=CoperNicoTV, C=AR" \
+  -dname "CN=CoperNicoTV, OU=Distribucion, O=CoperNicoTV, C=CO" \
   -noprompt >/dev/null
+# El keystore contiene la clave privada del APK: no depende del permiso del
+# directorio para quedar fuera del alcance de otros usuarios.
+chmod 600 "$DIRECTORIO/release.keystore"
 
 echo "-- 2/4 Clave de firma del manifiesto (ECDSA P-256)"
 openssl ecparam -name prime256v1 -genkey -noout -out "$DIRECTORIO/ota-firma.pem"
@@ -87,14 +90,23 @@ CLAVE_PUBLICA_BASE64="$(
   openssl ec -in "$DIRECTORIO/ota-firma.pem" -pubout -outform DER 2>/dev/null |
     base64 -w 0
 )"
-HUELLA_CERTIFICADO="$(
-  keytool -exportcert \
-    -keystore "$DIRECTORIO/release.keystore" \
-    -alias "$ALIAS" \
-    -storepass "$CLAVE_KEYSTORE" 2>/dev/null |
-    openssl dgst -sha256 -binary |
-    xxd -p -c 256
-)"
+CERT_TMP="$(mktemp)"
+trap 'rm -f "$CERT_TMP"' EXIT
+if ! keytool -exportcert \
+  -keystore "$DIRECTORIO/release.keystore" \
+  -alias "$ALIAS" \
+  -storepass "$CLAVE_KEYSTORE" >"$CERT_TMP" 2>/dev/null; then
+  echo "No se pudo exportar el certificado del keystore recién creado." >&2
+  exit 4
+fi
+TAMANO_CERT="$(wc -c <"$CERT_TMP")"
+# keytool escribe un mensaje en stdout cuando falla; hashearlo daría una huella
+# con forma válida sobre basura, y esa huella terminaría dentro de la app.
+if [ "$TAMANO_CERT" -lt 256 ]; then
+  echo "El certificado exportado mide $TAMANO_CERT bytes: no es un certificado X.509." >&2
+  exit 4
+fi
+HUELLA_CERTIFICADO="$(openssl dgst -sha256 -binary <"$CERT_TMP" | xxd -p -c 256)"
 
 {
   echo "OTA_MANIFIESTO_PUBKEY=$CLAVE_PUBLICA_BASE64"
@@ -115,21 +127,22 @@ echo "== Paso siguiente: cargar los secretos en GitHub =="
 echo "Ejecutá estas líneas vos mismo, desde este equipo:"
 echo
 cat <<COMANDOS
-  gh secret set ANDROID_KEYSTORE_BASE64 \\
-    --repo $REPOSITORIO \\
-    --body "\$(base64 -w 0 "$DIRECTORIO/release.keystore")"
+  base64 -w 0 "$DIRECTORIO/release.keystore" | \\
+    gh secret set ANDROID_KEYSTORE_BASE64 --repo $REPOSITORIO
   gh secret set ANDROID_KEYSTORE_PASSWORD --repo $REPOSITORIO
   gh secret set ANDROID_KEY_ALIAS --repo $REPOSITORIO --body "$ALIAS"
   gh secret set ANDROID_KEY_PASSWORD --repo $REPOSITORIO
-  gh secret set OTA_SIGNING_KEY_BASE64 \\
-    --repo $REPOSITORIO \\
-    --body "\$(base64 -w 0 "$DIRECTORIO/ota-firma.pem")"
+  base64 -w 0 "$DIRECTORIO/ota-firma.pem" | \\
+    gh secret set OTA_SIGNING_KEY_BASE64 --repo $REPOSITORIO
   gh variable set OTA_MANIFIESTO_PUBKEY \\
     --repo $REPOSITORIO --body "$CLAVE_PUBLICA_BASE64"
-  gh variable set OTA_CERT_SHA256 --repo $REPOSITORIO --body "$HUELLA_CERTIFICADO"
+  gh variable set OTA_CERT_SHA256 \\
+    --repo $REPOSITORIO --body "$HUELLA_CERTIFICADO"
 COMANDOS
 echo
-echo "Cada 'gh secret set' sin --body pide el valor por entrada oculta:"
+echo "Los secretos se envían por entrada estándar a propósito: con --body la"
+echo "clave quedaría en el historial del shell y en la lista de procesos."
+echo "Cada 'gh secret set' sin tubería pide el valor por entrada oculta:"
 echo "  ANDROID_KEYSTORE_PASSWORD -> la contraseña del keystore"
 echo "  ANDROID_KEY_PASSWORD      -> la contraseña de la clave"
 echo

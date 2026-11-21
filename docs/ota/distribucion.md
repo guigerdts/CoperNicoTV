@@ -78,16 +78,26 @@ Qué pasa si se pierde cada cosa:
    - crea o actualiza el release con el APK, `update.json` y
      `update.json.sig`.
 
-Para republicar un tag ya existente con otro canal, otro estado de
-obligatoriedad u otras notas, se usa `workflow_dispatch` con el tag como
-entrada. El APK se reemplaza con `--clobber` y el manifiesto se regenera.
+Un tag con manifiesto ya publicado **no se republica**. El `versionCode` sale del
+número de run, así que republicar un tag viejo le daría un número más alto que
+el de una versión posterior, y la app instalaría una regresión encima de una
+versión más nueva. El workflow se niega a subir un manifiesto si el release ya
+tiene `update.json`; para cambiar notas, canal u obligatoriedad se publica un tag
+nuevo con la versión siguiente.
+
+La única excepción es un run que falló antes de subir el manifiesto: el release
+queda con el APK y sin `update.json`, y el reintento de ese mismo tag se permite
+porque no hay manifiesto que reemplazar. Ese reintento solo es válido mientras no
+se haya publicado una versión posterior; si ya existe una, el reintento le
+asignaría al tag viejo un `versionCode` mayor y hay que publicar un tag nuevo.
 
 ### versionCode
 
 `versionCode` es el número de run del workflow, no el `versionName`. Crece de
 forma monotónica en todo el repositorio, así que dos releases nunca comparten
-`versionCode` y el OTA nunca ve un candidato "anterior". No se edita a mano: la
-app compara exclusivamente este campo.
+`versionCode` y el OTA nunca ve un candidato "anterior" mientras cada tag se
+publique una sola vez, en orden. No se edita a mano: la app compara
+exclusivamente este campo.
 
 ### Canales
 

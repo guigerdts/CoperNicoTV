@@ -30,7 +30,7 @@ class FuenteManifiestosGitHubTest {
         assertTrue(resultado is ResultadoFuente.Manifiestos)
         val verificado = (resultado as ResultadoFuente.Manifiestos).verificados.single()
         assertEquals(2L, verificado.manifiesto.versionCode)
-        assertEquals(json.toList(), verificado.json.toList())
+        assertEquals(json.encodeToByteArray().toList(), verificado.json.toList())
         assertEquals(firma.toList(), verificado.firma.toList())
     }
 

@@ -21,7 +21,6 @@ import com.copernicotv.core.m3u.ImportadorM3U
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -71,7 +70,14 @@ class ActualizacionGrandeTest {
         db.close()
     }
 
-    @Test(timeout = 20 * 60 * 1000L)
+    /**
+     * El presupuesto es un tope de cordura, no una meta: en un runner de CI el
+     * caso mide entre 19 y 20 minutos, así que el tope anterior (20 min) se
+     * agotaba de vez en cuando y tumbaba el job por `TestTimedOutException`, no
+     * por una aserción. 35 min deja el margen que el caso necesita y sigue por
+     * debajo del `timeout-minutes: 60` del job.
+     */
+    @Test(timeout = 35 * 60 * 1000L)
     fun `147000 canales se actualizan completos y conservan identidad grupos e historial`() {
         runBlocking {
             println("P0-PROGRESO seed inicio")
@@ -111,9 +117,8 @@ class ActualizacionGrandeTest {
             }
 
             for (j in 0 until NUEVAS) {
-                val canal = db.canalDao().porTvgId(fuenteId, "nuevo-$j")
-                assertNotNull(canal)
-                assertEquals("Nuevo $j", canal!!.nombre)
+                val canal = requireNotNull(db.canalDao().porTvgId(fuenteId, "nuevo-$j"))
+                assertEquals("Nuevo $j", canal.nombre)
                 assertEquals(EstadoCanal.A, canal.estado)
                 assertEquals("https://example.com/nuevo/$j.ts", descifrar(canal.urlStreamCifrada))
             }

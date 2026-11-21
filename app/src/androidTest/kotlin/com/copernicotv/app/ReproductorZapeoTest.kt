@@ -148,8 +148,13 @@ class ReproductorZapeoTest {
 
         // Dos zapeos casi simultáneos: la maquinaria de sustitución de E6-T4
         // debe terminar con una sola sesión viva, coherente con el Canal
-        // publicado y sin estado de error.
+        // publicado y sin estado de error. El primer zapeo recompone los
+        // controles mientras sustituye la sesión; antes de cada click se espera
+        // la condición observable de que el botón esté en el árbol merged y la
+        // UI ociosa, sin esperar a que el Canal termine de cambiar.
+        composeRule.esperarAccionDisponible(TAG_REPRODUCTOR_SIGUIENTE)
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_SIGUIENTE).performClick()
+        composeRule.esperarAccionDisponible(TAG_REPRODUCTOR_SIGUIENTE)
         composeRule.onNodeWithTag(TAG_REPRODUCTOR_SIGUIENTE).performClick()
 
         composeRule.esperarHasta {

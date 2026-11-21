@@ -23,8 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     # El 147k de `:app` recorre el camino real de actualización con Room; el
     # ciclo normal de `:app:testDebugUnitTest` tardaba menos de 3 min, pero este
-    # caso necesita un presupuesto propio. El timeout del test (55 min) deja
-    # margen para publicar el reporte si la prueba se cuelga.
+    # caso necesita un presupuesto propio: mide ~19 min en el runner y su tope
+    # de JUnit es de 35 min, así que el job mantiene margen para publicar el
+    # reporte si la prueba se cuelga.
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

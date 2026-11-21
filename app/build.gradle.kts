@@ -31,6 +31,21 @@ fun hayNdkValido(): Boolean {
 val buildNativo = hayNdkValido()
 
 /**
+ * Keystore de producción. El workflow de release lo materializa desde un
+ * secreto y pasa la ruta; en local la variable falta y `release` se compila sin
+ * firmar, que es lo que permite ensayar el ensamblado sin tener las claves.
+ */
+val archivoKeystoreRelease: File? =
+    System.getenv("ANDROID_KEYSTORE_FILE")?.let(::File)?.takeIf { it.isFile }
+
+/**
+ * Versión publicada. El workflow la deriva del tag; sin la variable se mantiene
+ * el valor de desarrollo para que `assembleDebug` no dependa del release.
+ */
+val versionCodePublicada: Int = System.getenv("OTA_VERSION_CODE")?.toIntOrNull() ?: 1
+val versionNamePublicada: String = System.getenv("OTA_VERSION_NAME") ?: "0.1.0"
+
+/**
  * Valor de `BuildConfig` a partir de una variable de entorno.
  *
  * El valor se escapa para que un error de configuración no rompa el script de
@@ -62,8 +77,8 @@ android {
         applicationId = "com.copernicotv.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = versionCodePublicada
+        versionName = versionNamePublicada
 
         // Identidad del canal OTA. En release la inyecta el workflow; en debug
         // quedan vacías y el comprobador falla cerrado (no hay actualizaciones
@@ -83,9 +98,23 @@ android {
         }
     }
 
+    signingConfigs {
+        if (archivoKeystoreRelease != null) {
+            create("release") {
+                storeFile = archivoKeystoreRelease
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Sin keystore configurado queda nulo y el APK se ensambla sin
+            // firmar: el workflow de release es el único que publica.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

@@ -20,7 +20,14 @@ import kotlinx.coroutines.flow.map
 import java.util.Base64
 import javax.inject.Singleton
 
-/** Manifiesto persistido con sus bytes exactos y su firma. */
+/**
+ * Instantánea del último manifiesto verificado, con sus bytes exactos y su firma.
+ *
+ * Es caché descartable, no una entidad de dominio: se guarda para poder
+ * re-verificarla al leerla y se pierde sin costo (basta volver a consultar el
+ * canal). Su persistencia en DataStore es la excepción acotada que documenta
+ * ADR-0009 frente al criterio general de ADR-0002.
+ */
 data class ManifiestoGuardado(
     val json: ByteArray,
     val firma: ByteArray,
@@ -32,7 +39,8 @@ data class ManifiestoGuardado(
  *
  * Usa un DataStore propio (`ota_actualizaciones`), separado del de las Listas
  * M3U: los dos sistemas comparten el proceso pero nunca el mismo archivo ni
- * las mismas claves.
+ * las mismas claves. El reparto entre preferencias y caché verificada está
+ * decidido en ADR-0009.
  *
  * El manifiesto se guarda con sus bytes y su firma para poder reverificarlo al
  * leerlo. Guardar solo campos ya parseados permitiría que un archivo alterado
@@ -135,8 +143,7 @@ class AlmacenManifiestoOtaDataStore(
         }
     }
 
-    override fun versionOmitida(): Flow<Long?> =
-        dataStore.data.map { prefs -> prefs[CLAVE_VERSION_OMITIDA] }.distinctUntilChanged()
+    override fun versionOmitida(): Flow<Long?> = dataStore.data.map { prefs -> prefs[CLAVE_VERSION_OMITIDA] }.distinctUntilChanged()
 
     override suspend fun omitirVersion(versionCode: Long) {
         dataStore.edit { prefs -> prefs[CLAVE_VERSION_OMITIDA] = versionCode }

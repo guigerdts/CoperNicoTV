@@ -67,9 +67,10 @@ class ComprobadorActualizaciones(
         val decision = elegirActualizacion(versionInstalada, canal, sdkInt, verificados.map { it.manifiesto })
         return when (decision) {
             DecisionActualizacion.AlDia -> alDia()
-            is DecisionActualizacion.Incompatible -> guardarYDevolver(verificados, decision.manifiesto) {
-                ResultadoComprobacion.Incompatible(decision.manifiesto)
-            }
+            is DecisionActualizacion.Incompatible ->
+                guardarYDevolver(verificados, decision.manifiesto) {
+                    ResultadoComprobacion.Incompatible(decision.manifiesto)
+                }
             is DecisionActualizacion.Disponible -> {
                 val omitida = almacen.versionOmitida().first()
                 if (!decision.obligatoria && omitida == decision.manifiesto.versionCode) {

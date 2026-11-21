@@ -2,6 +2,7 @@ package com.copernicotv.app.ota
 
 import com.copernicotv.core.ota.FirmaManifiesto
 import com.copernicotv.core.ota.ManifiestoActualizacion
+import com.copernicotv.core.ota.PublicacionGitHub
 import com.copernicotv.core.ota.PublicacionesGitHub
 import com.copernicotv.core.ota.ResultadoManifiesto
 
@@ -55,43 +56,35 @@ class FuenteManifiestosGitHub(
 ) : FuenteManifiestos {
     override suspend fun buscar(): ResultadoFuente {
         if (!configuracion.configurada) return ResultadoFuente.Fallo(FalloFuente.CONFIGURACION)
-        val lista =
+        val publicaciones =
             when (val respuesta = cliente.obtener(configuracion.urlReleases, PublicacionesGitHub.MAX_BYTES)) {
-                is ResultadoHttp.Exito -> respuesta.cuerpo
+                is ResultadoHttp.Exito ->
+                    PublicacionesGitHub.parse(respuesta.cuerpo.decodeToString())
+                        ?: return ResultadoFuente.Fallo(FalloFuente.RESPUESTA_INVALIDA)
                 is ResultadoHttp.Fallo -> return ResultadoFuente.Fallo(tipoDe(respuesta.tipo), respuesta.detalle)
             }
-        val publicaciones =
-            PublicacionesGitHub.parse(lista.decodeToString())
-                ?: return ResultadoFuente.Fallo(FalloFuente.RESPUESTA_INVALIDA)
         val candidatas = publicaciones.filter { !it.borrador }.take(maximoPublicaciones)
         if (candidatas.isEmpty()) return ResultadoFuente.SinPublicaciones
+        return verificarTodas(candidatas)
+    }
 
+    /**
+     * Verifica cada publicación y resume el canal.
+     *
+     * Una publicación rota no invalida a las demás: se guarda el motivo del
+     * fallo y se devuelve el mejor resultado posible (manifiestos válidos >
+     * firma inválida > respuesta inválida > sin publicaciones).
+     */
+    private suspend fun verificarTodas(candidatas: List<PublicacionGitHub>): ResultadoFuente {
         val verificados = mutableListOf<ManifiestoVerificado>()
         var firmaInvalida = false
         var respuestaInvalida = false
-        for (publicacion in candidatas) {
-            val manifiestoActivo = publicacion.activo(PublicacionesGitHub.NOMBRE_MANIFIESTO)
-            val firmaActivo = publicacion.activo(PublicacionesGitHub.NOMBRE_FIRMA)
-            if (manifiestoActivo == null || firmaActivo == null) {
-                respuestaInvalida = true
-                continue
-            }
-            val json = leer(manifiestoActivo.urlDescarga, ManifiestoActualizacion.MAX_BYTES) ?: continue
-            val firma = leer(firmaActivo.urlDescarga, MAX_BYTES_FIRMA) ?: continue
-            if (!FirmaManifiesto.verificar(json, firma, configuracion.clavePublicaManifiesto)) {
-                firmaInvalida = true
-                continue
-            }
-            val parseo =
-                ManifiestoActualizacion.parse(
-                    texto = json.decodeToString(),
-                    paqueteEsperado = configuracion.paquete,
-                    huellaFirmaEsperada = configuracion.huellaFirmaApk,
-                )
-            when (parseo) {
-                is ResultadoManifiesto.Valido ->
-                    verificados += ManifiestoVerificado(parseo.manifiesto, json, firma)
-                is ResultadoManifiesto.Invalido -> respuestaInvalida = true
+        candidatas.forEach { publicacion ->
+            when (val verificacion = verificarPublicacion(publicacion)) {
+                is VerificacionPublicacion.Valida -> verificados += verificacion.manifiesto
+                VerificacionPublicacion.FirmaInvalida -> firmaInvalida = true
+                VerificacionPublicacion.ManifiestoInvalido, VerificacionPublicacion.SinActivos -> respuestaInvalida = true
+                VerificacionPublicacion.SinDescarga -> Unit
             }
         }
         return when {
@@ -100,6 +93,43 @@ class FuenteManifiestosGitHub(
             respuestaInvalida -> ResultadoFuente.Fallo(FalloFuente.RESPUESTA_INVALIDA)
             else -> ResultadoFuente.SinPublicaciones
         }
+    }
+
+    private suspend fun verificarPublicacion(publicacion: PublicacionGitHub): VerificacionPublicacion {
+        val activoManifiesto = publicacion.activo(PublicacionesGitHub.NOMBRE_MANIFIESTO)
+        val activoFirma = publicacion.activo(PublicacionesGitHub.NOMBRE_FIRMA)
+        if (activoManifiesto == null || activoFirma == null) return VerificacionPublicacion.SinActivos
+        val json =
+            leer(activoManifiesto.urlDescarga, ManifiestoActualizacion.MAX_BYTES)
+                ?: return VerificacionPublicacion.SinDescarga
+        val firma = leer(activoFirma.urlDescarga, MAX_BYTES_FIRMA) ?: return VerificacionPublicacion.SinDescarga
+        if (!FirmaManifiesto.verificar(json, firma, configuracion.clavePublicaManifiesto)) {
+            return VerificacionPublicacion.FirmaInvalida
+        }
+        val parseo =
+            ManifiestoActualizacion.parse(
+                texto = json.decodeToString(),
+                paqueteEsperado = configuracion.paquete,
+                huellaFirmaEsperada = configuracion.huellaFirmaApk,
+            )
+        return when (parseo) {
+            is ResultadoManifiesto.Valido ->
+                VerificacionPublicacion.Valida(ManifiestoVerificado(parseo.manifiesto, json, firma))
+            is ResultadoManifiesto.Invalido -> VerificacionPublicacion.ManifiestoInvalido
+        }
+    }
+
+    /** Desenlace de verificar una publicación concreta. */
+    private sealed interface VerificacionPublicacion {
+        data class Valida(val manifiesto: ManifiestoVerificado) : VerificacionPublicacion
+
+        data object SinActivos : VerificacionPublicacion
+
+        data object SinDescarga : VerificacionPublicacion
+
+        data object FirmaInvalida : VerificacionPublicacion
+
+        data object ManifiestoInvalido : VerificacionPublicacion
     }
 
     private suspend fun leer(

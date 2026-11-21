@@ -187,15 +187,16 @@ class ClienteHttpOtaUrlConnection(
         var escritos = inicial
         alProgresar(escritos, total)
         val buffer = ByteArray(TAMANO_BLOQUE)
-        while (true) {
+        var leidos = entrada.read(buffer)
+        while (leidos >= 0) {
             currentCoroutineContext().ensureActive()
-            val leidos = entrada.read(buffer)
-            if (leidos < 0) break
-            if (leidos == 0) continue
-            salida.write(buffer, 0, leidos)
-            escritos += leidos
-            actualizar(escritos)
-            alProgresar(escritos, total)
+            if (leidos > 0) {
+                salida.write(buffer, 0, leidos)
+                escritos += leidos
+                actualizar(escritos)
+                alProgresar(escritos, total)
+            }
+            leidos = entrada.read(buffer)
         }
     }
 
@@ -208,19 +209,24 @@ class ClienteHttpOtaUrlConnection(
     private fun leerAcotado(
         conexion: HttpURLConnection,
         maxBytes: Int,
+    ): ByteArray? = conexion.inputStream.use { entrada -> leerHasta(entrada, maxBytes) }
+
+    /** Acumula el stream completo y devuelve `null` si supera [maxBytes]. */
+    private fun leerHasta(
+        entrada: InputStream,
+        maxBytes: Int,
     ): ByteArray? {
         val salida = ByteArrayOutputStream()
-        conexion.inputStream.use { entrada ->
-            val buffer = ByteArray(TAMANO_BLOQUE)
-            var total = 0
-            while (true) {
-                val leidos = entrada.read(buffer)
-                if (leidos < 0) break
-                if (leidos == 0) continue
-                total += leidos
-                if (total > maxBytes) return null
+        val buffer = ByteArray(TAMANO_BLOQUE)
+        var restante = maxBytes
+        var leidos = entrada.read(buffer)
+        while (leidos >= 0) {
+            if (leidos > restante) return null
+            if (leidos > 0) {
                 salida.write(buffer, 0, leidos)
+                restante -= leidos
             }
+            leidos = entrada.read(buffer)
         }
         return salida.toByteArray()
     }

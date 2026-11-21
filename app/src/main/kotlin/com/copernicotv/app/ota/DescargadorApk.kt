@@ -72,44 +72,87 @@ class DescargadorApk(
         }
         val parcial = archivoParcial(manifiesto)
         if (parcial.isFile && parcial.length() > manifiesto.tamanoBytes) parcial.delete()
+        return reintentar(manifiesto, parcial, final, alProgresar)
+    }
 
+    private suspend fun reintentar(
+        manifiesto: ManifiestoActualizacion,
+        parcial: File,
+        final: File,
+        alProgresar: (escritos: Long, totales: Long) -> Unit,
+    ): ResultadoDescargaApk {
         var desde = parcial.takeIf { it.isFile }?.length() ?: 0L
-        var ultimo: FalloDescargaApk = FalloDescargaApk.RED
+        var ultimo = FalloDescargaApk.RED
         for (intento in 1..intentosMaximos) {
-            val resultado =
-                cliente.descargar(manifiesto.urlDescarga, parcial, desde) { escritos, _ ->
-                    alProgresar(escritos, manifiesto.tamanoBytes)
-                }
-            when (resultado) {
-                is ResultadoDescargaHttp.Completa -> {
-                    if (parcial.length() != manifiesto.tamanoBytes) {
-                        ultimo = FalloDescargaApk.TAMANO
-                        desde = parcial.length()
-                        if (intento < intentosMaximos) espera(intento)
-                        continue
-                    }
-                    if (!verificarHash(parcial, manifiesto.sha256)) {
-                        parcial.delete()
-                        return ResultadoDescargaApk.Fallo(FalloDescargaApk.HASH)
-                    }
-                    if (!mover(parcial, final)) return ResultadoDescargaApk.Fallo(FalloDescargaApk.ESCRITURA)
-                    return ResultadoDescargaApk.Exito(final)
-                }
-                is ResultadoDescargaHttp.Fallo -> {
-                    desde = parcial.takeIf { it.isFile }?.length() ?: 0L
-                    if (resultado.tipo == FalloHttp.ESTADO_HTTP && desde > 0L) {
-                        parcial.delete()
-                        desde = 0L
-                    }
-                    ultimo = FalloDescargaApk.RED
-                    if (!resultado.reintentable) {
-                        return ResultadoDescargaApk.Fallo(ultimo, resultado.detalle)
-                    }
+            when (val paso = unIntento(manifiesto, parcial, final, desde, alProgresar)) {
+                is Paso.Terminado -> return paso.resultado
+                is Paso.Reanudar -> {
+                    desde = paso.desde
+                    ultimo = paso.fallo
                     if (intento < intentosMaximos) espera(intento)
                 }
             }
         }
         return ResultadoDescargaApk.Fallo(ultimo)
+    }
+
+    private suspend fun unIntento(
+        manifiesto: ManifiestoActualizacion,
+        parcial: File,
+        final: File,
+        desde: Long,
+        alProgresar: (escritos: Long, totales: Long) -> Unit,
+    ): Paso {
+        val resultado =
+            cliente.descargar(manifiesto.urlDescarga, parcial, desde) { escritos, _ ->
+                alProgresar(escritos, manifiesto.tamanoBytes)
+            }
+        return when (resultado) {
+            is ResultadoDescargaHttp.Completa -> alCompletar(manifiesto, parcial, final)
+            is ResultadoDescargaHttp.Fallo -> alFallar(parcial, resultado)
+        }
+    }
+
+    private fun alCompletar(
+        manifiesto: ManifiestoActualizacion,
+        parcial: File,
+        final: File,
+    ): Paso {
+        if (parcial.length() != manifiesto.tamanoBytes) {
+            return Paso.Reanudar(parcial.length(), FalloDescargaApk.TAMANO)
+        }
+        if (!verificarHash(parcial, manifiesto.sha256)) {
+            parcial.delete()
+            return Paso.Terminado(ResultadoDescargaApk.Fallo(FalloDescargaApk.HASH))
+        }
+        return if (mover(parcial, final)) {
+            Paso.Terminado(ResultadoDescargaApk.Exito(final))
+        } else {
+            Paso.Terminado(ResultadoDescargaApk.Fallo(FalloDescargaApk.ESCRITURA))
+        }
+    }
+
+    private fun alFallar(
+        parcial: File,
+        resultado: ResultadoDescargaHttp.Fallo,
+    ): Paso {
+        var reinicio = parcial.takeIf { it.isFile }?.length() ?: 0L
+        if (resultado.tipo == FalloHttp.ESTADO_HTTP && reinicio > 0L) {
+            parcial.delete()
+            reinicio = 0L
+        }
+        return if (resultado.reintentable) {
+            Paso.Reanudar(reinicio, FalloDescargaApk.RED)
+        } else {
+            Paso.Terminado(ResultadoDescargaApk.Fallo(FalloDescargaApk.RED, resultado.detalle))
+        }
+    }
+
+    /** Un intento termina la descarga o deja el próximo punto de reanudación. */
+    private sealed interface Paso {
+        data class Terminado(val resultado: ResultadoDescargaApk) : Paso
+
+        data class Reanudar(val desde: Long, val fallo: FalloDescargaApk) : Paso
     }
 
     /**

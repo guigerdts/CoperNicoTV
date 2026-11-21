@@ -174,13 +174,13 @@ class ClienteHttpOtaTest {
         val lector = socket.getInputStream().bufferedReader()
         val linea = lector.readLine() ?: return
         val cabeceras = mutableMapOf<String, String>()
-        while (true) {
-            val actual = lector.readLine() ?: break
-            if (actual.isEmpty()) break
+        var actual = lector.readLine()
+        while (!actual.isNullOrEmpty()) {
             val separador = actual.indexOf(':')
             if (separador > 0) {
                 cabeceras[actual.substring(0, separador).trim().lowercase()] = actual.substring(separador + 1).trim()
             }
+            actual = lector.readLine()
         }
         val respuesta = responder(Peticion(linea, cabeceras))
         val salida = socket.getOutputStream()

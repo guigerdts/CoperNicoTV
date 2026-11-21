@@ -125,15 +125,16 @@ class FuenteManifiestosGitHubTest {
                 release(),
                 release(etiqueta = "v0.3.0-beta", jsonUrl = URL_JSON_BETA, firmaUrl = URL_FIRMA_BETA, preliminar = true),
             )
-        val cliente = ClienteMapa(
-            mapOf(
-                URL_API to publicaciones,
-                URL_JSON to estable,
-                URL_FIRMA to firmaEstable,
-                URL_JSON_BETA to beta,
-                URL_FIRMA_BETA to firmaBeta,
-            ),
-        )
+        val cliente =
+            ClienteMapa(
+                mapOf(
+                    URL_API to publicaciones,
+                    URL_JSON to estable,
+                    URL_FIRMA to firmaEstable,
+                    URL_JSON_BETA to beta,
+                    URL_FIRMA_BETA to firmaBeta,
+                ),
+            )
 
         val resultado = runBlocking { fuente(cliente, par.public).buscar() }
 

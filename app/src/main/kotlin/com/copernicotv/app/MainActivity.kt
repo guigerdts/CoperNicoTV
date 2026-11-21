@@ -22,6 +22,8 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.copernicotv.app.data.PreferenciasTema
 import com.copernicotv.app.data.actualizacion.InicializadorActualizaciones
 import com.copernicotv.app.ota.InicializadorOta
+import com.copernicotv.app.ui.AjustesScreen
+import com.copernicotv.app.ui.AjustesViewModel
 import com.copernicotv.app.ui.CatalogoAcciones
 import com.copernicotv.app.ui.CatalogoScreen
 import com.copernicotv.app.ui.CatalogoViewModel
@@ -40,7 +42,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Pantallas de la actividad única. */
-private enum class Pantalla { CATALOGO, FUENTES, GUIA, REPRODUCTOR }
+private enum class Pantalla { CATALOGO, FUENTES, GUIA, AJUSTES, REPRODUCTOR }
 
 /** Única actividad del canario de E1-C. */
 @AndroidEntryPoint
@@ -88,6 +90,7 @@ class MainActivity : ComponentActivity() {
                             onAlternarTema = { alcance.launch { preferenciasTema.alternar() } },
                             onAbrirFuentes = { pantalla = Pantalla.FUENTES },
                             onAbrirGuia = { pantalla = Pantalla.GUIA },
+                            onAbrirAjustes = { pantalla = Pantalla.AJUSTES },
                             onAbrirReproductor = { canalId ->
                                 canalReproduciendo = canalId
                                 pantalla = Pantalla.REPRODUCTOR
@@ -123,6 +126,19 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                    Pantalla.AJUSTES -> {
+                        val ajustesViewModel: AjustesViewModel = hiltViewModel()
+                        val ajustesEstado by ajustesViewModel.estado.collectAsStateWithLifecycle()
+                        AjustesScreen(
+                            estado = ajustesEstado,
+                            onBuscar = ajustesViewModel::buscar,
+                            onCambiarCanal = ajustesViewModel::cambiarCanal,
+                            onInstalar = ajustesViewModel::instalar,
+                            onActualizarPermiso = ajustesViewModel::actualizarPermiso,
+                            onOlvidarAviso = ajustesViewModel::olvidarAviso,
+                            onVolver = { pantalla = Pantalla.CATALOGO },
+                        )
+                    }
                     Pantalla.REPRODUCTOR ->
                         ReproductorScreen(
                             canalId = canalReproduciendo,
@@ -141,6 +157,7 @@ private fun PantallaCatalogo(
     onAlternarTema: () -> Unit,
     onAbrirFuentes: () -> Unit,
     onAbrirGuia: () -> Unit,
+    onAbrirAjustes: () -> Unit,
     onAbrirReproductor: (Long) -> Unit,
 ) {
     val viewModel: CatalogoViewModel = hiltViewModel()
@@ -226,6 +243,7 @@ private fun PantallaCatalogo(
                 onDesasociarListaDePerfil = viewModel::desasociarListaDePerfil,
                 onAbrirFuentes = onAbrirFuentes,
                 onAbrirGuia = onAbrirGuia,
+                onAbrirAjustes = onAbrirAjustes,
                 onAlternarTema = onAlternarTema,
                 onBorrarHistorial = viewModel::borrarHistorial,
                 onBorrarFavoritos = viewModel::borrarFavoritos,

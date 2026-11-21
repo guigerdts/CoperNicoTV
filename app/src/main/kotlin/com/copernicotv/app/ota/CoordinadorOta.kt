@@ -51,8 +51,14 @@ class CoordinadorOta(
     private val notificador: NotificadorOta,
     private val almacen: AlmacenManifiestoOta,
 ) {
-    /** Ejecuta una pasada completa. Nunca lanza: devuelve el fallo tipado. */
-    suspend fun ejecutar(): ResultadoOta {
+    /**
+     * Ejecuta una pasada completa. Nunca lanza: devuelve el fallo tipado.
+     *
+     * [alProgreso] recibe el porcentaje descargado solo cuando cambia, para que
+     * la pantalla de Ajustes muestre el avance sin obligar al usuario a mirar
+     * la notificación. Es opcional: el worker no necesita informarlo.
+     */
+    suspend fun ejecutar(alProgreso: (Int) -> Unit = {}): ResultadoOta {
         val comprobacion =
             try {
                 comprobador.comprobar()
@@ -71,11 +77,14 @@ class CoordinadorOta(
                 descargador.limpiarExcepto(null)
                 ResultadoOta.Incompatible(comprobacion.manifiesto)
             }
-            is ResultadoComprobacion.Disponible -> descargar(comprobacion.manifiesto)
+            is ResultadoComprobacion.Disponible -> descargar(comprobacion.manifiesto, alProgreso)
         }
     }
 
-    private suspend fun descargar(manifiesto: ManifiestoActualizacion): ResultadoOta {
+    private suspend fun descargar(
+        manifiesto: ManifiestoActualizacion,
+        alProgreso: (Int) -> Unit,
+    ): ResultadoOta {
         val final = descargador.archivoFinal(manifiesto)
         if (descargador.estaVerificado(manifiesto)) {
             descargador.limpiarExcepto(manifiesto.versionCode)
@@ -92,6 +101,7 @@ class CoordinadorOta(
                     if (porcentaje != ultimoPorcentaje) {
                         ultimoPorcentaje = porcentaje
                         notificador.progreso(manifiesto, escritos, totales)
+                        alProgreso(porcentaje)
                     }
                 }
             }

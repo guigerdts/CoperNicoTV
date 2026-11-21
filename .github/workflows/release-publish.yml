@@ -1,0 +1,247 @@
+name: Publicar OTA
+
+# Publica exactamente los bytes que produjo un run de validación exitoso de
+# `release.yml`. No compila, no firma y no tiene acceso a ninguna clave privada:
+# descarga el artifact del run indicado, lo revalida con las variables públicas y
+# solo entonces lo sube al Release. Así el APK publicado es, byte por byte, el
+# APK validado.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag a publicar (debe apuntar al commit del run validado)"
+        required: true
+      run_id:
+        description: "ID del run de validación (Release OTA) que produjo el artifact"
+        required: true
+
+permissions:
+  # Escribir el Release es lo único que este workflow muta.
+  contents: write
+  # Descargar el artifact y leer el metadata de OTRA ejecución.
+  actions: read
+
+concurrency:
+  # Dos publicaciones simultáneas no pueden repartirse los archivos de un mismo
+  # tag. Una publicación en curso no se cancela.
+  group: release-ota-publish
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Resolver el commit del tag
+        id: tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          falla() { echo "ERROR: $*" >&2; exit 1; }
+          [ -n "${TAG}" ] || falla "falta el tag"
+          git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null \
+            || falla "el tag ${TAG} no existe en el repositorio"
+          COMMIT="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          VERSION_NAME="${TAG#v}"
+          # Mismo formato que exige el manifiesto: un tag que el validador
+          # habría rechazado no puede publicarse por otra puerta.
+          [[ "${VERSION_NAME}" =~ ^[0-9]+(\.[0-9]+){0,3}([-+][0-9A-Za-z.\-]+)?$ ]] \
+            || falla "el tag ${TAG} no produce un versionName válido: ${VERSION_NAME}"
+          [ "${#VERSION_NAME}" -le 64 ] \
+            || falla "el versionName ${VERSION_NAME} supera los 64 caracteres que acepta la app"
+          echo "commit=${COMMIT}" >> "${GITHUB_OUTPUT}"
+          echo "version_name=${VERSION_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verificar el run de validación
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          COMMIT_TAG: ${{ steps.tag.outputs.commit }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          falla() { echo "ERROR: $*" >&2; exit 1; }
+          [[ "${RUN_ID}" =~ ^[0-9]+$ ]] || falla "run_id inválido: ${RUN_ID}"
+          RUN="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}")"
+          campo() { jq -r "$1" <<< "${RUN}"; }
+
+          # `path` es la ruta del workflow relativa a la raíz del repositorio,
+          # con prefijo `.github/workflows/`. Verificado contra la API real.
+          [ "$(campo .repository.full_name)" = "${GITHUB_REPOSITORY}" ] \
+            || falla "el run pertenece a otro repositorio: $(campo .repository.full_name)"
+          [ "$(campo .path)" = ".github/workflows/release.yml" ] \
+            || falla "el run no proviene del workflow de validación: $(campo .path)"
+          [ "$(campo .status)" = "completed" ] \
+            || falla "el run no terminó: $(campo .status)"
+          [ "$(campo .conclusion)" = "success" ] \
+            || falla "el run no terminó en éxito: $(campo .conclusion)"
+          case "$(campo .event)" in
+            push|workflow_dispatch) ;;
+            *) falla "evento inesperado: $(campo .event)" ;;
+          esac
+
+          HEAD_SHA="$(campo .head_sha)"
+          [ "${HEAD_SHA}" = "${COMMIT_TAG}" ] \
+            || falla "el commit del run (${HEAD_SHA}) no es el commit del tag ${TAG} (${COMMIT_TAG})"
+
+          ATTEMPT="$(campo .run_attempt)"
+          [[ "${ATTEMPT}" =~ ^[0-9]+$ ]] || falla "run_attempt inválido: ${ATTEMPT}"
+          echo "head_sha=${HEAD_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "artifact=ota-${TAG}-${HEAD_SHA}-r${RUN_ID}-a${ATTEMPT}" >> "${GITHUB_OUTPUT}"
+
+      - name: Descargar el artifact exacto
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+          ARTEFACTO: ${{ steps.run.outputs.artifact }}
+          D: ${{ runner.temp }}/validado
+        run: |
+          set -euo pipefail
+          falla() { echo "ERROR: $*" >&2; exit 1; }
+          mkdir -p "${D}"
+          # `run_id` fija el run; el nombre fija el tag, el commit, el run y el
+          # intento. Si el nombre no coincide, GitHub no devuelve nada y esto
+          # falla en vez de publicar otro artifact.
+          gh run download "${RUN_ID}" -n "${ARTEFACTO}" -D "${D}" \
+            || falla "no existe el artifact ${ARTEFACTO} en el run ${RUN_ID} (¿venció la retención de 30 días?)"
+
+      - name: Reverificar contenido, firmas y hashes
+        id: verificacion
+        env:
+          OTA_CERT_SHA256: ${{ vars.OTA_CERT_SHA256 }}
+          OTA_MANIFIESTO_PUBKEY: ${{ vars.OTA_MANIFIESTO_PUBKEY }}
+          TAG: ${{ inputs.tag }}
+          D: ${{ runner.temp }}/validado
+        run: |
+          set -euo pipefail
+          falla() { echo "ERROR: $*" >&2; exit 1; }
+          VN="${{ steps.tag.outputs.version_name }}"
+
+          # 1. El artifact conserva el layout esperado: exactamente los tres
+          # archivos en la raíz, sin claves ni residuos del run de validación.
+          [ -f "${D}/update.json" ] || falla "falta update.json en la raíz del artifact"
+          [ -f "${D}/update.json.sig" ] || falla "falta update.json.sig en la raíz del artifact"
+          mapfile -t APKS < <(find "${D}" -maxdepth 1 -type f -name '*.apk')
+          [ "${#APKS[@]}" -eq 1 ] || falla "se esperaba exactamente un APK en la raíz del artifact y hay ${#APKS[@]}"
+          APK="${APKS[0]}"
+          TOTAL="$(find "${D}" -type f | wc -l)"
+          [ "${TOTAL}" -eq 3 ] || falla "el artifact debe contener exactamente 3 archivos y contiene ${TOTAL}"
+
+          # 2. El manifiesto describe este tag y este APK.
+          PAQ="$(jq -r .packageName "${D}/update.json")"
+          [ "${PAQ}" = "com.copernicotv.app" ] || falla "packageName inesperado: ${PAQ}"
+          [ "$(jq -r .versionName "${D}/update.json")" = "${VN}" ] \
+            || falla "el manifiesto no declara versionName ${VN}"
+          VC="$(jq -r .versionCode "${D}/update.json")"
+          case "${VC}" in ''|*[!0-9]*) falla "versionCode inválido: ${VC}" ;; esac
+          [ "${VC}" -gt 0 ] || falla "versionCode no positivo: ${VC}"
+          URL="$(jq -r .downloadUrl "${D}/update.json")"
+          case "${URL}" in
+            *"/releases/download/${TAG}/"*) ;;
+            *) falla "downloadUrl no apunta al tag ${TAG}: ${URL}" ;;
+          esac
+          case "$(jq -r .releaseUrl "${D}/update.json")" in
+            *"/releases/tag/${TAG}") ;;
+            *) falla "releaseUrl no apunta al tag ${TAG}" ;;
+          esac
+          [ "$(basename "${APK}")" = "$(basename "${URL}")" ] \
+            || falla "el APK del artifact ($(basename "${APK}")) no es el que declara el manifiesto ($(basename "${URL}"))"
+
+          # 3. El SHA-256 y el tamaño se recalculan sobre el archivo descargado.
+          SHA="$(sha256sum "${APK}" | cut -d' ' -f1)"
+          [ "${SHA}" = "$(jq -r .sha256 "${D}/update.json")" ] \
+            || falla "el SHA-256 del APK descargado no coincide con el manifiesto"
+          [ "$(stat -c %s "${APK}")" = "$(jq -r .sizeBytes "${D}/update.json")" ] \
+            || falla "el tamaño del APK descargado no coincide con el manifiesto"
+
+          # 4. El APK sigue firmado con el certificado fijado en la app.
+          BT="$(ls -1d "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"/build-tools/* 2>/dev/null | sort -V | tail -1)"
+          [ -n "${BT}" ] || falla "no hay build-tools de Android en el runner"
+          CERT="$("${BT}/apksigner" verify --print-certs "${APK}" |
+            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)"
+          [ "${CERT}" = "${OTA_CERT_SHA256}" ] \
+            || falla "el certificado del APK (${CERT}) no es OTA_CERT_SHA256"
+          [ "${CERT}" = "$(jq -r .signingCertSha256 "${D}/update.json")" ] \
+            || falla "el manifiesto declara otro certificado de firma"
+
+          # 5. Los datos del APK coinciden con el manifiesto y con el tag.
+          BADGING="$("${BT}/aapt2" dump badging "${APK}")"
+          LINEA="$(printf '%s\n' "${BADGING}" | grep -m1 '^package: ')"
+          [ -n "${LINEA}" ] || falla "no se pudo leer el badging del APK"
+          PAQ_APK="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" <<< "${LINEA}")"
+          VC_APK="$(sed -n "s/^package: name='[^']*' versionCode='\([^']*\)'.*/\1/p" <<< "${LINEA}")"
+          VN_APK="$(sed -n "s/^package: name='[^']*' versionCode='[^']*' versionName='\([^']*\)'.*/\1/p" <<< "${LINEA}")"
+          [ "${PAQ_APK}" = "${PAQ}" ] || falla "el applicationId del APK (${PAQ_APK}) no coincide con el manifiesto"
+          [ "${VC_APK}" = "${VC}" ] || falla "el versionCode del APK (${VC_APK}) no coincide con el manifiesto (${VC})"
+          [ "${VN_APK}" = "${VN}" ] || falla "el versionName del APK (${VN_APK}) no coincide con el tag (${VN})"
+
+          # 6. La firma del manifiesto verifica con la MISMA clave pública que
+          # lleva embebida la app (OTA_MANIFIESTO_PUBKEY, SPKI DER en base64).
+          printf '%s' "${OTA_MANIFIESTO_PUBKEY}" | base64 -d > "${RUNNER_TEMP}/manifiesto.der" \
+            || falla "OTA_MANIFIESTO_PUBKEY no es base64 válido"
+          openssl pkey -pubin -inform DER -in "${RUNNER_TEMP}/manifiesto.der" \
+            -out "${RUNNER_TEMP}/manifiesto.pem" 2>/dev/null \
+            || falla "OTA_MANIFIESTO_PUBKEY no es una clave pública DER válida"
+          openssl dgst -sha256 -verify "${RUNNER_TEMP}/manifiesto.pem" \
+            -signature "${D}/update.json.sig" "${D}/update.json" >/dev/null \
+            || falla "la firma del manifiesto no verifica con la clave embebida en la app"
+
+          {
+            echo "apk=${APK}"
+            echo "sha256=${SHA}"
+            echo "version_code=${VC}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Publicar el release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          D: ${{ runner.temp }}/validado
+          APK: ${{ steps.verificacion.outputs.apk }}
+        run: |
+          set -euo pipefail
+          falla() { echo "ERROR: $*" >&2; exit 1; }
+          # Un tag con manifiesto ya publicado no se republica: el versionCode
+          # sale del número de run, así que republicar un tag viejo le daría un
+          # número más alto que una versión posterior y la app instalaría una
+          # regresión encima de una versión más nueva.
+          ASSETS="$(gh release view "${TAG}" --json assets --jq '.assets[].name' 2>/dev/null || true)"
+          if grep -qx 'update.json' <<< "${ASSETS}"; then
+            falla "el tag ${TAG} ya tiene un manifiesto publicado: no se republica"
+          fi
+          jq -r .releaseNotes "${D}/update.json" > "${RUNNER_TEMP}/notas.md"
+          if ! gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release create "${TAG}" --verify-tag --title "CoperNicoTV ${TAG}" \
+              --notes-file "${RUNNER_TEMP}/notas.md"
+          fi
+          # Exactamente los tres archivos validados, sin recompilar ni re-firmar.
+          gh release upload "${TAG}" \
+            "${APK}" \
+            "${D}/update.json" \
+            "${D}/update.json.sig" \
+            --clobber
+
+      - name: Resumen de publicación
+        env:
+          TAG: ${{ inputs.tag }}
+          RUN_ID: ${{ inputs.run_id }}
+          SHA256: ${{ steps.verificacion.outputs.sha256 }}
+          VC: ${{ steps.verificacion.outputs.version_code }}
+        run: |
+          {
+            echo "## PUBLICACIÓN — ${TAG}"
+            echo
+            echo "- APK validado en el run \`${RUN_ID}\`, publicado sin recompilar"
+            echo "- SHA-256: \`${SHA256}\`"
+            echo "- versionCode: \`${VC}\`"
+            echo "- release: https://github.com/${{ github.repository }}/releases/tag/${TAG}"
+          } >> "${GITHUB_STEP_SUMMARY}"

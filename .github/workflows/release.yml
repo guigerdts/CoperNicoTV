@@ -77,6 +77,10 @@ jobs:
             echo "El tag ${TAG} no produce un versionName válido: ${VERSION_NAME}" >&2
             exit 1
           fi
+          if [ "${#VERSION_NAME}" -gt 64 ]; then
+            echo "El versionName ${VERSION_NAME} supera los 64 caracteres que acepta la app." >&2
+            exit 1
+          fi
           # Monotónico dentro del repositorio: cualquier run posterior tiene un
           # número mayor, así que un release nunca retrocede el versionCode.
           VERSION_CODE="${GITHUB_RUN_NUMBER}"
@@ -276,6 +280,17 @@ jobs:
           NOTAS: ${{ steps.version.outputs.notas }}
         run: |
           set -euo pipefail
+          # Un tag ya publicado no se vuelve a publicar: el versionCode sale del
+          # número de run, así que republicar un tag viejo le daría un número más
+          # alto que una versión posterior y la app instalaría una regresión
+          # encima de una versión más nueva.
+          ASSETS="$(gh release view "${TAG}" --json assets --jq '.assets[].name' 2>/dev/null || true)"
+          if grep -qx 'update.json' <<< "${ASSETS}"; then
+            echo "El tag ${TAG} ya tiene un manifiesto publicado." >&2
+            echo "Republicarlo cambiaría el versionCode de una versión que ya está en uso." >&2
+            echo "Creá un tag nuevo con la versión siguiente." >&2
+            exit 1
+          fi
           if ! gh release view "${TAG}" >/dev/null 2>&1; then
             gh release create "${TAG}" --verify-tag --title "CoperNicoTV ${TAG}" --notes "${NOTAS}"
           fi

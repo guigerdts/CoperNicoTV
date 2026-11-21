@@ -13,9 +13,9 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
-import androidx.work.await
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -85,13 +85,14 @@ class ProgramadorOta
          *
          * Cancela trabajos con el tag del OTA que no correspondan a los nombres
          * actuales (restos de versiones anteriores o de nombres renombrados) y
-         * garantiza que el periódico exista. Es `suspend`: consultar WorkManager
-         * es E/S asíncrona y no debe bloquear el hilo del llamador.
+         * garantiza que el periódico exista. Es `suspend` y consulta el estado
+         * por Flow: la API de WorkManager es asíncrona y no debe bloquear el
+         * hilo del llamador.
          */
         suspend fun reconciliar() {
             val etiquetasConocidas = setOf(TrabajosOta.ETIQUETA_PERIODICO, TrabajosOta.ETIQUETA_MANUAL)
             val trabajo = gestor()
-            trabajo.getWorkInfosByTag(TrabajosOta.ETIQUETA).await()
+            trabajo.getWorkInfosByTagFlow(TrabajosOta.ETIQUETA).first()
                 .filter { info -> !info.state.isFinished }
                 .filter { info -> info.tags.none { tag -> tag in etiquetasConocidas } }
                 .forEach { info -> trabajo.cancelWorkById(info.id) }

@@ -70,12 +70,21 @@ jobs:
             exit 1
           fi
           VERSION_NAME="${TAG#v}"
+          # El manifiesto solo acepta versiones numéricas con sufijo opcional:
+          # un tag fuera de ese formato se rechaza acá y no se descubre en el
+          # dispositivo.
+          if ! [[ "${VERSION_NAME}" =~ ^[0-9]+(\.[0-9]+){0,3}([-+][0-9A-Za-z.\-]+)?$ ]]; then
+            echo "El tag ${TAG} no produce un versionName válido: ${VERSION_NAME}" >&2
+            exit 1
+          fi
           # Monotónico dentro del repositorio: cualquier run posterior tiene un
           # número mayor, así que un release nunca retrocede el versionCode.
           VERSION_CODE="${GITHUB_RUN_NUMBER}"
           if [ -n "${CANAL_MANUAL}" ]; then
             CANAL="${CANAL_MANUAL}"
-          elif [[ "${TAG}" == *-beta.* ]]; then
+          elif [[ "${VERSION_NAME}" == *-* ]]; then
+            # Cualquier sufijo (`-beta.1`, `-rc.1`, `-alpha`) es previo a la
+            # versión estable: se publica en el canal beta, nunca en stable.
             CANAL="beta"
           else
             CANAL="stable"
@@ -87,6 +96,11 @@ jobs:
           fi
           if [ -z "${NOTAS}" ]; then
             NOTAS="CoperNicoTV ${VERSION_NAME}"
+          fi
+          # La app rechaza notas de más de 8000 caracteres; se recortan acá para
+          # que un mensaje de tag largo no invalide el manifiesto publicado.
+          if [ "${#NOTAS}" -gt 7900 ]; then
+            NOTAS="${NOTAS:0:7900}…"
           fi
           OBLIGATORIA="${OBLIGATORIA_MANUAL:-false}"
           {
@@ -199,6 +213,11 @@ jobs:
 
           SHA256="$(sha256sum "${RUNNER_TEMP}/${APK_NOMBRE}" | cut -d' ' -f1)"
           TAMANO="$(stat -c %s "${RUNNER_TEMP}/${APK_NOMBRE}")"
+          # La app rechaza APK de más de 500 MiB y tamaños no positivos.
+          if [ "${TAMANO}" -le 0 ] || [ "${TAMANO}" -gt 524288000 ]; then
+            echo "Tamaño de APK fuera del rango que acepta la app: ${TAMANO} bytes." >&2
+            exit 1
+          fi
           PUBLICADO="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
           jq -n \

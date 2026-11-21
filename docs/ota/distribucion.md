@@ -55,8 +55,10 @@ Qué pasa si se pierde cada cosa:
 
 ## Publicar una versión
 
-1. Elegir el tag. `v1.2.0` publica al canal `stable`; `v1.2.0-beta.1` publica al
-   canal `beta`.
+1. Elegir el tag. `v1.2.0` publica al canal `stable`; cualquier sufijo
+   (`v1.2.0-beta.1`, `v1.2.0-rc.1`) publica al canal `beta`, porque un sufijo
+   marca una versión previa a la estable. Un tag que no produzca un
+   `versionName` numérico válido se rechaza antes de compilar.
 2. Crear el tag anotado: el cuerpo del tag se usa como notas del manifiesto si
    no se pasan otras.
 

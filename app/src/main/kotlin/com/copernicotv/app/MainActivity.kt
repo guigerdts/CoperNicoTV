@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.copernicotv.app.data.PreferenciasTema
 import com.copernicotv.app.data.actualizacion.InicializadorActualizaciones
+import com.copernicotv.app.ota.InicializadorOta
 import com.copernicotv.app.ui.CatalogoAcciones
 import com.copernicotv.app.ui.CatalogoScreen
 import com.copernicotv.app.ui.CatalogoViewModel
@@ -48,6 +49,9 @@ class MainActivity : ComponentActivity() {
     lateinit var inicializador: InicializadorActualizaciones
 
     @Inject
+    lateinit var inicializadorOta: InicializadorOta
+
+    @Inject
     lateinit var preferenciasTema: PreferenciasTema
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
@@ -56,6 +60,9 @@ class MainActivity : ComponentActivity() {
         // Reconciliación de programaciones de DC-07 punto 5. Es idempotente por
         // proceso, así que una recreación de la Activity no la repite.
         inicializador.iniciar()
+        // S8: la comprobación de la app tiene su propia programación, aislada
+        // de la de listas M3U/M3U8. También es idempotente por proceso.
+        inicializadorOta.iniciar()
         // E7-T3: dibujo edge-to-edge; cada pantalla raíz consume los insets de
         // barras del sistema con windowInsetsPadding (el reproductor ya los
         // maneja en sus overlays).

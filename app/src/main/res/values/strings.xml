@@ -200,4 +200,14 @@
     <string name="reproductor_volumen_bajar">Bajar volumen</string>
     <string name="reproductor_volumen_subir">Subir volumen</string>
     <string name="reproductor_volumen_valor">Volumen: %1$d%%</string>
+
+    <!-- Sistema OTA de la app (canal propio, separado de las listas). -->
+    <string name="ota_canal_nombre">Actualizaciones de la app</string>
+    <string name="ota_canal_descripcion">Avisos de versiones nuevas, descarga e instalación de CoperNicoTV.</string>
+    <string name="ota_notif_disponible_titulo">Actualización disponible</string>
+    <string name="ota_notif_disponible_texto">La versión %1$s está lista para descargar.</string>
+    <string name="ota_notif_progreso_titulo">Descargando actualización</string>
+    <string name="ota_notif_progreso_texto">Versión %1$s: %2$d%%</string>
+    <string name="ota_notif_listo_titulo">Actualización lista para instalar</string>
+    <string name="ota_notif_listo_texto">La versión %1$s se descargó y verificó.</string>
 </resources>

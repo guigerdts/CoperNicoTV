@@ -1,6 +1,6 @@
 # Sistema OTA de CoperNicoTV — documento de seguimiento (ODD)
 
-Objetivo: actualizaciones in-app de GitHub Releases con descarga reanudable, verificación de integridad y autenticidad, instalación nativa y continuidad de datos. Rama base: `main`. Estrategia de entrega: `feature-branch-chain` — cada PR apunta a la rama anterior y la cadena se integra en orden (#45 → `main`, #46 → #45, #47 → #46, #48 → #47). Runner: `./gradlew :core:test`; `:app` se valida en CI (ADR-0005).
+Objetivo: actualizaciones in-app de GitHub Releases con descarga reanudable, verificación de integridad y autenticidad, instalación nativa y continuidad de datos. Rama base: `main`. Estrategia de entrega: `feature-branch-chain` — cada PR apunta a la rama anterior y la cadena se integra en orden (#45 → `main`, #46 → #45, #47 → #46, #48 → #47, #50 → #48). La corrección del margen de timeout va aparte sobre `main` (#49). Runner: `./gradlew :core:test`; `:app` se valida en CI (ADR-0005).
 
 ## Specs
 

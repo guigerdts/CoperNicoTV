@@ -109,3 +109,11 @@ Esta enmienda resuelve el bloqueo residual de PD-4 en lo que afecta a este ADR y
 - **Comparación y migración.** No se comparan valores con `cvM` distinto ni un legacy sin `cvM` con un valor versionado. La migración de canonicalización es un proceso explícito distinto de la recuperación de clave; si altera `url_canonica`, exige nueva versión de identidad y migración.
 
 Referencias: DC-04.13, U0 §6.3.1/§6.3.2, U0 L31 y GLOSSARY «Versión de canonicalización URL».
+
+## Enmienda L32 (2026-11-21)
+
+Esta enmienda registra una excepción acotada y no altera el resto de este ADR.
+
+- **Estado del OTA (ADR-0009):** el sistema de actualizaciones de la app usa un DataStore propio (`ota_actualizaciones`) para el canal elegido, la última comprobación y la versión omitida —preferencias y estado de interfaz, dentro de la decisión original— y, como **excepción documentada en ADR-0009**, también la instantánea del manifiesto verificado (bytes originales y firma) por ser caché descartable de un único valor pequeño que se lee completo y se re-verifica al leerlo. No crea tablas ni columnas en Room. La excepción caduca si el OTA necesita historial, consultas o varias instantáneas simultáneas.
+
+Referencias: ADR-0009, `odd/tasks/ota-actualizaciones.md`.

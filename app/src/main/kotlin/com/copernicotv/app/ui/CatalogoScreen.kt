@@ -126,6 +126,9 @@ const val TAG_FUENTES = "abrir-fuentes"
 /** Etiqueta del botón que abre la Guía. */
 const val TAG_GUIA = "abrir-guia"
 
+/** Etiqueta del botón que abre Ajustes > Actualizaciones. */
+const val TAG_AJUSTES = "abrir-ajustes"
+
 /** Prefijo de las etiquetas de canal del catálogo. */
 const val PREFIJO_TAG_CANAL = "canal-"
 
@@ -377,6 +380,7 @@ data class CatalogoAcciones(
     val onDesasociarListaDePerfil: (Long, Long) -> Unit,
     val onAbrirFuentes: () -> Unit,
     val onAbrirGuia: () -> Unit,
+    val onAbrirAjustes: () -> Unit,
     val onAlternarTema: () -> Unit,
     val onBorrarHistorial: () -> Unit,
     val onBorrarFavoritos: () -> Unit,
@@ -610,6 +614,12 @@ private fun FilaControles(
             modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_GUIA),
         ) {
             Text(stringResource(R.string.catalogo_guia))
+        }
+        TextButton(
+            onClick = acciones.onAbrirAjustes,
+            modifier = Modifier.heightIn(min = 48.dp).testTag(TAG_AJUSTES),
+        ) {
+            Text(stringResource(R.string.catalogo_ajustes))
         }
         // S43: la etiqueta muestra el tema actual; un toque lo invierte.
         val etiquetaTema =

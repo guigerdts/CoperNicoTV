@@ -210,4 +210,44 @@
     <string name="ota_notif_progreso_texto">Versión %1$s: %2$d%%</string>
     <string name="ota_notif_listo_titulo">Actualización lista para instalar</string>
     <string name="ota_notif_listo_texto">La versión %1$s se descargó y verificó.</string>
+
+    <!-- Ajustes > Actualizaciones (S9). Textos neutrales: la misma pantalla
+         sirve a móvil y a TV. Los fallos se muestran por familia: el detalle
+         técnico queda en la notificación y los registros, nunca crudo. -->
+    <string name="catalogo_ajustes">Ajustes</string>
+    <string name="ajustes_titulo">Ajustes</string>
+    <string name="ajustes_volver">Volver</string>
+    <string name="ajustes_actualizaciones">Actualizaciones</string>
+    <string name="ajustes_version_instalada">Versión instalada: %1$s</string>
+    <string name="ajustes_canal">Canal de actualizaciones</string>
+    <string name="ajustes_canal_estable">Estable</string>
+    <string name="ajustes_canal_beta">Beta</string>
+    <string name="ajustes_ultima_comprobacion">Última comprobación: %1$s</string>
+    <string name="ajustes_nunca">nunca</string>
+    <string name="ajustes_buscar">Buscar actualizaciones</string>
+    <string name="ajustes_buscando">Buscando…</string>
+    <string name="ajustes_progreso">Descargando: %1$d%%</string>
+    <string name="ajustes_disponible">Versión %1$s disponible</string>
+    <string name="ajustes_publicada">Publicada: %1$s</string>
+    <string name="ajustes_tamano">Tamaño: %1$s</string>
+    <string name="ajustes_obligatoria">Esta actualización es obligatoria.</string>
+    <string name="ajustes_pedir_permiso">Permitir instalar aplicaciones</string>
+    <string name="ajustes_instalar">Instalar actualización</string>
+    <string name="ajustes_aviso_cerrar">Cerrar</string>
+    <string name="ajustes_al_dia">No hay una versión más nueva disponible.</string>
+    <string name="ajustes_incompatible">La versión %1$s no es compatible con este equipo.</string>
+    <string name="ajustes_sin_permiso">La app no tiene autorización para instalar paquetes.</string>
+    <string name="ajustes_instalacion_fallida">No se pudo iniciar la instalación: %1$s</string>
+    <string name="ajustes_instalacion_no_preparada">el sistema rechazó el paquete.</string>
+    <string name="ajustes_instalacion_rechazada">El sistema no completó la instalación.</string>
+    <string name="ajustes_instalada">Actualización instalada.</string>
+    <string name="ajustes_cancelada">Instalación cancelada.</string>
+    <string name="ajustes_confirmacion">Confirme la instalación en el diálogo del sistema.</string>
+    <string name="ajustes_fallo_configuracion">Esta compilación no trae la configuración de actualizaciones.</string>
+    <string name="ajustes_fallo_sin_red">No hay conexión para comprobar actualizaciones.</string>
+    <string name="ajustes_fallo_servidor">El servidor de actualizaciones no respondió.</string>
+    <string name="ajustes_fallo_firma">La firma del manifiesto no es válida.</string>
+    <string name="ajustes_fallo_manifiesto">El manifiesto de actualización no es válido.</string>
+    <string name="ajustes_fallo_descarga">La descarga no se pudo completar.</string>
+    <string name="ajustes_fallo_verificacion">El APK descargado no coincide con el esperado.</string>
 </resources>

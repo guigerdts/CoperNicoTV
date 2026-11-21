@@ -1,8 +1,9 @@
 name: Release OTA
 
-# Publica una versión instalable de CoperNicoTV: APK firmado, manifiesto
-# `update.json` y su firma separada `update.json.sig`. Es el único workflow que
-# escribe en Releases; la CI normal no publica nada.
+# Valida una versión: compila el APK firmado, compone y firma el manifiesto
+# `update.json`, y publica los tres archivos como artifact. NO crea ni modifica
+# Releases: la publicación es un workflow_dispatch aparte (`release-publish.yml`)
+# que descarga exactamente este artifact, sin recompilar ni volver a firmar.
 
 on:
   push:
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag existente a publicar (por ejemplo v1.2.0)"
+        description: "Tag existente a validar (por ejemplo v1.2.0)"
         required: true
       canal:
         description: "Canal del manifiesto"
@@ -26,17 +27,19 @@ on:
         required: false
 
 permissions:
-  contents: write
+  # Este workflow no escribe en el repositorio ni en Releases. Subir un artifact
+  # no requiere permisos del token.
+  contents: read
 
 concurrency:
-  # Una publicación no se cancela a la mitad: dos runs sobre el mismo tag
-  # podrían dejar el release con el APK de uno y el manifiesto del otro.
+  # Una validación no se cancela a la mitad: el artifact publicado por el run
+  # cancelado dejaría de existir para la publicación posterior.
   group: release-ota-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publicar:
-    name: publicar
+  validar:
+    name: validar
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -67,6 +70,16 @@ jobs:
           fi
           if ! git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
             echo "El tag ${TAG} no existe en el repositorio." >&2
+            exit 1
+          fi
+          # El artifact se publica con el nombre del commit compilado: si no es
+          # el commit del tag, el artifact jamás podría publicarse y el error se
+          # descubre en la fase de validación, no en la de publicación.
+          COMMIT_TAG="$(git rev-parse "refs/tags/${TAG}^{commit}")"
+          COMMIT_COMPILADO="$(git rev-parse HEAD)"
+          if [ "${COMMIT_COMPILADO}" != "${COMMIT_TAG}" ]; then
+            echo "HEAD (${COMMIT_COMPILADO}) no es el commit de ${TAG} (${COMMIT_TAG})." >&2
+            echo "Para revalidar un tag existente: gh workflow run release.yml --ref ${TAG} -f tag=${TAG}" >&2
             exit 1
           fi
           VERSION_NAME="${TAG#v}"
@@ -113,6 +126,7 @@ jobs:
             echo "version_code=${VERSION_CODE}"
             echo "canal=${CANAL}"
             echo "obligatoria=${OBLIGATORIA}"
+            echo "commit=${COMMIT_TAG}"
           } >> "${GITHUB_OUTPUT}"
           {
             echo "NOTAS<<__FIN_NOTAS__"
@@ -178,6 +192,7 @@ jobs:
         id: manifiesto
         env:
           OTA_CERT_SHA256: ${{ vars.OTA_CERT_SHA256 }}
+          OTA_MANIFIESTO_PUBKEY: ${{ vars.OTA_MANIFIESTO_PUBKEY }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION_NAME: ${{ steps.version.outputs.version_name }}
           VERSION_CODE: ${{ steps.version.outputs.version_code }}
@@ -267,50 +282,65 @@ jobs:
             -signature "${RUNNER_TEMP}/update.json.sig" \
             "${RUNNER_TEMP}/update.json"
 
+          # La verificación anterior usa una pública derivada de la MISMA clave
+          # privada que acaba de firmar: prueba "firmé bien", no "la app podrá
+          # verificar". Se compara con la clave que el APK lleva embebida.
+          PUBLICA_DERIVADA="$(
+            openssl ec -in "${RUNNER_TEMP}/ota-firma.pem" -pubout -outform DER 2>/dev/null |
+              base64 -w 0
+          )"
+          if [ "${PUBLICA_DERIVADA}" != "${OTA_MANIFIESTO_PUBKEY}" ]; then
+            echo "La clave que firma el manifiesto no es la que lleva la app." >&2
+            echo "Todos los dispositivos rechazarían la actualización." >&2
+            exit 1
+          fi
+
+          # El manifiesto debe describir exactamente el APK que se verificó y se
+          # va a publicar.
+          if [ "$(jq -r .sha256 "${RUNNER_TEMP}/update.json")" != "${SHA256}" ]; then
+            echo "El manifiesto no corresponde al APK verificado." >&2
+            exit 1
+          fi
+
           {
             echo "apk=${RUNNER_TEMP}/${APK_NOMBRE}"
             echo "nombre=${APK_NOMBRE}"
             echo "sha256=${SHA256}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Publicar el release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          NOTAS: ${{ steps.version.outputs.notas }}
-        run: |
-          set -euo pipefail
-          # Un tag ya publicado no se vuelve a publicar: el versionCode sale del
-          # número de run, así que republicar un tag viejo le daría un número más
-          # alto que una versión posterior y la app instalaría una regresión
-          # encima de una versión más nueva.
-          ASSETS="$(gh release view "${TAG}" --json assets --jq '.assets[].name' 2>/dev/null || true)"
-          if grep -qx 'update.json' <<< "${ASSETS}"; then
-            echo "El tag ${TAG} ya tiene un manifiesto publicado." >&2
-            echo "Republicarlo cambiaría el versionCode de una versión que ya está en uso." >&2
-            echo "Creá un tag nuevo con la versión siguiente." >&2
-            exit 1
-          fi
-          if ! gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release create "${TAG}" --verify-tag --title "CoperNicoTV ${TAG}" --notes "${NOTAS}"
-          fi
-          gh release upload "${TAG}" \
-            "${{ steps.manifiesto.outputs.apk }}" \
-            "${RUNNER_TEMP}/update.json" \
-            "${RUNNER_TEMP}/update.json.sig" \
-            --clobber
+      - name: Publicar artefacto validado
+        uses: actions/upload-artifact@v4
+        with:
+          # Nombre determinista: tag, commit, run e intento. El publicador lo
+          # reconstruye desde la API y solo descarga ese nombre exacto.
+          name: ota-${{ steps.version.outputs.tag }}-${{ steps.version.outputs.commit }}-r${{ github.run_id }}-a${{ github.run_attempt }}
+          path: |
+            ${{ steps.manifiesto.outputs.apk }}
+            ${{ runner.temp }}/update.json
+            ${{ runner.temp }}/update.json.sig
+          if-no-files-found: error
+          retention-days: 30
 
-      - name: Resumen
+      - name: Resumen de validación
         env:
           TAG: ${{ steps.version.outputs.tag }}
+          COMMIT: ${{ steps.version.outputs.commit }}
           SHA256: ${{ steps.manifiesto.outputs.sha256 }}
+          ARTEFACTO: ota-${{ steps.version.outputs.tag }}-${{ steps.version.outputs.commit }}-r${{ github.run_id }}-a${{ github.run_attempt }}
         run: |
           {
-            echo "## Release ${TAG}"
+            echo "## VALIDACIÓN — no se publicó ningún release"
             echo
+            echo "- Tag: \`${TAG}\` (commit \`${COMMIT}\`)"
             echo "- APK: \`${{ steps.manifiesto.outputs.nombre }}\`"
             echo "- SHA-256 del APK: \`${SHA256}\`"
             echo "- versionCode: \`${{ steps.version.outputs.version_code }}\`"
             echo "- canal: \`${{ steps.version.outputs.canal }}\`"
             echo "- actualización obligatoria: \`${{ steps.version.outputs.obligatoria }}\`"
+            echo "- artifact: \`${ARTEFACTO}\` (retención 30 días)"
+            echo
+            echo "Para publicar exactamente estos bytes:"
+            echo '```'
+            echo "gh workflow run release-publish.yml -f tag=${TAG} -f run_id=${{ github.run_id }}"
+            echo '```'
           } >> "${GITHUB_STEP_SUMMARY}"

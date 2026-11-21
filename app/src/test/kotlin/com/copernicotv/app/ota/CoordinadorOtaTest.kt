@@ -113,7 +113,9 @@ class CoordinadorOtaTest {
     @Test
     fun `una version incompatible no se descarga`() =
         runBlocking {
-            val manifiesto = manifiesto(versionCode = 2, contenido = ByteArray(0), minSdk = 34)
+            // El comprobador simula API 34: un minSdk mayor es incompatible y
+            // el descargador no debe ejecutarse.
+            val manifiesto = manifiesto(versionCode = 2, contenido = ByteArray(0), minSdk = 35)
             val cliente = ClienteFalso(ByteArray(0))
 
             val resultado = coordinador(manifiesto, cliente, NotificadorFalso()).ejecutar()

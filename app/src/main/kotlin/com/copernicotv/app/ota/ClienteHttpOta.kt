@@ -15,9 +15,11 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.URL
 import java.net.UnknownHostException
+import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
+import javax.net.ssl.SSLSession
 
 /** Motivo tipado de un fallo de red del cliente OTA. */
 enum class FalloHttp {
@@ -273,7 +275,13 @@ class ClienteHttpOtaUrlConnection(
         cabeceras.forEach { (nombre, valor) -> conexion.setRequestProperty(nombre, valor) }
         if (conexion is HttpsURLConnection && contextoPruebas != null) {
             conexion.sslSocketFactory = contextoPruebas.socketFactory
-            conexion.hostnameVerifier = { _, _ -> true }
+            conexion.hostnameVerifier =
+                object : HostnameVerifier {
+                    override fun verify(
+                        hostname: String?,
+                        sesion: SSLSession?,
+                    ): Boolean = true
+                }
         }
         return conexion
     }
@@ -283,7 +291,7 @@ class ClienteHttpOtaUrlConnection(
         ubicacion: String,
     ): URL? =
         try {
-            val destino = URI(base.toURI().resolve(ubicacion)).toURL()
+            val destino = base.toURI().resolve(ubicacion).toURL()
             if (esPermitida(destino)) destino else null
         } catch (_: Exception) {
             null

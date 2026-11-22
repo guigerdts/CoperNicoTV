@@ -454,14 +454,20 @@ class CatalogoUiTest {
         esperarTexto(0, nombres[0] ?: "Sin nombre")
     }
 
-    private fun esperarTag(tag: String) {
-        esperarHasta {
+    private fun esperarTag(
+        tag: String,
+        descripcion: String = "aparece el nodo '$tag'",
+    ) {
+        esperarHasta(descripcion) {
             composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
         }
     }
 
-    private fun esperarTagAusente(tag: String) {
-        esperarHasta {
+    private fun esperarTagAusente(
+        tag: String,
+        descripcion: String = "desaparece el nodo '$tag'",
+    ) {
+        esperarHasta(descripcion) {
             composeRule.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()
         }
     }
@@ -477,7 +483,7 @@ class CatalogoUiTest {
         indice: Int,
         tag: String,
     ) {
-        esperarHasta {
+        esperarHasta("la cabecera '$tag' aparece en la posición $indice tras desplazar la lista") {
             runCatching {
                 composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
                 composeRule.onNodeWithTag(PREFIJO_TAG_SECCION_GRUPO + tag).assertExists()
@@ -495,7 +501,7 @@ class CatalogoUiTest {
         indice: Int,
         texto: String,
     ) {
-        esperarHasta {
+        esperarHasta("el canal en la posición $indice muestra '$texto'") {
             runCatching {
                 composeRule.onNodeWithTag(TAG_RESULTADOS).performScrollToIndex(indice)
                 composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + indice).assertTextEquals(texto)
@@ -503,20 +509,89 @@ class CatalogoUiTest {
         }
     }
 
-    private fun esperarHasta(condicion: () -> Boolean) {
+    /**
+     * Espera [condicion] y, si el margen se agota, informa el paso, el margen y
+     * el último estado observable.
+     *
+     * [descripcion] nombra el paso que se rindió. Sin ella, un fallo
+     * intermitente sólo decía «no se cumplió a tiempo» y no había forma de
+     * saber cuál de las esperas encadenadas había sido.
+     */
+    private fun esperarHasta(
+        descripcion: String = "condición de UI sin descripción",
+        condicion: () -> Boolean,
+    ) {
         val fallo =
             runCatching {
                 composeRule.waitUntil(TIEMPO_ESPERA, condicion)
             }.exceptionOrNull()
         if (fallo != null) {
-            val arbol =
-                runCatching { composeRule.onRoot().printToString() }
-                    .getOrElse { "Sin árbol de semántica: $it" }
-            throw AssertionError("La condición de UI no se cumplió a tiempo\n$arbol", fallo)
+            throw AssertionError(informeEspera(descripcion), fallo)
+        }
+    }
+
+    /**
+     * Mensaje de un timeout: paso, margen y último estado observable.
+     *
+     * Se arma justo después de que `waitUntil` se rinde, así que el árbol que
+     * adjunta es el último que la prueba pudo observar. Se acota para no
+     * inundar el log de CI: etiquetas y textos distintos, y un recorte del
+     * árbol.
+     */
+    private fun informeEspera(descripcion: String): String {
+        val arbol =
+            runCatching { composeRule.onRoot().printToString() }
+                .getOrElse { "Sin árbol de semántica: $it" }
+        val etiquetas =
+            ETIQUETA_SEMANTICA.findAll(arbol)
+                .map { it.groupValues[1] }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(ETIQUETAS_MAX)
+                .toList()
+        val textos =
+            TEXTO_SEMANTICO.findAll(arbol)
+                .map { it.groupValues[1].trim().trimStart('[').trimEnd(']').take(TEXTO_RECORTE) }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .take(TEXTOS_MAX)
+                .toList()
+        val etiquetasPresentes = etiquetas.ifEmpty { listOf("(ninguna)") }.joinToString(", ")
+        val textosPresentes = textos.ifEmpty { listOf("(ninguno)") }.joinToString(" | ")
+        val nodos = NODO_SEMANTICO.findAll(arbol).count()
+        val lineas = arbol.lines()
+        val visibles = lineas.take(LINEAS_ARBOL_MAX)
+        val restantes = lineas.size - visibles.size
+        return buildString {
+            appendLine("La condición de UI no se cumplió a tiempo")
+            appendLine("Paso: $descripcion")
+            appendLine("Timeout: $TIEMPO_ESPERA ms")
+            appendLine("Nodos en el árbol: $nodos")
+            appendLine("Etiquetas presentes: $etiquetasPresentes")
+            appendLine("Textos presentes: $textosPresentes")
+            append("Árbol semántico (${visibles.size} de ${lineas.size} líneas):\n")
+            append(visibles.joinToString("\n"))
+            if (restantes > 0) appendLine("\n… $restantes líneas más")
         }
     }
 
     private companion object {
         const val TIEMPO_ESPERA = 20_000L
+
+        /** Líneas del árbol semántico que se adjuntan al informe. */
+        const val LINEAS_ARBOL_MAX = 80
+
+        /** Etiquetas de prueba distintas que se listan en el informe. */
+        const val ETIQUETAS_MAX = 12
+
+        /** Textos visibles distintos que se listan en el informe. */
+        const val TEXTOS_MAX = 8
+
+        /** Recorte de cada texto listado, para que una cadena larga no domine el log. */
+        const val TEXTO_RECORTE = 60
+
+        val NODO_SEMANTICO = Regex("""Node #\d+""")
+        val ETIQUETA_SEMANTICA = Regex("""TestTag = '([^']*)'""")
+        val TEXTO_SEMANTICO = Regex("""Text = '([^']*)'""")
     }
 }

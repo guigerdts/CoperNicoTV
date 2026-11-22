@@ -171,14 +171,22 @@ class ReproductorConectividadTest {
         // recuperación real: el error deja el motor en IDLE y `prepare()`
         // re-abre la fuente, así que aquí se pasa por `stop()` primero.
         fallar.set(true)
-        // Observación anticipada: el permiso sobrante de la puerta puede
-        // cruzar el primer backoff del corte sin pausa, y REINTENTANDO(1)
-        // es efímero; la suscripción tardía pierde la carrera en un
-        // emulador lento (flakiness observado en CI).
+        // El permiso sobrante de la puerta puede cruzar el primer backoff del
+        // corte sin pausa, y el índice intermedio de REINTENTANDO es efímero:
+        // StateFlow conflaciona y hasta una suscripción anticipada puede
+        // perderlo (flake observado en CI: llega REINTENTANDO con reintento=2).
+        // La condición observable es que la sesión siga reintentando con
+        // presupuesto repuesto: el máximo vuelve a 6 y el índice no lo alcanzó,
+        // que es lo que demuestra que el contador se reinició y no se agotó.
         val reintento =
             esperarSesionTras(
-                "reintento 1 con presupuesto repuesto",
-                { it.estado == EstadoReproductor.REINTENTANDO && it.reintento == 1 },
+                "reintento con presupuesto repuesto",
+                {
+                    it.estado == EstadoReproductor.REINTENTANDO &&
+                        it.reintentosMaximos == 6 &&
+                        it.reintento >= 1 &&
+                        it.reintento < it.reintentosMaximos
+                },
             ) {
                 composeRule.runOnUiThread {
                     composeRule.viewModelReproductor().sesionActual()?.reproductor?.let { motor ->

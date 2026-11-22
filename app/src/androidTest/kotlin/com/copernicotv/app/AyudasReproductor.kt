@@ -170,6 +170,27 @@ internal fun ReglaPrincipal.mostrarControlesConDpad() {
     esperarTag(TAG_REPRODUCTOR_CONTROLES)
 }
 
+/**
+ * Espera a que [tag] esté disponible en el árbol merged y la UI quede ociosa.
+ *
+ * Justo después de un zapeo los controles se recomponen mientras la sesión se
+ * sustituye. Si la prueba consulta la semántica en mitad de esa reconstrucción,
+ * `performClick` puede fallar con «Failed to inject touch input»: el nodo existe
+ * en el árbol unmerged pero todavía no en el merged. No es una fusión
+ * estructural —los ancestros no tienen `mergeDescendants`— sino una lectura sin
+ * sincronizar. Esperar la condición observable y sincronizar el reloj elimina
+ * la dependencia del frame sin esperas arbitrarias.
+ */
+internal fun ReglaPrincipal.esperarAccionDisponible(
+    tag: String,
+    tiempoMs: Long = ESPERA_TEST_MS,
+) {
+    esperarHasta(tiempoMs) {
+        onAllNodesWithTag(tag).fetchSemanticsNodes().size == 1
+    }
+    waitForIdle()
+}
+
 /** Espera a que el foco del D-pad quede en el nodo con [tag]. */
 internal fun ReglaPrincipal.esperarFocoEn(
     tag: String,

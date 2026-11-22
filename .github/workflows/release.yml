@@ -236,12 +236,23 @@ jobs:
             exit 1
           fi
 
-          MIN_SDK="$(
-            "${BUILD_TOOLS}/aapt2" dump badging "${RUNNER_TEMP}/${APK_NOMBRE}" |
-              sed -n "s/^sdkVersion:'\([0-9]\{1,\}\)'.*/\1/p" | head -1
+          # El rótulo del minSdk depende de la herramienta: el aapt clásico
+          # imprime "sdkVersion:'N'" y aapt2 imprime "minSdkVersion:'N'"
+          # (tools/aapt2, rename d228691). Acá se invoca aapt2, así que el
+          # patrón viejo devolvía vacío. Se aceptan los dos rótulos, anclados
+          # al inicio de línea para no capturar targetSdkVersion.
+          SALIDA_AAPT2="$(
+            "${BUILD_TOOLS}/aapt2" dump badging "${RUNNER_TEMP}/${APK_NOMBRE}" 2>&1 || true
           )"
-          if [ -z "${MIN_SDK}" ]; then
-            echo "No se pudo leer el minSdk del APK." >&2
+          MIN_SDK="$(
+            printf '%s\n' "${SALIDA_AAPT2}" |
+              sed -n "s/^minSdkVersion:'\([0-9]\{1,\}\)'.*/\1/p; s/^sdkVersion:'\([0-9]\{1,\}\)'.*/\1/p" |
+              head -1
+          )"
+          if ! [[ "${MIN_SDK}" =~ ^[0-9]+$ ]]; then
+            echo "No se pudo leer el minSdk del APK (valor: '${MIN_SDK}')." >&2
+            echo "Salida de aapt2:" >&2
+            printf '%s\n' "${SALIDA_AAPT2}" >&2
             exit 1
           fi
 

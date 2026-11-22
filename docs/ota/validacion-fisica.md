@@ -28,8 +28,12 @@ que la app rechaza. No se publica nada hasta que esa comprobación pase.
 
 ## 2. Preparación de la campaña
 
-- ADB inalámbrico habilitado y `adb devices` mostrando el dispositivo. Mientras
-  ADB siga deshabilitado, la campaña no arranca y no se repiten CAM-09-D/E.
+- ADB inalámbrico habilitado y `adb devices` mostrando el dispositivo. El ADB
+  volvió a estar operativo el 2026-11-19; la campaña no arranca si el dispositivo
+  no responde, y no se repiten CAM-09-D/E sobre una instalación sin claves.
+- Un **release publicado** con la identidad de producción. Un APK de CI (debug,
+  keystore efímero) no sirve: `release.yml` y `release-publish.yml` son los que
+  producen el primer APK instalable.
 - Raíz de evidencia `campana-fisica-<fecha>/`, con `tools/physical-qa/pqa` para
   lo que ADB puede verificar mecánicamente y capturas para lo que no.
 - Canal del dispositivo en **`beta`** durante toda la campaña: acepta tanto
@@ -41,10 +45,16 @@ que la app rechaza. No se publica nada hasta que esa comprobación pase.
 ## 3. F-13 — instalación limpia release e importación
 
 ```bash
-adb uninstall com.copernicotv.app          # pierde los datos: autorizado
+adb uninstall com.copernicotv.app          # destruye las claves Keystore: requiere autorización expresa
 adb install copernicotv-<version>.apk
 adb shell dumpsys package com.copernicotv.app | grep -E "versionCode|versionName"
 ```
+
+La desinstalación no es opcional cuando la instalación previa está firmada con
+otra identidad (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`), y no es inocua: las claves
+AES/HMAC viven en Android Keystore, no en el datadir, así que cualquier catálogo
+previo queda con URL ilegibles. Es una pérdida única y consciente, no un efecto
+colateral a ignorar.
 
 Abrir la app, importar una Lista M3U real y confirmar catálogo y reproducción.
 En Ajustes > Actualizaciones, la versión instalada debe coincidir con el
@@ -55,19 +65,24 @@ la versión correcta sin ofrecer actualización.
 
 ## 4. F-14 — segunda versión detectada, notificada y descargada
 
-Publicar la versión siguiente (el `versionCode` sale del número de run, así que
-siempre es mayor):
+Publicar la versión siguiente. El `versionCode` sale del número de run de
+validación, así que siempre es mayor. La publicación son **dos** workflows: uno
+valida y produce el artifact, otro publica esos mismos bytes.
 
 ```bash
 git tag -a v1.0.1 -m "Corrección de reproducción"
 git push origin v1.0.1
-gh run watch -R guigerdts/CoperNicoTV      # workflow Release OTA
+gh run watch -R guigerdts/CoperNicoTV        # workflow "Release OTA": valida y produce el artifact
+gh run list --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId'   # <run_id>
+gh workflow run release-publish.yml -f tag=v1.0.1 -f run_id=<run_id>
 gh release view v1.0.1 --json assets --jq '.assets[].name'
 ```
 
-Deben estar el APK, `update.json` y `update.json.sig`. En el dispositivo, pulsar
-**Buscar** en Ajustes > Actualizaciones y esperar la comprobación periódica como
-segundo camino.
+Deben estar el APK, `update.json` y `update.json.sig`. El workflow `Release OTA`
+**no publica nada por sí solo**: si `gh release view` no encuentra el tag después
+de ejecutar el bloque, falta el paso `release-publish.yml`. En el dispositivo,
+pulsar **Buscar** en Ajustes > Actualizaciones y esperar la comprobación
+periódica como segundo camino.
 
 **Esperado**: notificación de versión disponible, descarga con progreso,
 verificación completa y botón de instalar. Ningún aviso de hash ni de firma.

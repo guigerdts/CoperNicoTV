@@ -19,7 +19,7 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 | F-09 | E7-T7 | Importación física (S33/S35/S36/S42, I-M) | Pendiente | sin evidencia recuperada | checklist E7-T7 |
 | F-10 | E7-T7 ronda 9 | Importación ~147k canales | Pendiente | medición aproximada sin confirmación | `e7-t7-ronda9-metricas-room.md` |
 | F-11 | E7-T6 | Duck de audio | Pendiente | atenuación no medible por API pública | matriz §L91 |
-| F-12 | E4-T7 (DC-07 punto 8) | Reinicio del dispositivo / force-stop: el trabajo periódico de WorkManager sobrevive y se reanuda en el próximo arranque, sin hora exacta | Pendiente | sin evidencia física recuperada; en CI queda cubierto por persistencia de plataforma y reconciliación idempotente (`ProgramadorWorkManagerTest`) | `odd/tasks/e4-t7-dc-07-implementacion-cierre.md` §D |
+| F-12 | E4-T7 (DC-07 punto 8) | Reinicio del dispositivo / force-stop: el trabajo periódico de WorkManager sobrevive y se reanuda en el próximo arranque, sin hora exacta | Pendiente | CAM-09 ejecutada 2026-11-18 (INCONCLUSIVE: la app no arrancó tras el reinicio) y 2026-11-19 (BLOCKED: el índice HMAC aborta antes de la red por pérdida de claves Keystore). Evidencia parcial: trabajo periódico `ENQUEUED` no bloquea controles manuales y el fallo vuelve a reposo sin reiniciar. En CI queda cubierto por persistencia de plataforma y reconciliación idempotente (`ProgramadorWorkManagerTest`) | `odd/tasks/e4-t7-dc-07-implementacion-cierre.md` §D; `campana-fisica-2026-11-18/CAM-09/forensic-2026-11-18.md`; `campana-fisica-2026-11-19/CAM-09/reinstalacion-claves-keystore-2026-11-19.md` |
 | F-13 | OTA T6 | Instalación limpia del primer APK release firmado + importación M3U | Pendiente | requiere APK release y desinstalar la versión de pruebas | `odd/tasks/ota-actualizaciones.md` |
 | F-14 | OTA T6 | Publicación de una segunda versión: detección, notificación y descarga verificada | Pendiente | requiere un release posterior al instalado | mismo doc |
 | F-15 | OTA T6 | Instalación sobre la versión anterior, retorno a la app y conservación de datos | Pendiente | requiere F-13 y F-14 | mismo doc |
@@ -74,10 +74,10 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 - El multiplicador de volumen del duck es interno del sink de Media3; la atenuación efectiva no es medible por API pública (`mvp:4862`). Verificación física de percepción pendiente en campaña consolidada.
 
 ### F-13 — OTA: instalación limpia release + importación — PENDIENTE
-- **Procedimiento**: desinstalar la versión de pruebas (pierde datos, aceptado y autorizado); instalar el APK release publicado; abrir la app; importar una Lista M3U real; confirmar catálogo y reproducción.
+- **Procedimiento**: desinstalar la versión de pruebas (pierde datos, incluida la clave Keystore; requiere autorización expresa del propietario); instalar el APK release publicado; abrir la app; importar una Lista M3U real; confirmar catálogo y reproducción.
 - **Resultado esperado**: la app arranca, la Lista importa con su informe, el canal OTA informa la versión instalada y el canal elegido en Ajustes > Actualizaciones.
-- **Estado**: pendiente. Requiere un APK release firmado con el keystore de producción, que a su vez requiere las claves de T5.
-- **Bloqueo**: ADB y Wi-Fi del dispositivo deshabilitados; no se repiten CAM-09-D/E mientras sigan así.
+- **Estado**: pendiente. Requiere un APK release firmado con el keystore de producción; las claves ya están cargadas (L20 de `odd/tasks/ota-actualizaciones.md`), falta publicar el primer release.
+- **Bloqueo**: sin APK release publicado a la fecha. El ADB inalámbrico volvió a estar operativo el 2026-11-19 (`192.168.1.7:46725`), así que el bloqueo de conectividad ya no aplica. El bloqueo real es de firma: la instalación actual es un APK debug de CI con keystore efímero, y el 2026-11-19 un `adb uninstall` exigido por `INSTALL_FAILED_UPDATE_INCOMPATIBLE` destruyó las claves de Android Keystore, dejando las URL del catálogo restaurado ilegibles (`url_ilegible`) y el índice HMAC inoperativo. Instalar el release firmado exige una instalación limpia única, que es una decisión del propietario. Detalle en `campana-fisica-2026-11-19/CAM-09/reinstalacion-claves-keystore-2026-11-19.md`.
 
 ### F-14 — OTA: segunda versión detectada, notificada y descargada — PENDIENTE
 - **Procedimiento**: instalar la versión N; publicar la versión N+1 con `versionCode` mayor; esperar la comprobación periódica o usar "Buscar" en Ajustes; observar notificación de disponibilidad; descargar.
@@ -93,3 +93,20 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 - **Procedimiento**: con un canal de pruebas controlable, provocar en orden: manifiesto con un campo faltante, firma modificada, hash de APK alterado, APK truncado, y corte de red a mitad de descarga seguido de reanudación.
 - **Resultado esperado**: cada caso se rechaza con el motivo tipado, no se ofrece instalar, no se corrompe el estado guardado y la descarga interrumpida se reanuda en vez de repetirse desde cero. Una comprobación duplicada no descarga dos veces.
 - **Estado**: pendiente. Requiere un release de pruebas que se pueda alterar sin afectar el canal real.
+
+## Campaña física 2026-11-18 → 2026-11-20 (evidencia recuperada)
+
+Evidencia producida por la campaña consolidada (`odd/tasks/campana-fisica-mvp-plan.md`) que quedó en directorios de evidencia sin consolidar en este registro. No crea identificadores `F-` nuevos: se mapea a las filas existentes. Los informes primarios viven en `campana-fisica-2026-11-18/`, `campana-fisica-2026-11-19/` y `campana-fisica-2026-11-20/` (untracked, preservados).
+
+| Fecha | Escenario | Resultado | Evidencia | Mapeo |
+|---|---|---|---|---|
+| 2026-11-18 06:57 | CAM-E7T1 — batería de verificación del ejecutor (solo lectura) | PASS | `campana-fisica-2026-11-18/CAM-E7T1/report-20261118-065757.md` | Precondición de campaña |
+| 2026-11-18 11:20–11:33 | CAM-09 — reinicio del dispositivo (DC-07) | INCONCLUSIVE: la app no arrancó tras el reinicio, por lo que no se ejercitaron los criterios (b)–(e); logcat con 5 coincidencias de crash/ANR | `campana-fisica-2026-11-18/CAM-09/forensic-2026-11-18.md` | F-12 |
+| 2026-11-18 (fases 2–4) | CAM-09 — WorkManager, reconciliación y actualización manual | Sin cierre: la actualización falla al sellar el índice HMAC | `forensic-fase2-workmanager-2026-11-18.md`, `forensic-fase3-reconciliacion-2026-11-18.md`, `forensic-fase4-actualizacion-manual-fallo-url-2026-11-18.md` | F-12 |
+| 2026-11-18 | CAM-15 / CAM-16 — captura autónoma con `pqa` y corte de conectividad | Captura y logcat obtenidos; veredicto no consolidado | `CAM-15-logcat.txt`, `CAM-15-app-logcat.txt`, `CAM-16-estable.txt`, `CAM-16-estable-eventos.txt`, `CAM-16-logcat.txt` | F-03 (recuperación de red), F-12 |
+| 2026-11-19 01:14–01:44 | CAM-09-D/E re-ejecutados con CAM-09-DEF-01 en `main` (`1237f62`) | BLOCKED: `indice_hmac_no_operativo`; la actualización aborta antes de la red y el catálogo no se escribe | `campana-fisica-2026-11-19/CAM-09/reinstalacion-claves-keystore-2026-11-19.md` | F-12 |
+| 2026-11-20 00:17 | CAM-09 — extracción de DB y diagnóstico | `integrity_check: ok`, 147.088 canales, sesiones y eventos `RECUPERACION_RED` presentes; DB SHA-256 `8a03e6b2…` | `campana-fisica-2026-11-20/CAM-09/diag-20261120-001758.txt` | F-12 |
+
+**Hallazgo de causa raíz (2026-11-19).** Cada runner de CI firma el APK debug con un keystore efímero distinto, así que `adb install -r` devuelve `INSTALL_FAILED_UPDATE_INCOMPATIBLE`. El `adb uninstall` que se usó para poder instalar destruye las claves AES/HMAC de Android Keystore (`ClavesApp.kt`), que no viven en el datadir y no están en el backup. El catálogo restaurado conserva filas e `integrity_check: ok`, pero las URL cifradas y el índice HMAC quedan criptográficamente huérfanos: reproducir devuelve `url_ilegible` y actualizar devuelve `indice_hmac_no_operativo`. `ReconstructorIndiceHmac` existe pero no está cableado a ningún flujo de la app.
+
+Este hallazgo es la justificación directa de OTA T5 (identidad de firma permanente) y la razón por la que F-13 exige una instalación limpia única.

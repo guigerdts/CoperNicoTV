@@ -166,8 +166,14 @@ jobs:
           # 4. El APK sigue firmado con el certificado fijado en la app.
           BT="$(ls -1d "${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"/build-tools/* 2>/dev/null | sort -V | tail -1)"
           [ -n "${BT}" ] || falla "no hay build-tools de Android en el runner"
-          CERT="$("${BT}/apksigner" verify --print-certs "${APK}" |
-            sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -1)"
+          # Mismo criterio que release.yml: el rótulo del certificado cambió
+          # entre versiones de apksigner ("Signer #1 certificate …" frente a
+          # "V3.0 Signer: certificate …"). Se ancla en el sufijo estable.
+          SALIDA_APKSIGNER="$("${BT}/apksigner" verify --verbose --print-certs "${APK}" 2>&1 || true)"
+          CERT="$(printf '%s\n' "${SALIDA_APKSIGNER}" |
+            sed -n 's/.*certificate SHA-256 digest: *//p' | head -1)"
+          [[ "${CERT}" =~ ^[0-9a-fA-F]{64}$ ]] \
+            || falla "no se pudo leer el certificado del APK: ${SALIDA_APKSIGNER}"
           [ "${CERT}" = "${OTA_CERT_SHA256}" ] \
             || falla "el certificado del APK (${CERT}) no es OTA_CERT_SHA256"
           [ "${CERT}" = "$(jq -r .signingCertSha256 "${D}/update.json")" ] \

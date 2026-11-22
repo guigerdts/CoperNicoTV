@@ -22,6 +22,31 @@
 ## Commits
 - Mensajes convencionales (feat:, fix:, chore:, test:).
 
+## Integración de PRs
+
+No se acumulan PR pendientes que ya cumplen los requisitos de integración. Todo
+PR que cumpla **todo** lo siguiente se integra de inmediato con merge normal, sin
+esperar una autorización adicional:
+
+- Todos los checks obligatorios completados y en verde.
+- Sin conflictos.
+- Actualizado respecto a `main`.
+- Revisión técnica y de alcance superada.
+- Sin regresiones y sin incumplir criterios de aceptación.
+
+Nunca se integra con checks rojos: si algo falla, se diagnostica la causa, se
+corrige únicamente lo necesario y se vuelve a validar.
+
+Prohibido squash, force push y cualquier operación que elimine historial.
+
+Ciclo de trabajo de todo PR: implementar, validar, abrir PR, esperar checks,
+corregir fallos si existen, integrar en cuanto esté verde, verificar `main` y
+continuar con el siguiente trabajo.
+
+La autorización para publicar releases, crear tags o desinstalar la aplicación
+**no** se deriva de esta regla: esas operaciones requieren decisión expresa del
+propietario.
+
 ## Agent skills
 
 ### Issue tracker

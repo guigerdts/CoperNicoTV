@@ -80,16 +80,18 @@ internal fun ReglaPrincipal.textoDeTag(tag: String): String =
 internal fun ReglaPrincipal.esperarTag(
     tag: String,
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "aparece el nodo '$tag'",
 ) {
-    esperarHasta(tiempoMs) { onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
+    esperarHasta(tiempoMs, descripcion) { onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty() }
 }
 
 /** Espera a que desaparezca el nodo con [tag]. */
 internal fun ReglaPrincipal.esperarTagAusente(
     tag: String,
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "desaparece el nodo '$tag'",
 ) {
-    esperarHasta(tiempoMs) { onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
+    esperarHasta(tiempoMs, descripcion) { onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty() }
 }
 
 /** Espera a que el nodo con [tag] muestre exactamente [texto]. */
@@ -97,13 +99,23 @@ internal fun ReglaPrincipal.esperarTexto(
     tag: String,
     texto: String,
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "el nodo '$tag' muestra '$texto'",
 ) {
-    esperarHasta(tiempoMs) { textoDeTag(tag) == texto }
+    esperarHasta(tiempoMs, descripcion) { textoDeTag(tag) == texto }
 }
 
-/** Espera a una condición de UI y, si no llega, adjunta el árbol semántico. */
+/**
+ * Espera a una condición de UI y, si no llega, informa el paso, el margen y el
+ * último estado observable.
+ *
+ * [descripcion] identifica el paso que agota el margen. Sin ella, un fallo
+ * intermitente sólo dice «no se cumplió a tiempo» y obliga a adivinar cuál de
+ * las esperas de la prueba fue; con ella, el informe lo nombra. El árbol
+ * semántico se acota para no inundar el log de CI.
+ */
 internal fun ReglaPrincipal.esperarHasta(
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "condición de UI sin descripción",
     condicion: () -> Boolean,
 ) {
     val fallo =
@@ -111,10 +123,67 @@ internal fun ReglaPrincipal.esperarHasta(
             waitUntil(tiempoMs, condicion)
         }.exceptionOrNull()
     if (fallo != null) {
-        val arbol =
-            runCatching { onRoot().printToString() }
-                .getOrElse { "Sin árbol de semántica: $it" }
-        throw AssertionError("La condición de UI no se cumplió a tiempo\n$arbol", fallo)
+        throw AssertionError(informeEspera(descripcion, tiempoMs), fallo)
+    }
+}
+
+/** Líneas del árbol semántico que se adjuntan al informe de un timeout. */
+private const val LINEAS_ARBOL_MAX = 80
+
+/** Etiquetas de prueba distintas que se listan en el informe. */
+private const val ETIQUETAS_MAX = 12
+
+/** Textos visibles distintos que se listan en el informe. */
+private const val TEXTOS_MAX = 8
+
+/** Recorte de cada texto listado, para que una cadena larga no domine el log. */
+private const val TEXTO_RECORTE = 60
+
+private val NODO_SEMANTICO = Regex("""Node #\d+""")
+private val ETIQUETA_SEMANTICA = Regex("""TestTag = '([^']*)'""")
+private val TEXTO_SEMANTICO = Regex("""Text = '([^']*)'""")
+
+/**
+ * Mensaje de un timeout: paso, margen y último estado observable acotado.
+ *
+ * Se arma justo después de que `waitUntil` se rinde, así que el árbol que
+ * adjunta es el último que la prueba pudo observar.
+ */
+private fun ReglaPrincipal.informeEspera(
+    descripcion: String,
+    tiempoMs: Long,
+): String {
+    val arbol =
+        runCatching { onRoot().printToString() }
+            .getOrElse { "Sin árbol de semántica: $it" }
+    val nodos = NODO_SEMANTICO.findAll(arbol).count()
+    val etiquetas =
+        ETIQUETA_SEMANTICA.findAll(arbol)
+            .map { it.groupValues[1] }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(ETIQUETAS_MAX)
+            .toList()
+    val textos =
+        TEXTO_SEMANTICO.findAll(arbol)
+            .map { it.groupValues[1].trim().trimStart('[').trimEnd(']').take(TEXTO_RECORTE) }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(TEXTOS_MAX)
+            .toList()
+    val lineas = arbol.lines()
+    val visibles = lineas.take(LINEAS_ARBOL_MAX)
+    val restantes = lineas.size - visibles.size
+    return buildString {
+        appendLine("La condición de UI no se cumplió a tiempo")
+        appendLine("Paso: $descripcion")
+        appendLine("Timeout: $tiempoMs ms")
+        appendLine("Nodos en el árbol: $nodos")
+        appendLine("Etiquetas presentes: ${etiquetas.ifEmpty { listOf("(ninguna)") }.joinToString(", ")}")
+        appendLine("Textos presentes: ${textos.ifEmpty { listOf("(ninguno)") }.joinToString(", ") { "\"$it\"" }}")
+        append("Árbol semántico (${visibles.size} de ${lineas.size} líneas):\n")
+        append(visibles.joinToString("\n"))
+        if (restantes > 0) appendLine("\n… $restantes líneas más")
     }
 }
 
@@ -125,8 +194,9 @@ internal fun ReglaPrincipal.faseActual(): String = textoDeTag(TAG_REPRODUCTOR_FA
 internal fun ReglaPrincipal.esperarFase(
     fase: String,
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "la fase del reproductor es '$fase'",
 ) {
-    esperarTexto(TAG_REPRODUCTOR_FASE, fase, tiempoMs)
+    esperarTexto(TAG_REPRODUCTOR_FASE, fase, tiempoMs, descripcion)
 }
 
 /** Estado del motor y posición publicados por el diagnóstico de E6-T1. */
@@ -146,7 +216,7 @@ internal fun ReglaPrincipal.posicionMs(): Long = estadoMotor().second
  * de que el sondeo lea la etiqueta.
  */
 internal fun ReglaPrincipal.esperarReproduccionAvanzando() {
-    esperarHasta {
+    esperarHasta(descripcion = "el motor informa un estado reproducible con posición mayor que cero") {
         val (estado, posicion) = estadoMotor()
         (estado == "READY" || estado == "ENDED") && posicion > 0L
     }
@@ -184,8 +254,9 @@ internal fun ReglaPrincipal.mostrarControlesConDpad() {
 internal fun ReglaPrincipal.esperarAccionDisponible(
     tag: String,
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "la acción '$tag' está disponible en el árbol fusionado",
 ) {
-    esperarHasta(tiempoMs) {
+    esperarHasta(tiempoMs, descripcion) {
         onAllNodesWithTag(tag).fetchSemanticsNodes().size == 1
     }
     waitForIdle()
@@ -195,8 +266,9 @@ internal fun ReglaPrincipal.esperarAccionDisponible(
 internal fun ReglaPrincipal.esperarFocoEn(
     tag: String,
     tiempoMs: Long = ESPERA_TEST_MS,
+    descripcion: String = "el foco del D-pad queda en '$tag'",
 ) {
-    esperarHasta(tiempoMs) {
+    esperarHasta(tiempoMs, descripcion) {
         runCatching { onNodeWithTag(tag).assertIsFocused() }.isSuccess
     }
 }

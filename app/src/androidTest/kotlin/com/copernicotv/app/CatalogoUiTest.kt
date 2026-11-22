@@ -132,39 +132,45 @@ class CatalogoUiTest {
         sembrarCanales()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performClick()
-        esperarTag(TAG_ACCION_FAVORITO)
+        esperarTag(TAG_ACCION_FAVORITO, descripcion = "el canal 0 abre sus acciones con el botón Favorito")
         composeRule.onNodeWithTag(TAG_ACCION_FAVORITO).performClick()
-        esperarHasta { runBlocking { db.favoritoDao().existe(canalIds[0]) > 0 } }
+        esperarHasta(descripcion = "el Favorito del canal 0 queda persistido en Room") {
+            runBlocking { db.favoritoDao().existe(canalIds[0]) > 0 }
+        }
 
         composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performClick()
-        esperarTagAusente(PREFIJO_TAG_CANAL + 1)
+        esperarTagAusente(PREFIJO_TAG_CANAL + 1, descripcion = "el filtro Favoritos descarta el canal 1")
         // Paging invalida y vuelve a emitir al aplicar el filtro: comprobar la
         // presencia sin esperar puede caer en la emisión vacía intermedia.
-        esperarTag(PREFIJO_TAG_CANAL + 0)
+        esperarTag(PREFIJO_TAG_CANAL + 0, descripcion = "el filtro Favoritos conserva el canal 0")
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performClick()
-        esperarTag(TAG_ACCION_OCULTO)
+        esperarTag(TAG_ACCION_OCULTO, descripcion = "el canal 0 abre sus acciones con el botón Oculto")
         composeRule.onNodeWithTag(TAG_ACCION_OCULTO).performClick()
-        esperarHasta { runBlocking { db.ocultacionCanalDao().existe(canalIds[0]) > 0 } }
+        esperarHasta(descripcion = "la Ocultación del canal 0 queda persistida en Room") {
+            runBlocking { db.ocultacionCanalDao().existe(canalIds[0]) > 0 }
+        }
 
         composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performClick()
-        esperarHasta {
+        esperarHasta(descripcion = "el filtro Todos deja de mostrar el canal 0 oculto") {
             composeRule.onAllNodesWithText("Canal A").fetchSemanticsNodes().isEmpty()
         }
         composeRule.onNodeWithTag(TAG_FILTRO_OCULTOS).performClick()
         // Paging conserva la emisión anterior mientras aplica «mostrar ocultos»:
         // esperar el canal 0 no garantiza que ya sea el canal oculto. La insignia
         // «Oculto» es la señal de que la nueva emisión llegó.
-        esperarHasta {
+        esperarHasta(descripcion = "el filtro Ocultos recibe la emisión nueva con la insignia Oculto") {
             composeRule.onAllNodesWithText("Oculto").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).assertExists()
         composeRule.onNodeWithText("Oculto").assertExists()
 
         composeRule.onNodeWithTag(PREFIJO_TAG_CANAL + 0).performClick()
-        esperarTag(TAG_ACCION_OCULTO)
+        esperarTag(TAG_ACCION_OCULTO, descripcion = "el canal oculto reabre sus acciones con el botón Oculto")
         composeRule.onNodeWithTag(TAG_ACCION_OCULTO).performClick()
-        esperarHasta { runBlocking { db.ocultacionCanalDao().existe(canalIds[0]) == 0 } }
+        esperarHasta(descripcion = "la Ocultación del canal 0 se revierte en Room") {
+            runBlocking { db.ocultacionCanalDao().existe(canalIds[0]) == 0 }
+        }
     }
 
     @Test

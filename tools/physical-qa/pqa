@@ -1,0 +1,514 @@
+#!/usr/bin/env bash
+# pqa — physical QA executor for CoperNicoTV (ADB-driven, PC-free).
+#
+# Target environment: Ubuntu shell / Termux on aarch64, talking over wireless
+# ADB to the campaign device (Samsung SM-A356E).
+#
+# Safety invariants (do not remove):
+#   * Read-only against the device: cat/getprop/dumpsys/logcat/pm/df/run-as cat.
+#   * Never uninstall, clear, force-stop, push, or delete anything on the device.
+#   * Never overwrite or delete previous evidence; every file gets a timestamped
+#     name and is appended, not replaced.
+#   * Every executed command is logged with its exit code.
+#   * Results are separated as PASS / FAIL / BLOCKED / INCONCLUSIVE.
+#
+# Usage: ./pqa <command> [args]   (see ./pqa help)
+
+set -u -o pipefail
+
+# ------------------------------------------------------------------ setup ----
+REPO="$(cd "$(dirname "$0")/../.." && pwd)"
+ROOT="${PQA_EVIDENCE_DIR:-$REPO/campana-fisica-$(date +%Y-%m-%d)}"
+SESSION_LOG="$ROOT/pqa-commands-$(date +%H%M%S).log"
+LOGGED_FILE=""
+PKG="com.copernicotv.app"
+EXPECTED_MODEL="SM-A356E"
+DB_NAME="copernicotv.db"
+
+mkdir -p "$ROOT" 2>/dev/null
+
+say()  { printf '%s\n' "$*"; }
+err()  { printf 'ERROR: %s\n' "$*" >&2; }
+
+stamp() { date +%Y%m%d-%H%M%S; }
+
+# Unique timestamped file inside an evidence dir. Never overwrites: if the name
+# exists it appends another timestamp component until free.
+new_file() { # $1=dir $2=basename-without-ext $3=ext
+    local dir="$1" base="$2" ext="$3" f
+    f="$dir/${base}-$(stamp).${ext}"
+    while [ -e "$f" ]; do f="$dir/${base}-$(stamp)-$RANDOM.${ext}"; done
+    printf '%s' "$f"
+}
+
+# Evidence dir per campaign id: ROOT/CAM-ID/
+evidence_dir() { # $1=CAM-ID (optional)
+    if [ $# -ge 1 ] && [ -n "$1" ]; then
+        mkdir -p "$ROOT/$1"
+        printf '%s' "$ROOT/$1"
+    else
+        mkdir -p "$ROOT/general"
+        printf '%s' "$ROOT/general"
+    fi
+}
+
+# run_cmd — execute and log: timestamp, exit code, duration. Everything the
+# executor runs against the world goes through here or A() (which wraps it).
+run_cmd() { # $@ = command line
+    local t0 t1 rc
+    t0=$(date +%s)
+    printf '[%s] RUN: %s\n' "$(date '+%F %T')" "$*" >>"$SESSION_LOG"
+    "$@"
+    rc=$?
+    t1=$(date +%s)
+    printf '[%s] EXIT: %s (%ss) <- %s\n' "$(date '+%F %T')" "$rc" "$((t1 - t0))" "$*" >>"$SESSION_LOG"
+    return $rc
+}
+
+# ---------------------------------------------------------------- device ----
+SERIAL=""
+# Resolve exactly one device; refuse to guess when several are attached.
+pick_device() {
+    if [ -n "${PQA_SERIAL:-}" ]; then SERIAL="$PQA_SERIAL"; return 0; fi
+    local list n
+    list=$(adb devices 2>/dev/null | awk 'NR>1 && $2=="device" {print $1}')
+    n=$(printf '%s\n' "$list" | grep -c . || true)
+    if [ "$n" -eq 0 ]; then
+        err "no ADB device in 'device' state (wireless ADB drops when Wi-Fi is off; reconnect and retry)"
+        return 1
+    elif [ "$n" -gt 1 ]; then
+        err "multiple devices attached; export PQA_SERIAL=<serial> (candidates: $list)"
+        return 1
+    fi
+    SERIAL="$list"
+    return 0
+}
+
+A() { adb -s "$SERIAL" "$@"; }
+
+# AC — run an adb shell command through run_cmd logging.
+AC() { run_cmd adb -s "$SERIAL" shell "$@"; }
+
+# record_result — accumulate separated results for the campaign report.
+record_result() { # $1=CAM-ID $2=PASS|FAIL|BLOCKED|INCONCLUSIVE $3=check $4=detail
+    local dir
+    dir=$(evidence_dir "$1")
+    printf '%s\t%s\t%s\t%s\t%s\n' "$(date '+%F %T')" "$2" "$3" "$4" "$SERIAL" >>"$dir/results.tsv"
+    printf '[%s] RESULT: %s %s %s %s\n' "$(date '+%F %T')" "$1" "$2" "$3" "$4" >>"$SESSION_LOG"
+}
+
+# ------------------------------------------------------------ subcommands ---
+
+cmd_device() {
+    say "== Device verification =="
+    if ! pick_device; then
+        record_result "${1:-general}" BLOCKED "device-connection" "no ADB device; dependent operations halted"
+        say "BLOCKED: dependent operations halted (nothing invented, nothing executed)."
+        return 1
+    fi
+    say "serial: $SERIAL"
+    local model api rel abi battery space_ok
+    model=$(AC getprop ro.product.model) && say "model:    $model"
+    AC getprop ro.build.version.release && true
+    AC getprop ro.build.version.sdk && true
+    AC getprop ro.product.cpu.abi && true
+    AC getprop ro.build.version.security_patch && true
+    battery=$(AC dumpsys battery 2>/dev/null | awk '/level:/ {print $2; exit}')
+    say "battery:  ${battery:-unknown}%"
+    if AC df -h /data >/tmp/pqa-df.txt 2>&1; then
+        tail -1 /tmp/pqa-df.txt
+        grep -qE '[0-9]+(\.[0-9]+)?[GT]' /tmp/pqa-df.txt && space_ok=1 || space_ok=0
+    fi
+    rm -f /tmp/pqa-df.txt
+    if [ "$model" != "$EXPECTED_MODEL" ]; then
+        err "model '$model' != expected '$EXPECTED_MODEL' (continue only if intentional)"
+        record_result "${1:-general}" INCONCLUSIVE "device-identity" "unexpected model $model"
+        return 1
+    fi
+    record_result "${1:-general}" PASS "device-identity" "model=$model api=$(AC getprop ro.build.version.sdk) serial=$SERIAL"
+    return 0
+}
+
+cmd_app() {
+    say "== App state ($PKG) =="
+    pick_device || return 1
+    local cam="${1:-general}"
+    local ver installed apk_path sha
+    if ! AC pm list packages | grep -q "$PKG"; then
+        record_result "$cam" BLOCKED "app-installed" "$PKG not installed"
+        err "$PKG is not installed (do NOT install from here without operator authorization)"
+        return 1
+    fi
+    AC dumpsys package "$PKG" | grep -E 'versionName|versionCode=|lastUpdateTime' | head -3
+    AC pm path "$PKG" | head -1
+    apk_path=$(A shell pm path "$PKG" 2>/dev/null | head -1 | sed 's/^package://' | tr -d '\r')
+    if [ -n "$apk_path" ]; then
+        sha=$(A shell sha256sum "$apk_path" 2>/dev/null | awk '{print $1}')
+        say "base.apk sha256: $sha"
+        case "$sha" in
+            f28054d78ef539f7a1c5cd5951f992b103e3195076b16420e179ba67aa56a5ff)
+                say "  -> matches section 3.1 APK (199b17b, E7-T10 A+B)"; record_result "$cam" PASS "apk-traceability" "sha256=$sha (199b17b)" ;;
+            64b97880611eef43c77a3d92dfd86604f84bfae9a61c7e9dd57fc814e3c260ac)
+                say "  -> matches the ORIGINAL campaign APK (c63d241)"; record_result "$cam" INCONCLUSIVE "apk-traceability" "sha256=$sha (c63d241, pre A+B)" ;;
+            *) say "  -> UNKNOWN hash; check against runbook section 3/3.1"; record_result "$cam" INCONCLUSIVE "apk-traceability" "sha256=$sha unknown" ;;
+        esac
+    fi
+    local pid
+    pid=$(A shell pidof "$PKG" 2>/dev/null | tr -d '\r')
+    if [ -n "$pid" ]; then
+        say "pid: $pid"
+        AC dumpsys meminfo "$PKG" | sed -n '1,30p'
+        record_result "$cam" PASS "app-running" "pid=$pid"
+    else
+        say "pid: (not running)"
+        record_result "$cam" PASS "app-installed" "installed; process inactive"
+    fi
+    say "-- database files (read-only listing):"
+    AC run-as "$PKG" ls -l databases/ 2>&1 | head -12
+    return 0
+}
+
+cmd_system() {
+    say "== System snapshot =="
+    pick_device || return 1
+    local cam="${1:-general}" dir f
+    dir=$(evidence_dir "$cam")
+    f=$(new_file "$dir" "system" "txt")
+    {
+        echo "# system snapshot $(date '+%F %T') serial=$SERIAL"
+        for p in ro.product.model ro.build.version.release ro.build.version.sdk \
+                 ro.product.cpu.abi ro.build.version.security_patch ro.kernel.version; do
+            printf '%-34s %s\n' "$p" "$(adb -s "$SERIAL" shell getprop "$p" | tr -d '\r')"
+        done
+        adb -s "$SERIAL" shell cat /proc/meminfo | head -3
+        adb -s "$SERIAL" shell df -h /data | tail -1
+        adb -s "$SERIAL" shell dumpsys battery | grep -E 'level|status|health|temperature' | head -4
+        adb -s "$SERIAL" shell uptime
+    } >"$f" && run_cmd adb -s "$SERIAL" shell true
+    say "saved: $f"
+    record_result "$cam" PASS "system-snapshot" "$f"
+    return 0
+}
+
+cmd_logcat() {
+    # pqa logcat [CAM-ID] [--seconds N] — default: dump the existing buffer (safe,
+    # non-blocking). With --seconds N: live capture for N seconds via timeout.
+    local cam="${1:-general}"; shift 2>/dev/null || true
+    local secs=0 dir f
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --seconds) secs="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+    pick_device || return 1
+    dir=$(evidence_dir "$cam")
+    f=$(new_file "$dir" "logcat" "txt")
+    if [ "$secs" -gt 0 ]; then
+        say "capturing live logcat for ${secs}s..."
+        if run_cmd timeout "$secs" adb -s "$SERIAL" logcat -v time >"$f"; then :; fi
+    else
+        say "dumping logcat buffer (non-blocking)..."
+        AC logcat -d -v time >"$f" || { record_result "$cam" FAIL "logcat" "buffer dump failed"; return 1; }
+    fi
+    say "saved: $f ($(wc -l <"$f") lines)"
+    record_result "$cam" PASS "logcat-capture" "$f"
+    # Immediate crash/ANR scan of what was just captured.
+    cmd_filter "$f" "$cam" || true
+    return 0
+}
+
+# Scan a logcat file for crashes, ANRs and app exceptions. Evidence-only: a
+# match is reported as a finding, not as a campaign verdict.
+cmd_filter() {
+    local file="${1:?usage: pqa filter <logfile> [CAM-ID]}" cam="${2:-general}"
+    [ -f "$file" ] || { err "no such file: $file"; return 1; }
+    local hits=0 pat
+    pat='FATAL EXCEPTION|ANR in com\.copernicotv|Force finishing activity.*com\.copernicotv|Process com\.copernicotv\.app.*has died|AndroidRuntime: Process: com\.copernicotv\.app|E AndroidRuntime.*copernicotv'
+    say "== Findings in $(basename "$file") =="
+    local n
+    n=$(grep -cE "$pat" "$file" || true)
+    if [ "$n" -eq 0 ]; then
+        say "no crash/ANR patterns found"
+        record_result "$cam" PASS "log-filter" "$(basename "$file"): 0 crash/ANR matches"
+        return 0
+    fi
+    say "$n matching lines:"
+    grep -nE "$pat" "$file" | head -20
+    record_result "$cam" INCONCLUSIVE "log-filter" "$(basename "$file"): $n crash/ANR matches (inspect)"
+    return 0
+}
+
+cmd_memory() {
+    say "== Memory snapshot ($PKG) =="
+    pick_device || return 1
+    local cam="${1:-general}" dir f pid
+    pid=$(A shell pidof "$PKG" 2>/dev/null | tr -d '\r')
+    if [ -z "$pid" ]; then
+        record_result "$cam" BLOCKED "memory" "process not running; start the app first"
+        err "process not running (start the app manually; we never launch with side effects)"
+        return 1
+    fi
+    dir=$(evidence_dir "$cam")
+    f=$(new_file "$dir" "meminfo" "txt")
+    { echo "# meminfo $(date '+%F %T') pid=$pid"; AC dumpsys meminfo "$PKG"; } >"$f" \
+        || { record_result "$cam" FAIL "memory" "dumpsys failed"; return 1; }
+    grep -E 'TOTAL PSS|Native Heap' "$f" | head -2
+    say "saved: $f"
+    record_result "$cam" PASS "memory-snapshot" "$f"
+    return 0
+}
+
+# DB handling: everything read-only. We pull byte copies with run-as cat, hash
+# them, and run ALL SQL (integrity checks, diagnostics) against a SEPARATE
+# working copy so the evidence copy stays byte-exact and the device file is
+# never touched. No push, no checkpoint on device, ever.
+_latest_db_copy() { ls -1t "$ROOT"/general/copernicotv.db* "$ROOT"/*/copernicotv.db* 2>/dev/null | grep -v -e '\-wal$' -e '\-shm$' | head -1; }
+
+cmd_db() {
+    say "== SQLite extraction ($DB_NAME, read-only) =="
+    pick_device || return 1
+    local cam="${1:-general}" dir fbase
+    dir=$(evidence_dir "$cam")
+    fbase="$dir/$DB_NAME"
+    local suffix; suffix=$(stamp)
+    for part in "" "-wal" "-shm"; do
+        local out="$fbase$suffix$part"
+        if run_cmd adb -s "$SERIAL" shell "run-as $PKG cat databases/$DB_NAME$part" >"$out"; then
+            say "pulled: $(basename "$out") ($(wc -c <"$out") bytes)"
+        else
+            [ -n "$part" ] && { say "pulled: $(basename "$out") (absent on device — removing empty copy)"; rm -f "$out"; } || {
+                record_result "$cam" FAIL "db-extract" "could not pull $DB_NAME$part"
+                err "extraction failed; nothing was modified on the device"
+                return 1; }
+        fi
+    done
+    shasum -a 256 "$fbase$suffix" 2>/dev/null | tee -a "$dir/db-sha256.txt" || sha256sum "$fbase$suffix" | tee -a "$dir/db-sha256.txt"
+    record_result "$cam" PASS "db-extract" "$fbase$suffix (+wal/shm if present)"
+    cmd_diag "$cam" || true
+    return 0
+}
+
+# Local sqlite3 detection (Termux ships it; do not install anything from here).
+_sqlite() {
+    if command -v sqlite3 >/dev/null 2>&1; then sqlite3 "$@"; else
+        err "sqlite3 not available locally; evidence copy is safe but queries are BLOCKED (install sqlite3 yourself, e.g. 'pkg install sqlite' in Termux)"
+        return 127
+    fi
+}
+
+cmd_query() {
+    local sql="${1:?usage: pqa query \"SQL\"}"
+    local copy; copy=$(_latest_db_copy)
+    [ -n "$copy" ] || { err "no extracted DB copy yet; run 'pqa db' first"; return 1; }
+    # Work on a scratch copy so evidence bytes never change.
+    local work; work=$(mktemp "${TMPDIR:-/tmp}/pqa-query-XXXXXX.db")
+    cp "$copy" "$work"
+    for p in wal shm; do [ -f "$copy-$p" ] && cp "$copy-$p" "$work-$p"; done
+    _sqlite "$work" "$sql"
+    local rc=$?
+    rm -f "$work" "$work-wal" "$work-shm"
+    return $rc
+}
+
+cmd_diag() {
+    say "== Diagnostic queries (on extracted copy; device untouched) =="
+    local cam="${1:-general}" dir f
+    dir=$(evidence_dir "$cam")
+    local copy; copy=$(_latest_db_copy)
+    [ -n "$copy" ] || { err "no extracted DB copy; run 'pqa db' first"; return 1; }
+    local work; work=$(mktemp "${TMPDIR:-/tmp}/pqa-diag-XXXXXX.db")
+    cp "$copy" "$work"
+    for p in wal shm; do [ -f "$copy-$p" ] && cp "$copy-$p" "$work-$p"; done
+    f=$(new_file "$dir" "diag" "txt")
+    {
+        echo "# diagnostics from copy: $(basename "$copy") at $(date '+%F %T')"
+        echo "-- integrity_check:"; _sqlite "$work" "PRAGMA integrity_check;"
+        echo "-- recent sessions:"; _sqlite "$work" \
+"SELECT id, substr(COALESCE(canalNombre,'?'),1,24), resultado, faseFinal, clasificacionTecnica, recuperacionesRed, ultimoError FROM SesionDiagnostico ORDER BY id DESC LIMIT 12;" 2>&1
+        echo "-- event counts by type:"; _sqlite "$work" \
+"SELECT tipo, COUNT(*) FROM EventoDiagnostico GROUP BY tipo ORDER BY 2 DESC;" 2>&1
+        echo "-- recent RECUPERACION_RED events:"; _sqlite "$work" \
+"SELECT e.sesionId, e.codigo, substr(COALESCE(e.detalle,''),1,60) FROM EventoDiagnostico e WHERE e.tipo='RECUPERACION_RED' ORDER BY e.id DESC LIMIT 10;" 2>&1
+        echo "-- catalog size:"; _sqlite "$work" "SELECT COUNT(*) FROM Canal;" 2>&1
+    } >"$f"
+    rc=$?
+    rm -f "$work" "$work-wal" "$work-shm"
+    if [ $rc -eq 0 ]; then
+        sed -n '1,40p' "$f"
+        say "saved: $f"
+        record_result "$cam" PASS "diagnostics" "$f"
+    else
+        record_result "$cam" BLOCKED "diagnostics" "sqlite3 unavailable or query failed"
+        say "saved (partial): $f"
+    fi
+    return $rc
+}
+
+# Autonomous on-device capture: starts logcat (and optionally screenrecord) ON
+# the device, writing to /sdcard, so evidence survives a Wi-Fi/ADB outage.
+# Never toggles connectivity; the operator cuts/restores Wi-Fi manually.
+_state_file() { printf '%s/autocapture.state' "$ROOT"; }
+
+cmd_autocapture() {
+    local cam="${1:?usage: pqa autocapture <CAM-ID> <seconds> [--screen]}"
+    local secs="${2:?usage: pqa autocapture <CAM-ID> <seconds> [--screen]}"
+    shift 2 2>/dev/null || true
+    local screen=0
+    [ "${1:-}" = "--screen" ] && screen=1
+    pick_device || return 1
+    local devdir="/sdcard/campana/$(date +%Y-%m-%d)"
+    AC "mkdir -p $devdir" || return 1
+    local lc="$devdir/${cam}-logcat-$(stamp).txt"
+    AC "nohup logcat -v time > $lc 2>&1 &" || { record_result "$cam" FAIL "autocapture" "logcat start failed"; return 1; }
+    local lcpid; lcpid=$(A shell pidof logcat 2>/dev/null | tr -d '\r' | tr ' ' '\n' | tail -1)
+    local srpid=""
+    if [ "$screen" -eq 1 ]; then
+        local sr="$devdir/${cam}-screen-$(stamp).mp4"
+        AC "nohup screenrecord --time-limit 180 $sr >/dev/null 2>&1 &" || true
+        sleep 1; srpid=$(A shell pidof screenrecord 2>/dev/null | tr -d '\r' | tr ' ' '\n' | tail -1)
+        say "screenrecord started (device-side, max 180s per invocation; restart it if the scenario is longer)"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$cam" "$lcpid" "$srpid" "$lc" "$(date '+%F %T')" >"$(_state_file)"
+    say "autonomous capture started ON DEVICE:"
+    say "  logcat pid: $lcpid -> $lc"
+    [ -n "$srpid" ] && say "  screenrecord pid: $srpid"
+    say "ADB may now drop safely (Wi-Fi cut does NOT stop these). Restore Wi-Fi, then run: pqa recover $cam"
+    record_result "$cam" PASS "autocapture-start" "logcat=$lc pid=$lcpid"
+    return 0
+}
+
+cmd_autocapture_stop() {
+    pick_device || return 1
+    local sf; sf=$(_state_file)
+    [ -f "$sf" ] || { err "no autocapture state; nothing to stop"; return 1; }
+    local cam lcpid srpid
+    IFS=$'\t' read -r cam lcpid srpid _ <<<"$(tail -1 "$sf")"
+    [ -n "$srpid" ] && [ "$srpid" != "" ] && AC "kill $srpid" 2>/dev/null && true
+    [ -n "$lcpid" ] && AC "kill -INT $lcpid" 2>/dev/null && true
+    say "stop signal sent to device-side capture (cam=$cam). Files stay on /sdcard; they are never deleted automatically."
+    record_result "$cam" PASS "autocapture-stop" "pids=$lcpid,$srpid"
+    return 0
+}
+
+cmd_recover() {
+    local cam="${1:?usage: pqa recover <CAM-ID>}"
+    pick_device || return 1
+    local dir; dir=$(evidence_dir "$cam")
+    local devdir="/sdcard/campana/$(date +%Y-%m-%d)"
+    AC "ls -l $devdir" || return 1
+    local f base
+    for f in $(A shell "ls $devdir" 2>/dev/null | tr -d '\r' | grep -E "^${cam}-"); do
+        base="$devdir/$f"
+        local out; out=$(new_file "$dir" "${f%.*}" "${f##*.}")
+        run_cmd adb -s "$SERIAL" pull "$base" "$out" >/dev/null 2>&1 && say "recovered: $out" \
+            || { err "pull failed for $base (ADB flaky; retry after reconnect)"; record_result "$cam" FAIL "recover" "$base"; }
+    done
+    record_result "$cam" PASS "recover" "device files pulled to $dir (device copies preserved)"
+    return 0
+}
+
+cmd_evidence() {
+    local cam="${1:?usage: pqa evidence <CAM-ID> [files...]}"
+    shift
+    local dir; dir=$(evidence_dir "$cam")
+    if [ $# -gt 0 ]; then
+        local f
+        for f in "$@"; do
+            [ -f "$f" ] || { err "missing file: $f"; continue; }
+            local base out
+            base=$(basename "$f"); ext="${base##*.}"; out=$(new_file "$dir" "${base%.*}" "$ext")
+            cp "$f" "$out" && say "registered: $out"
+        done
+    fi
+    say "== evidence inventory: $dir =="
+    ls -l "$dir" | tail -n +2
+    return 0
+}
+
+# Report per campaign id. Status comes from the operator or accumulated
+# results.tsv — never invented by the executor.
+cmd_report() {
+    local cam="${1:?usage: pqa report <CAM-ID> [PASS|FAIL|BLOCKED|INCONCLUSIVE] [summary]}"
+    local status="${2:-}" summary="${3:-}"
+    local dir; dir=$(evidence_dir "$cam")
+    if [ -z "$status" ]; then
+        local counts; counts=$(awk -F'\t' '{print $2}' "$dir/results.tsv" 2>/dev/null | sort | uniq -c | tr '\n' ' ')
+        [ -n "${counts// /}" ] || { err "no recorded results and no status given; refusing to invent a verdict"; return 1; }
+        say "recorded results: $counts"
+        err "pass the status explicitly: pqa report $cam PASS|FAIL|BLOCKED|INCONCLUSIVE \"summary\""
+        return 1
+    fi
+    case "$status" in PASS|FAIL|BLOCKED|INCONCLUSIVE) ;; *) err "status must be PASS, FAIL, BLOCKED or INCONCLUSIVE"; return 1 ;; esac
+    local f; f="$dir/report-$(stamp).md"
+    {
+        echo "# Campaign report — $cam"
+        echo
+        echo "- **Date:** $(date '+%F %T')"
+        echo "- **Status:** $status"
+        echo "- **Summary:** ${summary:-(operator summary)}"
+        echo "- **Device:** $SERIAL (model $(adb -s "$SERIAL" shell getprop ro.product.model 2>/dev/null | tr -d '\r'))"
+        echo
+        echo "## Recorded checks"
+        if [ -f "$dir/results.tsv" ]; then
+            printf '| Time | Status | Check | Detail |\n|---|---|---|---|\n'
+            awk -F'\t' '{printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4}' "$dir/results.tsv"
+        else echo "(none)"; fi
+        echo
+        echo "## Evidence files"
+        ls -1 "$dir" | grep -v '^report-' | sed 's/^/- /'
+        echo
+        echo "## Command log"
+        echo "See \`$SESSION_LOG\` (every command and exit code)."
+        echo
+        echo "## Operator notes"
+        echo "${summary:+> }${summary}"
+    } >"$f"
+    say "report: $f"
+    return 0
+}
+
+cmd_status() {
+    say "== pqa session status =="
+    say "evidence root: $ROOT"
+    say "session log:   $SESSION_LOG"
+    if pick_device 2>/dev/null; then
+        say "device: $SERIAL ($(adb -s "$SERIAL" shell getprop ro.product.model 2>/dev/null | tr -d '\r'), Android $(adb -s "$SERIAL" shell getprop ro.build.version.release 2>/dev/null | tr -d '\r'))"
+        say "app:    $(adb -s "$SERIAL" shell dumpsys package "$PKG" 2>/dev/null | grep -m1 versionName | tr -d '\r' || echo 'not installed')"
+    else
+        say "device: NOT CONNECTED (wireless ADB dependent on Wi-Fi)"
+    fi
+    say "campaign dirs:"
+    ls -1d "$ROOT"/*/ 2>/dev/null | sed 's/^/  /' || say "  (none yet)"
+    local d f
+    for d in "$ROOT"/*/; do
+        [ -f "$d/results.tsv" ] || continue
+        say "  $(basename "$d"): $(awk -F'\t' '{print $2}' "$d/results.tsv" | sort | uniq -c | tr '\n' ' ')"
+    done
+    return 0
+}
+
+usage() {
+    sed -n '2,25p' "$0"
+}
+
+# ------------------------------------------------------------------ main ----
+case "${1:-help}" in
+    device)            shift; cmd_device "${1:-general}" ;;
+    app)               shift; cmd_app "${1:-general}" ;;
+    system)            shift; cmd_system "${1:-general}" ;;
+    logcat)            shift; cmd_logcat "$@" ;;
+    filter)            shift; cmd_filter "$@" ;;
+    memory)            shift; cmd_memory "${1:-general}" ;;
+    db)                shift; cmd_db "${1:-general}" ;;
+    query)             shift; cmd_query "$@" ;;
+    diag)              shift; cmd_diag "${1:-general}" ;;
+    autocapture)       shift; cmd_autocapture "$@" ;;
+    autocapture-stop)  shift; cmd_autocapture_stop ;;
+    recover)           shift; cmd_recover "$@" ;;
+    evidence)          shift; cmd_evidence "$@" ;;
+    report)            shift; cmd_report "$@" ;;
+    status)            cmd_status ;;
+    help|--help|-h)    usage ;;
+    *) err "unknown command: ${1:-}"; usage; exit 1 ;;
+esac

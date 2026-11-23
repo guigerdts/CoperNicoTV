@@ -2,6 +2,7 @@ package com.copernicotv.app.ota
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
@@ -11,6 +12,7 @@ import org.junit.Test
 import java.io.File
 import java.io.InputStream
 import java.net.InetAddress
+import java.net.ServerSocket
 import java.net.Socket
 import java.nio.file.Files
 import java.security.KeyStore
@@ -127,6 +129,82 @@ class ClienteHttpOtaTest {
             }
         }
 
+    @Test
+    fun `un host que no resuelve se informa como falta de red`() =
+        runBlocking {
+            val cliente =
+                ClienteHttpOtaUrlConnection(
+                    contextoPruebas = contextoCliente(),
+                    hostsPermitidos = setOf("sin-dns.invalid"),
+                    permitirPuertoDePruebas = true,
+                )
+
+            assertFallo(cliente, "https://sin-dns.invalid/recurso", FalloHttp.SIN_RED)
+        }
+
+    @Test
+    fun `una conexion rechazada se informa como falta de red`() =
+        runBlocking {
+            val puerto = ServerSocket(0).use { it.localPort }
+
+            assertFallo(clientePruebas(), "https://localhost:$puerto/recurso", FalloHttp.SIN_RED)
+        }
+
+    @Test
+    fun `un servidor que no responde se informa como timeout`() =
+        runBlocking {
+            val servidor = servidorTls()
+            val atencion =
+                launch(Dispatchers.IO) {
+                    runCatching { servidor.accept().use { delay(5_000) } }
+                }
+            try {
+                assertFallo(
+                    clientePruebas(lecturaMs = 500),
+                    "https://localhost:${servidor.localPort}/recurso",
+                    FalloHttp.TIMEOUT,
+                )
+            } finally {
+                servidor.close()
+                atencion.cancel()
+            }
+        }
+
+    @Test
+    fun `un cuerpo mas corto que el declarado se informa como descarga incompleta`() =
+        runBlocking {
+            val completo = "0123456789".toByteArray()
+
+            conServidor(
+                listOf { _ -> Respuesta(200, completo.copyOfRange(0, 4), largoDeclarado = completo.size) },
+            ) { url ->
+                val resultado = clientePruebas().obtener(url, 1024)
+
+                assertTrue(resultado is ResultadoHttp.Fallo)
+                assertEquals(FalloHttp.IO, (resultado as ResultadoHttp.Fallo).tipo)
+            }
+        }
+
+    @Test
+    fun `un http 404 se informa como estado http`() =
+        runBlocking {
+            conServidor(listOf({ _ -> Respuesta(404, "no existe".toByteArray()) })) { url ->
+                assertFallo(clientePruebas(), url, FalloHttp.ESTADO_HTTP)
+            }
+        }
+
+    @Test
+    fun `un http 500 al descargar se informa como estado http reintentable`() =
+        runBlocking {
+            conServidor(listOf({ _ -> Respuesta(500, "fallo".toByteArray()) })) { url ->
+                val resultado = clientePruebas().descargar(url, destinoTemporal(), 0L) { _, _ -> }
+
+                assertTrue(resultado is ResultadoDescargaHttp.Fallo)
+                assertEquals(FalloHttp.ESTADO_HTTP, (resultado as ResultadoDescargaHttp.Fallo).tipo)
+                assertTrue(resultado.reintentable)
+            }
+        }
+
     private suspend fun assertFallo(
         cliente: ClienteHttpOta,
         url: String,
@@ -137,11 +215,16 @@ class ClienteHttpOtaTest {
         assertEquals(esperado, (resultado as ResultadoHttp.Fallo).tipo)
     }
 
-    private fun clientePruebas(): ClienteHttpOta =
+    private fun clientePruebas(
+        conexionMs: Int = 15_000,
+        lecturaMs: Int = 30_000,
+    ): ClienteHttpOta =
         ClienteHttpOtaUrlConnection(
             contextoPruebas = contextoCliente(),
             hostsPermitidos = setOf("localhost"),
             permitirPuertoDePruebas = true,
+            tiempoConexionMs = conexionMs,
+            tiempoLecturaMs = lecturaMs,
         )
 
     private suspend fun conServidor(
@@ -228,11 +311,12 @@ class ClienteHttpOtaTest {
         val codigo: Int,
         val cuerpo: ByteArray,
         val cabeceras: Map<String, String> = emptyMap(),
+        val largoDeclarado: Int? = null,
     ) {
         fun cabecera(): String {
             val extra = cabeceras.entries.joinToString("") { "${it.key}: ${it.value}\r\n" }
             return "HTTP/1.1 $codigo Respuesta\r\n" +
-                "Content-Length: ${cuerpo.size}\r\n" +
+                "Content-Length: ${largoDeclarado ?: cuerpo.size}\r\n" +
                 extra +
                 "Connection: close\r\n\r\n"
         }

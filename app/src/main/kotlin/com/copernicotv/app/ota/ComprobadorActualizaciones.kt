@@ -54,6 +54,9 @@ class ComprobadorActualizaciones(
         if (!configuracion.configurada) return ResultadoComprobacion.Fallo(FalloComprobacion.CONFIGURACION)
         val canal = almacen.canalActual()
         return when (val resultado = fuente.buscar()) {
+            // Solo hay "al día" cuando el canal no tiene publicaciones que
+            // consultar. Cualquier fallo de red, de servidor, de manifiesto o
+            // de firma llega como `Fallo` y nunca se convierte en al día.
             is ResultadoFuente.SinPublicaciones -> alDia()
             is ResultadoFuente.Fallo -> ResultadoComprobacion.Fallo(tipoDe(resultado.tipo), resultado.detalle)
             is ResultadoFuente.Manifiestos -> decidir(canal, resultado.verificados)

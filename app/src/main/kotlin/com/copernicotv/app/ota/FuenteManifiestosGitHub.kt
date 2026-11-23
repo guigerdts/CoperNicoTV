@@ -72,37 +72,64 @@ class FuenteManifiestosGitHub(
      * Verifica cada publicación y resume el canal.
      *
      * Una publicación rota no invalida a las demás: se guarda el motivo del
-     * fallo y se devuelve el mejor resultado posible (manifiestos válidos >
-     * firma inválida > respuesta inválida > sin publicaciones).
+     * fallo y se devuelve el mejor resultado posible. El orden de prioridad es
+     * firma inválida > manifiesto inválido > error del servidor > error de red,
+     * para que un fallo de transporte nunca se degrade en [ResultadoFuente.SinPublicaciones].
+     * `SinPublicaciones` significa una sola cosa: no hay publicaciones que
+     * consultar. Un error de red, un HTTP fallido o una descarga incompleta se
+     * informan como error, jamás como «al día».
      */
     private suspend fun verificarTodas(candidatas: List<PublicacionGitHub>): ResultadoFuente {
         val verificados = mutableListOf<ManifiestoVerificado>()
-        var firmaInvalida = false
-        var respuestaInvalida = false
+        var fallo: FalloFuente? = null
         candidatas.forEach { publicacion ->
             when (val verificacion = verificarPublicacion(publicacion)) {
                 is VerificacionPublicacion.Valida -> verificados += verificacion.manifiesto
-                VerificacionPublicacion.FirmaInvalida -> firmaInvalida = true
-                VerificacionPublicacion.ManifiestoInvalido, VerificacionPublicacion.SinActivos -> respuestaInvalida = true
-                VerificacionPublicacion.SinDescarga -> Unit
+                VerificacionPublicacion.FirmaInvalida ->
+                    fallo = masGrave(fallo, FalloFuente.FIRMA_INVALIDA)
+                VerificacionPublicacion.ManifiestoInvalido, VerificacionPublicacion.SinActivos ->
+                    fallo = masGrave(fallo, FalloFuente.RESPUESTA_INVALIDA)
+                is VerificacionPublicacion.FalloTransporte ->
+                    fallo = masGrave(fallo, tipoDe(verificacion.tipo))
             }
         }
+        val motivo = fallo
         return when {
             verificados.isNotEmpty() -> ResultadoFuente.Manifiestos(verificados)
-            firmaInvalida -> ResultadoFuente.Fallo(FalloFuente.FIRMA_INVALIDA)
-            respuestaInvalida -> ResultadoFuente.Fallo(FalloFuente.RESPUESTA_INVALIDA)
+            motivo != null -> ResultadoFuente.Fallo(motivo)
             else -> ResultadoFuente.SinPublicaciones
         }
     }
+
+    /** Conserva el motivo más informativo: firma > manifiesto > servidor > red. */
+    private fun masGrave(
+        actual: FalloFuente?,
+        nuevo: FalloFuente,
+    ): FalloFuente = if (actual == null || gravedad(nuevo) > gravedad(actual)) nuevo else actual
+
+    private fun gravedad(fallo: FalloFuente): Int =
+        when (fallo) {
+            FalloFuente.FIRMA_INVALIDA -> 4
+            FalloFuente.RESPUESTA_INVALIDA -> 3
+            FalloFuente.SERVIDOR -> 2
+            FalloFuente.SIN_RED -> 1
+            FalloFuente.CONFIGURACION, FalloFuente.SIN_PUBLICACIONES -> 0
+        }
 
     private suspend fun verificarPublicacion(publicacion: PublicacionGitHub): VerificacionPublicacion {
         val activoManifiesto = publicacion.activo(PublicacionesGitHub.NOMBRE_MANIFIESTO)
         val activoFirma = publicacion.activo(PublicacionesGitHub.NOMBRE_FIRMA)
         if (activoManifiesto == null || activoFirma == null) return VerificacionPublicacion.SinActivos
         val json =
-            leer(activoManifiesto.urlDescarga, ManifiestoActualizacion.MAX_BYTES)
-                ?: return VerificacionPublicacion.SinDescarga
-        val firma = leer(activoFirma.urlDescarga, MAX_BYTES_FIRMA) ?: return VerificacionPublicacion.SinDescarga
+            when (val respuesta = cliente.obtener(activoManifiesto.urlDescarga, ManifiestoActualizacion.MAX_BYTES)) {
+                is ResultadoHttp.Exito -> respuesta.cuerpo
+                is ResultadoHttp.Fallo -> return VerificacionPublicacion.FalloTransporte(respuesta.tipo)
+            }
+        val firma =
+            when (val respuesta = cliente.obtener(activoFirma.urlDescarga, MAX_BYTES_FIRMA)) {
+                is ResultadoHttp.Exito -> respuesta.cuerpo
+                is ResultadoHttp.Fallo -> return VerificacionPublicacion.FalloTransporte(respuesta.tipo)
+            }
         if (!FirmaManifiesto.verificar(json, firma, configuracion.clavePublicaManifiesto)) {
             return VerificacionPublicacion.FirmaInvalida
         }
@@ -125,27 +152,28 @@ class FuenteManifiestosGitHub(
 
         data object SinActivos : VerificacionPublicacion
 
-        data object SinDescarga : VerificacionPublicacion
+        /** La descarga falló; conserva el motivo real para clasificarlo. */
+        data class FalloTransporte(val tipo: FalloHttp) : VerificacionPublicacion
 
         data object FirmaInvalida : VerificacionPublicacion
 
         data object ManifiestoInvalido : VerificacionPublicacion
     }
 
-    private suspend fun leer(
-        url: String,
-        maxBytes: Int,
-    ): ByteArray? =
-        when (val respuesta = cliente.obtener(url, maxBytes)) {
-            is ResultadoHttp.Exito -> respuesta.cuerpo
-            is ResultadoHttp.Fallo -> null
-        }
-
+    /**
+     * Traduce el fallo de transporte del cliente HTTP a la clase que ve el
+     * canal: [FalloFuente.SERVIDOR] para una respuesta HTTP fallida y
+     * [FalloFuente.SIN_RED] para todo lo que impidió completar la transferencia
+     * (DNS, conexión rechazada, timeout, TLS, corte o cuerpo incompleto). Un
+     * contenido inaceptable (URL no permitida, exceso de tamaño) describe al
+     * manifiesto, no a la red.
+     */
     private fun tipoDe(fallo: FalloHttp): FalloFuente =
         when (fallo) {
-            FalloHttp.ESTADO_HTTP -> FalloFuente.SERVIDOR
-            FalloHttp.SIN_RED, FalloHttp.TIMEOUT -> FalloFuente.SIN_RED
-            else -> FalloFuente.RESPUESTA_INVALIDA
+            FalloHttp.ESTADO_HTTP, FalloHttp.REDIRECCION_INVALIDA -> FalloFuente.SERVIDOR
+            FalloHttp.SIN_RED, FalloHttp.TIMEOUT, FalloHttp.TLS, FalloHttp.IO -> FalloFuente.SIN_RED
+            FalloHttp.URL_INSEGURA, FalloHttp.RESPUESTA_DEMASIADO_GRANDE, FalloHttp.ESCRITURA ->
+                FalloFuente.RESPUESTA_INVALIDA
         }
 
     private companion object {

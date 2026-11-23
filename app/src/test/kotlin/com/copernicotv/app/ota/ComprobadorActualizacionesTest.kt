@@ -113,6 +113,23 @@ class ComprobadorActualizacionesTest {
         assertEquals(ResultadoComprobacion.AlDia, resultado)
     }
 
+    @Test
+    fun `un fallo de la fuente no se reporta como al dia ni marca la comprobacion`() {
+        listOf(
+            FalloFuente.SIN_RED to FalloComprobacion.SIN_RED,
+            FalloFuente.SERVIDOR to FalloComprobacion.SERVIDOR,
+            FalloFuente.FIRMA_INVALIDA to FalloComprobacion.FIRMA_INVALIDA,
+            FalloFuente.RESPUESTA_INVALIDA to FalloComprobacion.MANIFIESTO_INVALIDO,
+        ).forEach { (falloFuente, esperado) ->
+            val almacen = AlmacenFalso()
+
+            val resultado = comprobar(FuenteFalsa(ResultadoFuente.Fallo(falloFuente)), almacen)
+
+            assertEquals("clase para $falloFuente", esperado, (resultado as ResultadoComprobacion.Fallo).tipo)
+            assertEquals("no debe marcar comprobación para $falloFuente", 0, almacen.marcas)
+        }
+    }
+
     private fun comprobar(
         fuente: FuenteManifiestos,
         almacen: AlmacenManifiestoOta,

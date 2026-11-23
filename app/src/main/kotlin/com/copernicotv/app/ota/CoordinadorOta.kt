@@ -108,11 +108,23 @@ class CoordinadorOta(
         return when (resultado) {
             is ResultadoDescargaApk.Fallo -> {
                 notificador.olvidarProgreso()
-                ResultadoOta.Fallo(FalloOta.DESCARGA, resultado.tipo.name)
+                ResultadoOta.Fallo(tipoDeDescarga(resultado.tipo), resultado.detalle ?: resultado.tipo.name)
             }
             is ResultadoDescargaApk.Exito -> verificar(manifiesto, resultado.archivo)
         }
     }
+
+    /**
+     * Clasifica el fallo de descarga por su causa: un corte de red no es lo
+     * mismo que un archivo que no supera la verificación de integridad. La UI
+     * muestra un mensaje distinto para cada clase.
+     */
+    private fun tipoDeDescarga(tipo: FalloDescargaApk): FalloOta =
+        when (tipo) {
+            FalloDescargaApk.RED -> FalloOta.SIN_RED
+            FalloDescargaApk.TAMANO, FalloDescargaApk.HASH -> FalloOta.VERIFICACION
+            FalloDescargaApk.ESCRITURA -> FalloOta.DESCARGA
+        }
 
     private fun verificar(
         manifiesto: ManifiestoActualizacion,
@@ -135,6 +147,8 @@ class CoordinadorOta(
 
     private fun fallo(resultado: ResultadoComprobacion.Fallo): ResultadoOta =
         when (resultado.tipo) {
+            // Solo el canal sin publicaciones se traduce en "sin novedad"; el
+            // resto conserva su clase de error hasta la UI.
             FalloComprobacion.SIN_PUBLICACIONES -> ResultadoOta.SinNovedad(null)
             FalloComprobacion.CONFIGURACION -> ResultadoOta.Fallo(FalloOta.CONFIGURACION, resultado.detalle)
             FalloComprobacion.SIN_RED -> ResultadoOta.Fallo(FalloOta.SIN_RED, resultado.detalle)

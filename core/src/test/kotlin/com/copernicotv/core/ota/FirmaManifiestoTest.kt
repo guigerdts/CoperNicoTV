@@ -69,6 +69,29 @@ class FirmaManifiestoTest {
         assertFalse(FirmaManifiesto.verificar(ByteArray(0), firmar(par, ByteArray(0)), publica(par)))
     }
 
+    @Test
+    fun `una firma truncada no valida`() {
+        val par = parDeClaves()
+        val documento = DOCUMENTO.toByteArray()
+        val firma = firmar(par, documento)
+
+        listOf(10, 30, firma.size - 1).forEach { largo ->
+            assertFalse(
+                FirmaManifiesto.verificar(documento, firma.copyOfRange(0, largo), publica(par)),
+                "una firma de $largo bytes no debe validar",
+            )
+        }
+    }
+
+    @Test
+    fun `la firma de otro manifiesto no valida`() {
+        val par = parDeClaves()
+        val original = DOCUMENTO.toByteArray()
+        val alterado = """{"schema":1,"packageName":"com.copernicotv.app","versionCode":3}""".toByteArray()
+
+        assertFalse(FirmaManifiesto.verificar(alterado, firmar(par, original), publica(par)))
+    }
+
     private fun parDeClaves(): KeyPair =
         KeyPairGenerator.getInstance("EC").apply {
             initialize(ECGenParameterSpec("secp256r1"))

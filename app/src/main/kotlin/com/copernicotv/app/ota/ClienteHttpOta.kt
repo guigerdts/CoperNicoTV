@@ -89,6 +89,8 @@ class ClienteHttpOtaUrlConnection(
     private val contextoPruebas: SSLContext? = null,
     private val hostsPermitidos: Set<String> = HOSTS_OTA,
     private val permitirPuertoDePruebas: Boolean = false,
+    private val tiempoConexionMs: Int = TIEMPO_CONEXION_MS,
+    private val tiempoLecturaMs: Int = TIEMPO_LECTURA_MS,
 ) : ClienteHttpOta {
     override suspend fun obtener(
         url: String,
@@ -101,11 +103,19 @@ class ClienteHttpOtaUrlConnection(
                     is Conexion.Abierta -> {
                         val abierta = conexion.conexion
                         try {
+                            val declarado = abierta.contentLengthLong
                             val cuerpo = leerAcotado(abierta, maxBytes)
-                            if (cuerpo == null) {
-                                ResultadoHttp.Fallo(FalloHttp.RESPUESTA_DEMASIADO_GRANDE)
-                            } else {
-                                ResultadoHttp.Exito(cuerpo, abierta.url.toString())
+                            when {
+                                cuerpo == null ->
+                                    ResultadoHttp.Fallo(FalloHttp.RESPUESTA_DEMASIADO_GRANDE)
+                                // Un cuerpo más corto que el declarado es una
+                                // transferencia interrumpida: no es un éxito.
+                                declarado > 0L && cuerpo.size.toLong() != declarado ->
+                                    ResultadoHttp.Fallo(
+                                        FalloHttp.IO,
+                                        "cuerpo incompleto: ${cuerpo.size} de $declarado bytes",
+                                    )
+                                else -> ResultadoHttp.Exito(cuerpo, abierta.url.toString())
                             }
                         } finally {
                             abierta.disconnect()
@@ -268,8 +278,8 @@ class ClienteHttpOtaUrlConnection(
     ): HttpURLConnection {
         val conexion = url.openConnection() as HttpURLConnection
         conexion.instanceFollowRedirects = false
-        conexion.connectTimeout = TIEMPO_CONEXION_MS
-        conexion.readTimeout = TIEMPO_LECTURA_MS
+        conexion.connectTimeout = tiempoConexionMs
+        conexion.readTimeout = tiempoLecturaMs
         conexion.setRequestProperty("Accept-Encoding", "identity")
         conexion.setRequestProperty("User-Agent", AGENTE)
         cabeceras.forEach { (nombre, valor) -> conexion.setRequestProperty(nombre, valor) }

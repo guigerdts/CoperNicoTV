@@ -142,15 +142,170 @@ class FuenteManifiestosGitHubTest {
         assertEquals(listOf(2L, 3L), (resultado as ResultadoFuente.Manifiestos).verificados.map { it.manifiesto.versionCode })
     }
 
+    @Test
+    fun `un fallo de red al descargar el manifiesto no se convierte en sin publicaciones`() {
+        listOf(FalloHttp.SIN_RED, FalloHttp.TIMEOUT, FalloHttp.TLS, FalloHttp.IO).forEach { tipo ->
+            val cliente =
+                clienteCon(
+                    listOf(release()),
+                    "{}",
+                    ByteArray(0),
+                    fallos = mapOf(URL_JSON to ResultadoHttp.Fallo(tipo, "detalle")),
+                )
+
+            val resultado = runBlocking { fuente(cliente, parDeClaves().public).buscar() }
+
+            assertEquals("clase para $tipo", FalloFuente.SIN_RED, falloDe(resultado).tipo)
+        }
+    }
+
+    @Test
+    fun `http 404 al descargar el manifiesto se informa como servidor`() {
+        val cliente =
+            clienteCon(
+                listOf(release()),
+                "{}",
+                ByteArray(0),
+                fallos = mapOf(URL_JSON to ResultadoHttp.Fallo(FalloHttp.ESTADO_HTTP, "HTTP 404")),
+            )
+
+        val resultado = runBlocking { fuente(cliente, parDeClaves().public).buscar() }
+
+        assertEquals(FalloFuente.SERVIDOR, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `http 500 al descargar el manifiesto se informa como servidor`() {
+        val cliente =
+            clienteCon(
+                listOf(release()),
+                "{}",
+                ByteArray(0),
+                fallos = mapOf(URL_JSON to ResultadoHttp.Fallo(FalloHttp.ESTADO_HTTP, "HTTP 500")),
+            )
+
+        val resultado = runBlocking { fuente(cliente, parDeClaves().public).buscar() }
+
+        assertEquals(FalloFuente.SERVIDOR, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `un fallo al descargar la firma se informa como error de red`() {
+        val par = parDeClaves()
+        val cliente =
+            clienteCon(
+                listOf(release()),
+                manifiestoJson(),
+                ByteArray(0),
+                fallos = mapOf(URL_FIRMA to ResultadoHttp.Fallo(FalloHttp.IO, "corte")),
+            )
+
+        val resultado = runBlocking { fuente(cliente, par.public).buscar() }
+
+        assertEquals(FalloFuente.SIN_RED, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `un manifiesto vacio no se acepta aunque su firma sea valida`() {
+        val par = parDeClaves()
+        val json = ""
+        val cliente = clienteCon(listOf(release()), json, firmar(json, par))
+
+        val resultado = runBlocking { fuente(cliente, par.public).buscar() }
+
+        // El verificador rechaza un documento de cero bytes antes de parsearlo,
+        // así que el resultado es firma inválida y nunca "al día".
+        assertEquals(FalloFuente.FIRMA_INVALIDA, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `un manifiesto malformado con firma valida se rechaza como manifiesto invalido`() {
+        val par = parDeClaves()
+        val json = "{no-es-json}"
+        val cliente = clienteCon(listOf(release()), json, firmar(json, par))
+
+        val resultado = runBlocking { fuente(cliente, par.public).buscar() }
+
+        assertEquals(FalloFuente.RESPUESTA_INVALIDA, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `una firma truncada se rechaza sin aceptar el manifiesto`() {
+        val par = parDeClaves()
+        val json = manifiestoJson()
+        val firma = firmar(json, par).copyOfRange(0, 10)
+        val cliente = clienteCon(listOf(release()), json, firma)
+
+        val resultado = runBlocking { fuente(cliente, par.public).buscar() }
+
+        assertEquals(FalloFuente.FIRMA_INVALIDA, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `un manifiesto alterado despues de firmar se rechaza`() {
+        val par = parDeClaves()
+        val original = manifiestoJson(versionCode = 2)
+        val firma = firmar(original, par)
+        val alterado = original.replace("\"versionCode\":2", "\"versionCode\":3")
+        val cliente = clienteCon(listOf(release()), alterado, firma)
+
+        val resultado = runBlocking { fuente(cliente, par.public).buscar() }
+
+        assertEquals(FalloFuente.FIRMA_INVALIDA, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `una firma ausente se rechaza como publicacion incompleta`() {
+        val par = parDeClaves()
+        val json = manifiestoJson()
+        val cliente = clienteCon(listOf(release(sinFirma = true)), json, firmar(json, par))
+
+        val resultado = runBlocking { fuente(cliente, par.public).buscar() }
+
+        assertEquals(FalloFuente.RESPUESTA_INVALIDA, falloDe(resultado).tipo)
+    }
+
+    @Test
+    fun `un error de red no deja la fuente en estado fallido`() {
+        val par = parDeClaves()
+        val json = manifiestoJson()
+        val cliente =
+            ClienteIntermitente(
+                mapOf(
+                    URL_API to releasesJson(release()),
+                    URL_JSON to json.toByteArray(),
+                    URL_FIRMA to firmar(json, par),
+                ),
+                fallosRestantes = 1,
+            )
+        val sujeto = fuente(cliente, par.public)
+
+        val (primera, segunda) =
+            runBlocking {
+                val fallo = sujeto.buscar()
+                val reintento = sujeto.buscar()
+                fallo to reintento
+            }
+
+        assertEquals(FalloFuente.SIN_RED, falloDe(primera).tipo)
+        assertTrue(segunda is ResultadoFuente.Manifiestos)
+    }
+
     private fun fuente(
         cliente: ClienteHttpOta,
         clave: PublicKey,
     ): FuenteManifiestosGitHub = FuenteManifiestosGitHub(cliente, configuracion(clave))
 
+    private fun falloDe(resultado: ResultadoFuente): ResultadoFuente.Fallo {
+        assertTrue("se esperaba un fallo, se obtuvo $resultado", resultado is ResultadoFuente.Fallo)
+        return resultado as ResultadoFuente.Fallo
+    }
+
     private fun clienteCon(
         publicaciones: List<ReleasePrueba>,
         json: String,
         firma: ByteArray,
+        fallos: Map<String, ResultadoHttp.Fallo> = emptyMap(),
     ): ClienteMapa =
         ClienteMapa(
             mapOf(
@@ -158,6 +313,7 @@ class FuenteManifiestosGitHubTest {
                 URL_JSON to json.toByteArray(),
                 URL_FIRMA to firma,
             ),
+            fallos,
         )
 
     private fun configuracion(clave: PublicKey): ConfiguracionOta =
@@ -206,16 +362,17 @@ class FuenteManifiestosGitHubTest {
         jsonUrl: String = URL_JSON,
         firmaUrl: String = URL_FIRMA,
         sinActivos: Boolean = false,
+        sinFirma: Boolean = false,
     ): ReleasePrueba =
         ReleasePrueba(
             etiqueta = etiqueta,
             borrador = borrador,
             preliminar = preliminar,
             activos =
-                if (sinActivos) {
-                    emptyList()
-                } else {
-                    listOf("update.json" to jsonUrl, "update.json.sig" to firmaUrl)
+                when {
+                    sinActivos -> emptyList()
+                    sinFirma -> listOf("update.json" to jsonUrl)
+                    else -> listOf("update.json" to jsonUrl, "update.json.sig" to firmaUrl)
                 },
         )
 
@@ -241,13 +398,37 @@ class FuenteManifiestosGitHubTest {
 
     private class ClienteMapa(
         private val respuestas: Map<String, ByteArray>,
+        private val fallos: Map<String, ResultadoHttp.Fallo> = emptyMap(),
     ) : ClienteHttpOta {
         override suspend fun obtener(
             url: String,
             maxBytes: Int,
         ): ResultadoHttp {
-            if (url == URL_API && respuestas[URL_API] == null) {
-                return ResultadoHttp.Fallo(FalloHttp.ESTADO_HTTP, "HTTP 404")
+            fallos[url]?.let { return it }
+            val cuerpo = respuestas[url] ?: return ResultadoHttp.Fallo(FalloHttp.ESTADO_HTTP, "HTTP 404")
+            return ResultadoHttp.Exito(cuerpo, url)
+        }
+
+        override suspend fun descargar(
+            url: String,
+            destino: File,
+            desdeBytes: Long,
+            alProgresar: (Long, Long?) -> Unit,
+        ): ResultadoDescargaHttp = ResultadoDescargaHttp.Fallo(FalloHttp.IO)
+    }
+
+    /** Falla las primeras [fallosRestantes] descargas del manifiesto y luego responde. */
+    private class ClienteIntermitente(
+        private val respuestas: Map<String, ByteArray>,
+        private var fallosRestantes: Int,
+    ) : ClienteHttpOta {
+        override suspend fun obtener(
+            url: String,
+            maxBytes: Int,
+        ): ResultadoHttp {
+            if (url == URL_JSON && fallosRestantes > 0) {
+                fallosRestantes--
+                return ResultadoHttp.Fallo(FalloHttp.IO, "conexion interrumpida")
             }
             val cuerpo = respuestas[url] ?: return ResultadoHttp.Fallo(FalloHttp.ESTADO_HTTP, "HTTP 404")
             return ResultadoHttp.Exito(cuerpo, url)

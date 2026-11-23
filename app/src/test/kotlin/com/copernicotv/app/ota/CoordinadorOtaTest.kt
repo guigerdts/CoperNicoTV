@@ -111,6 +111,73 @@ class CoordinadorOtaTest {
         }
 
     @Test
+    fun `un fallo de firma del manifiesto no descarga el apk`() =
+        runBlocking {
+            val cliente = ClienteFalso("apk".toByteArray())
+
+            val resultado =
+                CoordinadorOta(
+                    comprobador = comprobador(FuenteFalsa(ResultadoFuente.Fallo(FalloFuente.FIRMA_INVALIDA)), AlmacenFalso()),
+                    descargador = DescargadorApk(cliente, directorioTemporal(), intentosMaximos = 1, espera = {}),
+                    verificador = VerificadorFalso(ResultadoVerificacionApk.Valido),
+                    notificador = NotificadorFalso(),
+                    almacen = AlmacenFalso(),
+                ).ejecutar()
+
+            assertEquals(FalloOta.FIRMA, (resultado as ResultadoOta.Fallo).tipo)
+            assertEquals(0, cliente.descargas)
+        }
+
+    @Test
+    fun `un manifiesto invalido no descarga el apk`() =
+        runBlocking {
+            val cliente = ClienteFalso("apk".toByteArray())
+
+            val resultado =
+                CoordinadorOta(
+                    comprobador = comprobador(FuenteFalsa(ResultadoFuente.Fallo(FalloFuente.RESPUESTA_INVALIDA)), AlmacenFalso()),
+                    descargador = DescargadorApk(cliente, directorioTemporal(), intentosMaximos = 1, espera = {}),
+                    verificador = VerificadorFalso(ResultadoVerificacionApk.Valido),
+                    notificador = NotificadorFalso(),
+                    almacen = AlmacenFalso(),
+                ).ejecutar()
+
+            assertEquals(FalloOta.MANIFIESTO, (resultado as ResultadoOta.Fallo).tipo)
+            assertEquals(0, cliente.descargas)
+        }
+
+    @Test
+    fun `un corte de red al descargar el apk se informa como error de red`() =
+        runBlocking {
+            val resultado =
+                CoordinadorOta(
+                    comprobador =
+                        comprobador(
+                            FuenteFalsa(
+                                ResultadoFuente.Manifiestos(listOf(verificado(manifiesto(2, "apk".toByteArray())))),
+                            ),
+                            AlmacenFalso(),
+                        ),
+                    descargador = DescargadorApk(ClienteQueFalla(), directorioTemporal(), intentosMaximos = 1, espera = {}),
+                    verificador = VerificadorFalso(ResultadoVerificacionApk.Valido),
+                    notificador = NotificadorFalso(),
+                    almacen = AlmacenFalso(),
+                ).ejecutar()
+
+            assertEquals(FalloOta.SIN_RED, (resultado as ResultadoOta.Fallo).tipo)
+        }
+
+    @Test
+    fun `un apk con hash distinto al del manifiesto se informa como integridad`() =
+        runBlocking {
+            val manifiesto = manifiesto(versionCode = 2, contenido = "esperado".toByteArray())
+
+            val resultado = coordinador(manifiesto, ClienteFalso("otro contenido".toByteArray()), NotificadorFalso()).ejecutar()
+
+            assertEquals(FalloOta.VERIFICACION, (resultado as ResultadoOta.Fallo).tipo)
+        }
+
+    @Test
     fun `una version incompatible no se descarga`() =
         runBlocking {
             // El comprobador simula API 34: un minSdk mayor es incompatible y
@@ -214,6 +281,20 @@ class CoordinadorOtaTest {
             alProgresar(contenido.size.toLong(), contenido.size.toLong())
             return ResultadoDescargaHttp.Completa(contenido.size.toLong(), contenido.size.toLong())
         }
+    }
+
+    private class ClienteQueFalla : ClienteHttpOta {
+        override suspend fun obtener(
+            url: String,
+            maxBytes: Int,
+        ): ResultadoHttp = ResultadoHttp.Fallo(FalloHttp.SIN_RED, "sin ruta")
+
+        override suspend fun descargar(
+            url: String,
+            destino: File,
+            desdeBytes: Long,
+            alProgresar: (escritos: Long, totales: Long?) -> Unit,
+        ): ResultadoDescargaHttp = ResultadoDescargaHttp.Fallo(FalloHttp.IO, "conexion interrumpida", reintentable = false)
     }
 
     private class VerificadorFalso(

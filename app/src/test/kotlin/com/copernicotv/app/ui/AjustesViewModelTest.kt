@@ -112,6 +112,25 @@ class AjustesViewModelTest {
         }
 
     @Test
+    fun `cada clase de fallo llega a la UI sin colapsarse`() =
+        runTest(dispatcher) {
+            val vistos = mutableSetOf<AvisoAjustes>()
+
+            FalloOta.values().forEach { tipo ->
+                val viewModel = viewModel(pasada = PasadaFalsa(ResultadoOta.Fallo(tipo)))
+
+                viewModel.buscar()
+                advanceUntilIdle()
+
+                val aviso = requireNotNull(viewModel.estado.value.aviso) { "sin aviso para $tipo" }
+                assertEquals("clase para $tipo", AvisoAjustes.Fallo(tipo), aviso)
+                vistos += aviso
+            }
+
+            assertEquals(FalloOta.values().size, vistos.size)
+        }
+
+    @Test
     fun `el progreso de la descarga llega al estado mientras descarga`() =
         runTest(dispatcher) {
             val pasada = PasadaConPausa(ResultadoOta.SinNovedad(1L))

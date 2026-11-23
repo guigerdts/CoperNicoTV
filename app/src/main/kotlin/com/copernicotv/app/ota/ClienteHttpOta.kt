@@ -75,6 +75,34 @@ interface ClienteHttpOta {
 }
 
 /**
+ * Clasifica un error de red en el motivo tipado de [FalloHttp].
+ *
+ * Un handshake TLS que expira llega como [SSLException] con la
+ * [SocketTimeoutException] como causa según el JDK: sigue siendo un timeout de
+ * red —y por lo tanto reintentable—, no un certificado inválido.
+ */
+internal fun tipoDeError(error: Exception): FalloHttp =
+    when {
+        error is SocketTimeoutException || error.tieneCausaTimeout() -> FalloHttp.TIMEOUT
+        error is UnknownHostException || error is ConnectException -> FalloHttp.SIN_RED
+        error is SSLException -> FalloHttp.TLS
+        else -> FalloHttp.IO
+    }
+
+private fun Throwable.tieneCausaTimeout(): Boolean {
+    var actual = cause
+    var profundidad = 0
+    while (actual != null && profundidad < MAX_CAUSA_TIMEOUT) {
+        if (actual is SocketTimeoutException) return true
+        actual = actual.cause
+        profundidad++
+    }
+    return false
+}
+
+private const val MAX_CAUSA_TIMEOUT = 8
+
+/**
  * Implementación con `HttpURLConnection`.
  *
  * Cierra el acceso a cualquier host fuera de la lista de GitHub: el manifiesto
@@ -89,6 +117,8 @@ class ClienteHttpOtaUrlConnection(
     private val contextoPruebas: SSLContext? = null,
     private val hostsPermitidos: Set<String> = HOSTS_OTA,
     private val permitirPuertoDePruebas: Boolean = false,
+    private val tiempoConexionMs: Int = TIEMPO_CONEXION_MS,
+    private val tiempoLecturaMs: Int = TIEMPO_LECTURA_MS,
 ) : ClienteHttpOta {
     override suspend fun obtener(
         url: String,
@@ -101,11 +131,19 @@ class ClienteHttpOtaUrlConnection(
                     is Conexion.Abierta -> {
                         val abierta = conexion.conexion
                         try {
+                            val declarado = abierta.contentLengthLong
                             val cuerpo = leerAcotado(abierta, maxBytes)
-                            if (cuerpo == null) {
-                                ResultadoHttp.Fallo(FalloHttp.RESPUESTA_DEMASIADO_GRANDE)
-                            } else {
-                                ResultadoHttp.Exito(cuerpo, abierta.url.toString())
+                            when {
+                                cuerpo == null ->
+                                    ResultadoHttp.Fallo(FalloHttp.RESPUESTA_DEMASIADO_GRANDE)
+                                // Un cuerpo más corto que el declarado es una
+                                // transferencia interrumpida: no es un éxito.
+                                declarado > 0L && cuerpo.size.toLong() != declarado ->
+                                    ResultadoHttp.Fallo(
+                                        FalloHttp.IO,
+                                        "cuerpo incompleto: ${cuerpo.size} de $declarado bytes",
+                                    )
+                                else -> ResultadoHttp.Exito(cuerpo, abierta.url.toString())
                             }
                         } finally {
                             abierta.disconnect()
@@ -268,8 +306,8 @@ class ClienteHttpOtaUrlConnection(
     ): HttpURLConnection {
         val conexion = url.openConnection() as HttpURLConnection
         conexion.instanceFollowRedirects = false
-        conexion.connectTimeout = TIEMPO_CONEXION_MS
-        conexion.readTimeout = TIEMPO_LECTURA_MS
+        conexion.connectTimeout = tiempoConexionMs
+        conexion.readTimeout = tiempoLecturaMs
         conexion.setRequestProperty("Accept-Encoding", "identity")
         conexion.setRequestProperty("User-Agent", AGENTE)
         cabeceras.forEach { (nombre, valor) -> conexion.setRequestProperty(nombre, valor) }
@@ -315,15 +353,6 @@ class ClienteHttpOtaUrlConnection(
         val host = url.host?.lowercase() ?: return false
         return host in hostsPermitidos
     }
-
-    private fun tipoDeError(error: Exception): FalloHttp =
-        when (error) {
-            is SocketTimeoutException -> FalloHttp.TIMEOUT
-            is UnknownHostException, is ConnectException -> FalloHttp.SIN_RED
-            is SSLException -> FalloHttp.TLS
-            is IOException -> FalloHttp.IO
-            else -> FalloHttp.IO
-        }
 
     private sealed interface Conexion {
         class Abierta(val conexion: HttpURLConnection, val codigo: Int) : Conexion

@@ -327,13 +327,28 @@ class ClienteHttpOtaUrlConnection(
     }
 
     private fun tipoDeError(error: Exception): FalloHttp =
-        when (error) {
-            is SocketTimeoutException -> FalloHttp.TIMEOUT
-            is UnknownHostException, is ConnectException -> FalloHttp.SIN_RED
-            is SSLException -> FalloHttp.TLS
-            is IOException -> FalloHttp.IO
+        when {
+            error is SocketTimeoutException || error.tieneCausaTimeout() -> FalloHttp.TIMEOUT
+            error is UnknownHostException || error is ConnectException -> FalloHttp.SIN_RED
+            error is SSLException -> FalloHttp.TLS
             else -> FalloHttp.IO
         }
+
+    /**
+     * Un handshake TLS que expira llega como [SSLException] con la
+     * [SocketTimeoutException] como causa. Sigue siendo un timeout de red —y
+     * por lo tanto reintentable—, no un certificado inválido.
+     */
+    private fun Throwable.tieneCausaTimeout(): Boolean {
+        var actual = cause
+        var profundidad = 0
+        while (actual != null && profundidad < MAX_CAUSA_TIMEOUT) {
+            if (actual is SocketTimeoutException) return true
+            actual = actual.cause
+            profundidad++
+        }
+        return false
+    }
 
     private sealed interface Conexion {
         class Abierta(val conexion: HttpURLConnection, val codigo: Int) : Conexion
@@ -348,6 +363,7 @@ class ClienteHttpOtaUrlConnection(
     private companion object {
         const val TIEMPO_CONEXION_MS = 15_000
         const val TIEMPO_LECTURA_MS = 30_000
+        const val MAX_CAUSA_TIMEOUT = 8
         const val MAX_REDIRECCIONES = 3
         const val MAX_URL = 2048
         const val TAMANO_BLOQUE = 64 * 1024

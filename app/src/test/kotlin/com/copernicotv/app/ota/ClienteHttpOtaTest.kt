@@ -211,8 +211,9 @@ class ClienteHttpOtaTest {
         esperado: FalloHttp,
     ) {
         val resultado = cliente.obtener(url, 1024)
-        assertTrue(resultado is ResultadoHttp.Fallo)
-        assertEquals(esperado, (resultado as ResultadoHttp.Fallo).tipo)
+        assertTrue("se esperaba un fallo para $url, se obtuvo $resultado", resultado is ResultadoHttp.Fallo)
+        val fallo = resultado as ResultadoHttp.Fallo
+        assertEquals("tipo para $url (detalle: ${fallo.detalle})", esperado, fallo.tipo)
     }
 
     private fun clientePruebas(

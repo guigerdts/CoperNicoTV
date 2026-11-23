@@ -206,14 +206,16 @@ class FuenteManifiestosGitHubTest {
     }
 
     @Test
-    fun `un manifiesto vacio con firma valida se rechaza como manifiesto invalido`() {
+    fun `un manifiesto vacio no se acepta aunque su firma sea valida`() {
         val par = parDeClaves()
         val json = ""
         val cliente = clienteCon(listOf(release()), json, firmar(json, par))
 
         val resultado = runBlocking { fuente(cliente, par.public).buscar() }
 
-        assertEquals(FalloFuente.RESPUESTA_INVALIDA, falloDe(resultado).tipo)
+        // El verificador rechaza un documento de cero bytes antes de parsearlo,
+        // así que el resultado es firma inválida y nunca "al día".
+        assertEquals(FalloFuente.FIRMA_INVALIDA, falloDe(resultado).tipo)
     }
 
     @Test

@@ -14,12 +14,15 @@ import java.io.InputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketTimeoutException
 import java.nio.file.Files
 import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLException
 import javax.net.ssl.SSLServerSocket
+import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManagerFactory
 
 /**
@@ -156,7 +159,16 @@ class ClienteHttpOtaTest {
             val servidor = servidorTls()
             val atencion =
                 launch(Dispatchers.IO) {
-                    runCatching { servidor.accept().use { delay(5_000) } }
+                    runCatching {
+                        servidor.accept().use { socket ->
+                            // Completa el handshake y nunca responde la petición:
+                            // el timeout ocurre en la lectura HTTP, así que no
+                            // depende de cómo cada JDK envuelva un handshake
+                            // interrumpido.
+                            (socket as SSLSocket).startHandshake()
+                            delay(5_000)
+                        }
+                    }
                 }
             try {
                 assertFallo(
@@ -204,6 +216,15 @@ class ClienteHttpOtaTest {
                 assertTrue(resultado.reintentable)
             }
         }
+
+    @Test
+    fun `un timeout envuelto en un error TLS se clasifica como timeout`() {
+        val envuelto = SSLException("Read timed out", SocketTimeoutException("Read timed out"))
+
+        assertEquals(FalloHttp.TIMEOUT, tipoDeError(envuelto))
+        assertEquals(FalloHttp.TIMEOUT, tipoDeError(SocketTimeoutException("Read timed out")))
+        assertEquals(FalloHttp.TLS, tipoDeError(SSLException("certificado no confiable")))
+    }
 
     private suspend fun assertFallo(
         cliente: ClienteHttpOta,

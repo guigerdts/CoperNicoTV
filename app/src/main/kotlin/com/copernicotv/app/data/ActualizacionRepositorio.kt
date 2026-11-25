@@ -32,6 +32,8 @@ import com.copernicotv.core.reconciliacion.ResultadoReconciliacion
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.ConnectException
@@ -193,6 +195,9 @@ class ActualizacionRepositorio
                         var nuevas = 0
                         var observaciones = 0
                         for (destino in plan.declaraciones) {
+                            // H-04: punto de cancelación entre declaraciones; la
+                            // transacción se revierte si el trabajo se cancela.
+                            currentCoroutineContext().ensureActive()
                             when (destino.destino) {
                                 DestinoDeclaracion.CANAL_NUEVO -> {
                                     insertarCanal(

@@ -7,6 +7,8 @@ import com.copernicotv.app.data.ResumenActualizacion
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -163,7 +165,8 @@ class CoordinadorActualizacionTest {
 
             assertEquals(ResultadoEjecucion.Coalescido, resultado)
             assertEquals("No se actualizó ninguna Lista", 0, llamadas.get())
-            assertEquals(DecisionEjecucion.EXITO, decisionDe(resultado))
+            // H-04: una ejecución coalescida no hizo trabajo y no es un éxito.
+            assertEquals(DecisionEjecucion.SIN_TRABAJO, decisionDe(resultado))
             assertTrue("El reclamo ajeno no se libera", reclamo.tomado(fuenteId))
         }
     }
@@ -180,6 +183,47 @@ class CoordinadorActualizacionTest {
             assertTrue("Sin Listas no hay nada que reintentar", resultado is ResultadoEjecucion.Fallo)
             assertEquals("sin_listas", (resultado as ResultadoEjecucion.Fallo).motivo)
             assertFalse("El reclamo se libera", reclamo.tomado(fuenteId))
+        }
+    }
+
+    @Test
+    fun `el avance informa todas las listas y empieza en cero`() {
+        runBlocking {
+            val avances = mutableListOf<Pair<Int, Int>>()
+            val coordinador = coordinador { listaId, _ -> exito(listaId) }
+
+            coordinador.ejecutar(fuenteId, CausasActualizacion.MANUAL, 0) { hechos, total ->
+                avances += hechos to total
+            }
+
+            assertEquals("Arranca informando el total", 0 to listas.size, avances.first())
+            assertEquals("Termina con todas hechas", listas.size to listas.size, avances.last())
+            assertEquals("Un aviso por Lista más el inicial", listas.size + 1, avances.size)
+        }
+    }
+
+    @Test
+    fun `una ejecucion cancelada deja de actualizar listas`() {
+        runBlocking {
+            val llamadas = AtomicInteger()
+            val coordinador =
+                coordinador { listaId, _ ->
+                    llamadas.incrementAndGet()
+                    exito(listaId)
+                }
+
+            val trabajo =
+                launch(Dispatchers.Default) {
+                    coordinador.ejecutar(fuenteId, CausasActualizacion.MANUAL, 0) { hechos, _ ->
+                        // Cancela el propio trabajo después de la primera Lista.
+                        if (hechos == 1) cancel()
+                    }
+                }
+            trabajo.join()
+
+            assertTrue("La cancelación se propaga", trabajo.isCancelled)
+            assertEquals("No se actualiza la segunda Lista", 1, llamadas.get())
+            assertFalse("El reclamo se libera igual", reclamo.tomado(fuenteId))
         }
     }
 

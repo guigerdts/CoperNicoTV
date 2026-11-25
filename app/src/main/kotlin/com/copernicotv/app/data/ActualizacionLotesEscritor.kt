@@ -11,6 +11,8 @@ import com.copernicotv.core.m3u.CanalImportadoM3U
 import com.copernicotv.core.m3u.CodecAtributosExtra
 import com.copernicotv.core.reconciliacion.FilaPlan
 import com.copernicotv.core.reconciliacion.ResultadoReconciliacion
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.time.Instant
 
 /**
@@ -38,6 +40,10 @@ internal class ActualizacionLotesEscritor(
     ): Int {
         val estado = EstadoLoteEscritura(db.aparienciaDao().maxOrden(listaId) + 1)
         for (lote in plan.filas.chunked(LOTE_ESCRITURA)) {
+            // H-04: la cancelación de WorkManager se observa entre lotes. Sin
+            // esto, una ejecución cancelada seguía escribiendo el catálogo
+            // completo y bloqueaba el pool durante minutos.
+            currentCoroutineContext().ensureActive()
             aplicarLote(listaId, lote, canalesImportados, ahora, grupos, estado)
             db.canalDao().actualizarTodos(estado.canales)
             db.aparienciaDao().actualizarTodas(estado.aparienciasActualizadas)

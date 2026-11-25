@@ -5,6 +5,8 @@ import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.core.actualizacion.ClaseErrorActualizacion
 import com.copernicotv.core.actualizacion.ClasificacionErroresActualizacion
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.security.GeneralSecurityException
 import java.security.ProviderException
 import javax.inject.Inject
@@ -47,9 +49,16 @@ sealed interface ResultadoEjecucion {
     data object Coalescido : ResultadoEjecucion
 }
 
-/** Decisión que el worker traduce a `Result.success`, `retry` o `failure`. */
+/**
+ * Decisión que el worker traduce a un resultado de WorkManager.
+ *
+ * H-04: `SIN_TRABAJO` no es `EXITO`. Una ejecución coalescida no actualizó
+ * nada y no puede presentarse como una actualización exitosa; el worker lo
+ * publica con su propio código en los datos de salida.
+ */
 enum class DecisionEjecucion {
     EXITO,
+    SIN_TRABAJO,
     REINTENTAR,
     FALLAR,
 }
@@ -57,7 +66,8 @@ enum class DecisionEjecucion {
 /** Traduce el resultado del coordinador a la decisión de WorkManager. */
 fun decisionDe(resultado: ResultadoEjecucion): DecisionEjecucion =
     when (resultado) {
-        is ResultadoEjecucion.Exito, ResultadoEjecucion.Coalescido -> DecisionEjecucion.EXITO
+        is ResultadoEjecucion.Exito -> DecisionEjecucion.EXITO
+        ResultadoEjecucion.Coalescido -> DecisionEjecucion.SIN_TRABAJO
         is ResultadoEjecucion.Reintentar -> DecisionEjecucion.REINTENTAR
         is ResultadoEjecucion.Fallo -> DecisionEjecucion.FALLAR
     }
@@ -89,6 +99,7 @@ class CoordinadorActualizacion
             fuenteId: Long,
             causa: String,
             intento: Int,
+            progreso: ProgresoActualizacion = ProgresoActualizacion.NULO,
         ): ResultadoEjecucion {
             if (!reclamo.reclamar(fuenteId)) return ResultadoEjecucion.Coalescido
             return try {
@@ -96,11 +107,34 @@ class CoordinadorActualizacion
                 if (listas.isEmpty()) {
                     ResultadoEjecucion.Fallo(emptyList(), ERROR_SIN_LISTAS)
                 } else {
-                    decidir(listas.map { lista -> actualizar(lista.id, causa) }, intento)
+                    decidir(procesar(listas.map { it.id }, causa, progreso), intento)
                 }
             } finally {
                 reclamo.liberar(fuenteId)
             }
+        }
+
+        /**
+         * Actualiza cada Lista informando el avance y observando la cancelación.
+         *
+         * `ensureActive` entre Listas convierte una cancelación de WorkManager en
+         * una `CancellationException` real: sin él, una ejecución cancelada
+         * seguía escribiendo hasta terminar el ciclo completo (H-04).
+         */
+        private suspend fun procesar(
+            listaIds: List<Long>,
+            causa: String,
+            progreso: ProgresoActualizacion,
+        ): List<ResumenActualizacion> {
+            val total = listaIds.size
+            progreso.informar(0, total)
+            val resumenes = ArrayList<ResumenActualizacion>(total)
+            listaIds.forEachIndexed { indice, listaId ->
+                currentCoroutineContext().ensureActive()
+                resumenes += actualizar(listaId, causa)
+                progreso.informar(indice + 1, total)
+            }
+            return resumenes
         }
 
         /**

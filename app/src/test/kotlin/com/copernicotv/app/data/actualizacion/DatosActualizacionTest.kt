@@ -3,6 +3,7 @@ package com.copernicotv.app.data.actualizacion
 import androidx.work.Data
 import com.copernicotv.app.data.ResumenActualizacion
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,5 +96,38 @@ class DatosActualizacionTest {
 
         assertEquals(1, resumenes.size)
         assertEquals(2L, resumenes.single().listaId)
+    }
+
+    @Test
+    fun `un cierre sin trabajo se distingue de una actualizacion completada`() {
+        val sinTrabajo = DatosActualizacion.sinTrabajo(7L, CausasActualizacion.AUTOMATICA)
+
+        assertEquals(DatosActualizacion.RESULTADO_SIN_TRABAJO, DatosActualizacion.resultado(sinTrabajo))
+        assertEquals(7L, DatosActualizacion.fuenteId(sinTrabajo))
+        assertTrue("Sin trabajo no hay resumenes", DatosActualizacion.resumenes(sinTrabajo).isEmpty())
+
+        val completada = DatosActualizacion.de(7L, CausasActualizacion.AUTOMATICA, emptyList())
+        assertEquals(DatosActualizacion.RESULTADO_COMPLETADO, DatosActualizacion.resultado(completada))
+        assertNotEquals(
+            DatosActualizacion.resultado(completada),
+            DatosActualizacion.resultado(sinTrabajo),
+        )
+    }
+
+    @Test
+    fun `un cierre fallido conserva sus resumenes parciales`() {
+        val resumenes = listOf(ResumenActualizacion(5L, "fallida", error = "timeout"))
+        val datos = DatosActualizacion.fallo(7L, CausasActualizacion.MANUAL, resumenes)
+
+        assertEquals(DatosActualizacion.RESULTADO_FALLIDO, DatosActualizacion.resultado(datos))
+        assertEquals(resumenes, DatosActualizacion.resumenes(datos))
+    }
+
+    @Test
+    fun `el avance viaja como dos enteros y no filtra texto`() {
+        val datos = DatosActualizacion.progreso(3, 9)
+
+        assertEquals(3 to 9, DatosActualizacion.progreso(datos))
+        assertNull("Sin claves de avance no se adivina", DatosActualizacion.progreso(Data.EMPTY))
     }
 }

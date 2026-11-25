@@ -131,6 +131,9 @@
     <string name="guia_editar">Editar</string>
     <string name="guia_revocar">Revocar</string>
     <string name="guia_editar_titulo">Elegir Canal</string>
+    <string name="guia_editar_buscar">Buscar canal</string>
+    <string name="guia_reintentar">Reintentar</string>
+    <string name="guia_editar_hay_mas">Hay más canales: escriba para acotar la búsqueda</string>
     <string name="guia_cancelar">Cancelar</string>
     <string name="guia_detalle_inicio">Inicio: %1$s</string>
     <string name="guia_detalle_fin">Fin: %1$s</string>

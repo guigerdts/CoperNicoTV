@@ -19,10 +19,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +55,9 @@ const val TAG_GUIA_CARGANDO = "guia-cargando"
 /** Etiqueta del error de carga de la guía. */
 const val TAG_ERROR_GUIA = "error-guia"
 
+/** Etiqueta del botón que reintenta la carga de la guía (H-05). */
+const val TAG_REINTENTAR_GUIA = "reintentar-guia"
+
 /** Etiqueta del estado sin fuentes de guía. */
 const val TAG_SIN_FUENTES_GUIA = "sin-fuentes-guia"
 
@@ -74,6 +79,9 @@ const val TAG_DETALLE_GUIA = "detalle-guia"
 /** Etiqueta del diálogo de edición de Asociación. */
 const val TAG_EDITAR_ASOCIACION = "editar-asociacion"
 
+/** Etiqueta del campo de búsqueda del selector de Asociación (H-05). */
+const val TAG_BUSCAR_CANAL_ASOCIACION = "buscar-canal-asociacion"
+
 /** Etiqueta de una Asociación pendiente. */
 const val TAG_ASOCIACION_PENDIENTE = "asociacion-pendiente"
 
@@ -93,7 +101,11 @@ fun tagAsociacionPendiente(id: Long): String = "$TAG_ASOCIACION_PENDIENTE-$id"
  * temporal paginada (S26). El detalle presenta título, inicio, fin y
  * descripción en hora local (S28). Las Asociaciones pendientes se resuelven sin
  * reasignar programas automáticamente (S27d/S27e).
+ *
+ * Cada parámetro es un evento distinto del contrato de la UI (H-05 añadió la
+ * búsqueda acotada y el reintento); no son configuración agrupable.
  */
+@Suppress("LongParameterList")
 @Composable
 fun GuiaScreen(
     estado: GuiaUiState,
@@ -106,6 +118,8 @@ fun GuiaScreen(
     onConfirmarAsociacion: (Long) -> Unit,
     onEditarAsociacion: (Long, Long) -> Unit,
     onRevocarAsociacion: (Long) -> Unit,
+    onReintentar: () -> Unit,
+    onBuscarCanales: (String) -> Unit,
     onVolver: () -> Unit,
 ) {
     var editarId by remember { mutableStateOf<Long?>(null) }
@@ -120,7 +134,7 @@ fun GuiaScreen(
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             CabeceraGuia(onVolver = onVolver)
             SelectorFuentes(estado = estado, onSeleccionarFuente = onSeleccionarFuente)
-            MensajesGuia(estado = estado)
+            MensajesGuia(estado = estado, onReintentar = onReintentar)
             if (estado.pendientes.isNotEmpty()) {
                 SeccionPendientes(
                     pendientes = estado.pendientes,
@@ -148,6 +162,8 @@ fun GuiaScreen(
     editarId?.let { id ->
         DialogoEditarAsociacion(
             canales = estado.canalesCatalogo,
+            hayMas = estado.hayMasCanales,
+            onBuscar = onBuscarCanales,
             onElegir = { canalId ->
                 onEditarAsociacion(id, canalId)
                 editarId = null
@@ -197,26 +213,48 @@ private fun SelectorFuentes(
 }
 
 @Composable
-private fun MensajesGuia(estado: GuiaUiState) {
+/**
+ * Estado único de la pantalla (H-05).
+ *
+ * Un error y un estado vacío nunca conviven: cuando hay [GuiaUiState.error] se
+ * muestra la causa y un reintento, y los mensajes de «sin fuentes» o «sin
+ * canales» se omiten. Antes los dos aparecían juntos y el usuario no sabía si
+ * la guía estaba vacía o si había fallado.
+ */
+@Composable
+private fun MensajesGuia(
+    estado: GuiaUiState,
+    onReintentar: () -> Unit,
+) {
     if (estado.cargando) {
         Text(
             text = stringResource(R.string.guia_cargando),
             modifier = Modifier.testTag(TAG_GUIA_CARGANDO),
         )
+        return
     }
-    estado.error?.let { codigo ->
+    val error = estado.error
+    if (error != null) {
         Text(
-            text = stringResource(R.string.guia_error, codigo),
+            text = stringResource(R.string.guia_error, error),
             modifier = Modifier.testTag(TAG_ERROR_GUIA),
         )
+        Button(
+            onClick = onReintentar,
+            modifier = Modifier.testTag(TAG_REINTENTAR_GUIA),
+        ) {
+            Text(stringResource(R.string.guia_reintentar))
+        }
+        return
     }
-    if (!estado.cargando && estado.fuentes.isEmpty()) {
+    if (estado.fuentes.isEmpty()) {
         Text(
             text = stringResource(R.string.guia_sin_fuentes),
             modifier = Modifier.testTag(TAG_SIN_FUENTES_GUIA),
         )
+        return
     }
-    if (!estado.cargando && estado.fuentes.isNotEmpty() && estado.canales.isEmpty()) {
+    if (estado.canales.isEmpty()) {
         Text(
             text = stringResource(R.string.guia_sin_canales),
             modifier = Modifier.testTag(TAG_SIN_GUIA),
@@ -409,21 +447,51 @@ private fun DialogoDetalle(
     )
 }
 
+/**
+ * Selector de Canal para editar una Asociación (H-05, S14).
+ *
+ * La lista nunca es el catálogo completo: se consulta acotada y filtrada por la
+ * búsqueda, con 250 ms de agrupación y cancelación de la consulta anterior en el
+ * ViewModel. [hayMas] avisa que conviene seguir escribiendo en vez de desplazar.
+ */
 @Composable
 private fun DialogoEditarAsociacion(
     canales: List<CanalOpcion>,
+    hayMas: Boolean,
+    onBuscar: (String) -> Unit,
     onElegir: (Long) -> Unit,
     onCancelar: () -> Unit,
 ) {
+    var consulta by remember { mutableStateOf("") }
+    // Primera consulta al abrir: el diálogo nunca arranca vacío a la espera de
+    // que el usuario escriba.
+    LaunchedEffect(Unit) { onBuscar("") }
     AlertDialog(
         onDismissRequest = onCancelar,
         modifier = Modifier.testTag(TAG_EDITAR_ASOCIACION),
         title = { Text(stringResource(R.string.guia_editar_titulo)) },
         text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                items(canales, key = { it.id }) { canal ->
-                    TextButton(onClick = { onElegir(canal.id) }) {
-                        Text(canal.nombre ?: stringResource(R.string.guia_canal_sin_nombre))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = consulta,
+                    onValueChange = { texto ->
+                        consulta = texto
+                        onBuscar(texto)
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_BUSCAR_CANAL_ASOCIACION),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.guia_editar_buscar)) },
+                )
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                    items(canales, key = { it.id }) { canal ->
+                        TextButton(onClick = { onElegir(canal.id) }) {
+                            Text(canal.nombre ?: stringResource(R.string.guia_canal_sin_nombre))
+                        }
+                    }
+                    if (hayMas) {
+                        item(key = TAG_EDITAR_ASOCIACION + "-mas") {
+                            Text(stringResource(R.string.guia_editar_hay_mas))
+                        }
                     }
                 }
             }

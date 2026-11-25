@@ -122,6 +122,8 @@ class MainActivity : ComponentActivity() {
                                 onConfirmarAsociacion = guiaViewModel::confirmarAsociacion,
                                 onEditarAsociacion = guiaViewModel::editarAsociacion,
                                 onRevocarAsociacion = guiaViewModel::revocarAsociacion,
+                                onReintentar = guiaViewModel::recargar,
+                                onBuscarCanales = guiaViewModel::buscarCanales,
                                 onVolver = { pantalla = Pantalla.CATALOGO },
                             )
                         }

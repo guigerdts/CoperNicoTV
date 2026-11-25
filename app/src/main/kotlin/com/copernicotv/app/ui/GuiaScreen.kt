@@ -276,7 +276,6 @@ private fun SelectorFuentes(
     }
 }
 
-@Composable
 /**
  * Estado único de la pantalla (H-05).
  *

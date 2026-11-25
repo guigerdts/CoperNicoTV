@@ -122,8 +122,7 @@ class AdministracionGuiaRepositorio
         private val politica: PoliticaReintentoGuia,
     ) {
         /** Guías visibles, sin BLOB de URL ni secretos. */
-        fun observarTodas(): Flow<List<GuiaAdministrada>> =
-            db.fuenteGuiaDao().observarResumenes().map { filas -> filas.map { it.aVista() } }
+        fun observarTodas(): Flow<List<GuiaAdministrada>> = db.fuenteGuiaDao().observarResumenes().map { filas -> filas.map(::aVista) }
 
         /** Alta de una guía manual con URL propia (S7). */
         suspend fun crear(formulario: FormularioGuia): ResultadoGuia =

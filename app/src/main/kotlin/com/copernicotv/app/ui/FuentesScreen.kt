@@ -26,6 +26,9 @@ import com.copernicotv.app.data.ResultadoActualizacionFuente
 /** Etiqueta del botón que vuelve al catálogo. */
 const val TAG_VOLVER_FUENTES = "volver-fuentes"
 
+/** Etiqueta del botón que abre la administración de conexiones IPTV. */
+const val TAG_ABRIR_CONEXIONES = "abrir-conexiones"
+
 /** Etiqueta del indicador de carga de la pantalla. */
 const val TAG_FUENTES_CARGANDO = "fuentes-cargando"
 
@@ -63,6 +66,7 @@ fun tagFuente(
 fun FuentesScreen(
     estado: FuentesUiState,
     onActualizar: (Long) -> Unit,
+    onAbrirConexiones: () -> Unit,
     onVolver: () -> Unit,
 ) {
     Surface(
@@ -90,6 +94,12 @@ fun FuentesScreen(
                 modifier = Modifier.testTag(TAG_VOLVER_FUENTES),
             ) {
                 Text(stringResource(R.string.fuentes_volver))
+            }
+            Button(
+                onClick = onAbrirConexiones,
+                modifier = Modifier.testTag(TAG_ABRIR_CONEXIONES),
+            ) {
+                Text(stringResource(R.string.fuentes_conexiones))
             }
             if (estado.cargando) {
                 Text(

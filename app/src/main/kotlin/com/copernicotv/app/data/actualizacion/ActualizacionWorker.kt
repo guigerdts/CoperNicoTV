@@ -3,8 +3,8 @@ package com.copernicotv.app.data.actualizacion
 import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
-import androidx.work.Data
 import androidx.work.WorkerParameters
+import com.copernicotv.app.data.ResumenActualizacion
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -30,29 +30,35 @@ class ActualizacionWorker
         override suspend fun doWork(): Result {
             val fuenteId = DatosActualizacion.fuenteId(inputData) ?: return Result.failure()
             val causa = DatosActualizacion.causa(inputData) ?: CausasActualizacion.AUTOMATICA
-            val resultado = coordinador.ejecutar(fuenteId, causa, runAttemptCount)
+            // H-04: el avance se publica con `setProgress` para que la UI pueda
+            // mostrar Listas terminadas sobre el total mientras la ejecución corre.
+            val resultado =
+                coordinador.ejecutar(fuenteId, causa, runAttemptCount) { hechos, total ->
+                    setProgress(DatosActualizacion.progreso(hechos, total))
+                }
             return when (decisionDe(resultado)) {
-                DecisionEjecucion.EXITO -> Result.success(datosDe(resultado, fuenteId, causa))
+                DecisionEjecucion.EXITO -> Result.success(DatosActualizacion.de(fuenteId, causa, resumenesDe(resultado)))
+                // H-04: la ejecución no hizo trabajo. WorkManager no tiene un
+                // cuarto estado final, así que se publica `resultado=sin_trabajo`
+                // en los datos de salida y nunca se presenta como actualización
+                // exitosa. El estado SUCCEEDED solo evita un reintento inútil.
+                DecisionEjecucion.SIN_TRABAJO -> Result.success(DatosActualizacion.sinTrabajo(fuenteId, causa))
                 DecisionEjecucion.REINTENTAR -> Result.retry()
-                DecisionEjecucion.FALLAR -> Result.failure(datosDe(resultado, fuenteId, causa))
+                DecisionEjecucion.FALLAR ->
+                    Result.failure(DatosActualizacion.fallo(fuenteId, causa, resumenesDe(resultado)))
             }
         }
 
         /**
-         * Datos de salida del trabajo.
+         * Resúmenes que publica cada desenlace.
          *
-         * Coalescido y Reintentar no publican resultado: en el primer caso lo
-         * publica la ejecución que sí corrió, y en el segundo el resultado
-         * parcial se descarta porque el ciclo aún no terminó.
+         * `Reintentar` no los publica: el ciclo todavía no terminó y la
+         * ejecución que lo cierre será la que informe el resultado final.
          */
-        private fun datosDe(
-            resultado: ResultadoEjecucion,
-            fuenteId: Long,
-            causa: String,
-        ): Data =
+        private fun resumenesDe(resultado: ResultadoEjecucion): List<ResumenActualizacion> =
             when (resultado) {
-                is ResultadoEjecucion.Exito -> DatosActualizacion.de(fuenteId, causa, resultado.resumenes)
-                is ResultadoEjecucion.Fallo -> DatosActualizacion.de(fuenteId, causa, resultado.resumenes)
-                is ResultadoEjecucion.Reintentar, ResultadoEjecucion.Coalescido -> Data.EMPTY
+                is ResultadoEjecucion.Exito -> resultado.resumenes
+                is ResultadoEjecucion.Fallo -> resultado.resumenes
+                is ResultadoEjecucion.Reintentar, ResultadoEjecucion.Coalescido -> emptyList()
             }
     }

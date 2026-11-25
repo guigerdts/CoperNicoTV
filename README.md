@@ -20,7 +20,8 @@ Funcionalidades previstas
 1. Administración de listas
 
 - Importación de listas M3U/M3U8 desde archivos locales y direcciones URL.
-- Gestión de múltiples listas y perfiles de reproducción.
+- Conexiones Xtream Codes administradas como perfiles: servidor, puerto, protocolo, formato de salida y guía opcional, con credenciales cifradas.
+- Gestión de múltiples listas y perfiles de reproducción: alta, edición, prueba de conexión, activación y baja sin perder favoritos, historial ni asociaciones.
 - Actualización manual y automática de listas, con intervalos configurables.
 - Validación de fuentes, manejo de errores y detección de listas inválidas.
 - Procesamiento eficiente de listas grandes.
@@ -51,12 +52,14 @@ Funcionalidades previstas
 
 4. Guía electrónica de programación (EPG)
 
-- Compatibilidad prevista con fuentes XMLTV.
+- Fuentes XMLTV administradas desde la app: alta, edición, baja, activación y URL independiente o asociada a una conexión.
+- Detección de la guía declarada por la lista M3U (`url-tvg`, `x-tvg-url`, `tvg-url`) y prioridad de la URL configurada por el usuario.
 - Programación actual y siguiente para canales con información disponible.
-- Guía de programación con vista temporal.
-- Asociación configurable entre canales y datos de programación.
-- Información sobre títulos, horarios y descripciones de los programas.
-- Actualización de la guía y gestión de datos incompletos.
+- Guía de programación con vista temporal y progreso del programa actual.
+- Asociación configurable entre canales y datos de programación, con propuestas puntuadas y resolución manual de casos ambiguos.
+- Información sobre títulos, horarios, descripciones, categoría, episodio, subtítulo e idioma.
+- Actualización manual y automática configurable, con reintento controlado, diagnóstico del último error y conservación de la última guía válida.
+- Descarga de XMLTV comprimido (gzip) y persistencia por lotes con reemplazo atómico.
 
 5. Experiencia Android TV
 

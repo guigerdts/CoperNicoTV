@@ -24,6 +24,10 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 | F-14 | OTA T6 | Publicación de una segunda versión: detección, notificación y descarga verificada | Pendiente | requiere un release posterior al instalado | mismo doc |
 | F-15 | OTA T6 | Instalación sobre la versión anterior, retorno a la app y conservación de datos | Pendiente | requiere F-13 y F-14 | mismo doc |
 | F-16 | OTA T6 | Caminos de error en dispositivo: manifiesto inválido, firma incompatible, hash incorrecto, APK corrupto, descarga interrumpida y duplicada | Pendiente | requiere un canal de pruebas controlable | mismo doc |
+| F-17 | beta.4 | Conexiones Xtream y M3U: alta, edición, prueba, activación, baja y conservación de favoritos/historial/asociaciones | Pendiente | requiere la APK candidata instalada | `docs/iptv-profesional.md` §3-§4 |
+| F-18 | beta.4 | EPG de punta a punta sin sembrar `FuenteGuia` por DAO: alta, actualización, asociación y Ahora/Siguiente | Pendiente | requiere F-17 | `docs/iptv-profesional.md` §5-§7 |
+| F-19 | beta.4 | H-01/H-02/H-03 en dispositivo: historial real, `font_scale` 1.0/1.3/1.5/2.0 e indicador de scroll | Pendiente | corrección lógica con pruebas JVM; falta verificación física | `docs/iptv-profesional.md` §8 |
+| F-20 | beta.4 | Catálogo grande (100 000+): importar → actualizar sin duplicar filas ni bloquear el pool de SQLite; selector de asociación acotado | Pendiente | requiere la APK candidata y la lista de la campaña | `docs/iptv-profesional.md` §8 (H-04/H-05) |
 
 ## Detalle
 
@@ -107,6 +111,26 @@ Clasificación de niveles: **CI** (automatizada en GitHub Actions) · **Instrume
 - **Procedimiento**: con un canal de pruebas controlable, provocar en orden: manifiesto con un campo faltante, firma modificada, hash de APK alterado, APK truncado, y corte de red a mitad de descarga seguido de reanudación.
 - **Resultado esperado**: cada caso se rechaza con el motivo tipado, no se ofrece instalar, no se corrompe el estado guardado y la descarga interrumpida se reanuda en vez de repetirse desde cero. Una comprobación duplicada no descarga dos veces.
 - **Estado**: pendiente. Requiere un release de pruebas que se pueda alterar sin afectar el canal real.
+
+### F-17 — Conexiones Xtream y M3U — PENDIENTE
+- **Procedimiento**: instalar la APK candidata a `beta.4`; desde `Fuentes → Conexiones` crear una conexión Xtream (servidor, puerto, protocolo, usuario, contraseña y formato de salida) y una M3U con URL de guía opcional. Probar, activar, editar sin reescribir la contraseña, actualizar lista y guía, y eliminar con confirmación.
+- **Resultado esperado**: la prueba informa el estado real; editar conserva favoritos, historial, ocultos y asociaciones; no se muestran credenciales completas; eliminar borra los secretos y no altera la lista activa si había otra.
+- **Estado**: pendiente. La lógica está cubierta por `ConexionRepositorioTest` (9 casos) y `SondaConexion`; no hay evidencia en dispositivo.
+
+### F-18 — EPG administrada de punta a punta — PENDIENTE
+- **Procedimiento**: en un dispositivo sin sembrar datos por DAO, dar de alta una `FuenteGuia` con URL propia y otra asociada a una conexión; ejecutar «Actualizar ahora»; asociar un canal por id y por nombre; abrir la guía y comprobar actual/siguiente, progreso, categoría y episodio; forzar un error (URL caída) y comprobar causa, reintento y que la última guía válida sigue publicada.
+- **Resultado esperado**: el alta es alcanzable desde la UI y persiste; la actualización manual y automática informa resultado y tiempos; un fallo no destruye la guía anterior; la asociación ambigua exige decisión manual.
+- **Estado**: pendiente. Cierra la brecha de H-06, hoy cubierta solo por pruebas JVM y por `GuiaUiTest`, que siembra la fuente por DAO.
+
+### F-19 — H-01/H-02/H-03 en dispositivo — PENDIENTE
+- **Procedimiento**: reproducir un canal, volver al catálogo y comprobar que aparece en «Acceso rápido» una sola vez; repetir sin cerrar sesión para descartar duplicados. Fijar `font_scale` en 1.0, 1.3, 1.5 y 2.0 y revisar selector de lista, filtros, `Mostrar ocultos` y `Ajustes`; comprobar el indicador de contenido desplazable y el foco por D-pad cuando aplique.
+- **Resultado esperado**: el historial se registra una vez por reproducción; a ninguna escala queda un control recortado o inalcanzable sin señal; el indicador aparece solo cuando hay contenido desplazable.
+- **Estado**: pendiente. Las correcciones están implementadas (`RegistroHistorial`, `FlowRow`, `IndicadorDesplazamiento`) y verificadas con pruebas JVM y revisión de composición, no en hardware.
+
+### F-20 — Catálogo grande y selector acotado — PENDIENTE
+- **Procedimiento**: importar una lista de 100 000+ canales y comparar el conteo de Canales con el importado; disparar la actualización automática y medir bloqueo del pool; abrir `Guía` y el selector de asociación, buscar y paginar; forzar el fallo de carga y comprobar un único estado con reintento.
+- **Resultado esperado**: el conteo no se duplica por una actualización de la misma fuente; ninguna pantalla bloquea el pool más de 1 s; el selector no ejecuta `SELECT * FROM Canal` completo; el error y el estado vacío no se muestran a la vez.
+- **Estado**: pendiente. H-04 corrige el reporte falso de éxito y la cancelación; H-05 acota y pagina el selector. La duplicación exacta observada (`totalRows=238469` para 119 532 canales) sigue sin verificación directa.
 
 ### OTA T6 — validación CI de la corrección de clasificación (2026-11-23) — PASS de CI, NO de dispositivo
 

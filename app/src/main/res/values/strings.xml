@@ -53,6 +53,7 @@
     <string name="catalogo_bajar">Bajar</string>
     <string name="catalogo_cerrar">Cerrar</string>
     <string name="catalogo_mostrar_ocultos">Mostrar ocultos</string>
+    <string name="catalogo_desliza_para_mas">Desliza para ver más controles</string>
     <string name="catalogo_oculto">Oculto</string>
     <string name="catalogo_accion_error">No se pudo completar la acción: %1$s</string>
     <string name="catalogo_reintentar">Reintentar</string>
@@ -131,6 +132,9 @@
     <string name="guia_editar">Editar</string>
     <string name="guia_revocar">Revocar</string>
     <string name="guia_editar_titulo">Elegir Canal</string>
+    <string name="guia_editar_buscar">Buscar canal</string>
+    <string name="guia_reintentar">Reintentar</string>
+    <string name="guia_editar_hay_mas">Hay más canales: escriba para acotar la búsqueda</string>
     <string name="guia_cancelar">Cancelar</string>
     <string name="guia_detalle_inicio">Inicio: %1$s</string>
     <string name="guia_detalle_fin">Fin: %1$s</string>
@@ -250,4 +254,109 @@
     <string name="ajustes_fallo_manifiesto">El manifiesto de actualización no es válido.</string>
     <string name="ajustes_fallo_descarga">La descarga no se pudo completar.</string>
     <string name="ajustes_fallo_verificacion">El APK descargado no coincide con el esperado.</string>
+
+    <!-- Administración de conexiones IPTV (S4, S5, S6) -->
+    <string name="fuentes_conexiones">Administrar conexiones</string>
+    <string name="conexiones_titulo">Conexiones IPTV</string>
+    <string name="conexiones_volver">Volver</string>
+    <string name="conexiones_nueva">Nueva conexión</string>
+    <string name="conexiones_cargando">Cargando conexiones…</string>
+    <string name="conexiones_error">No se pudo completar la operación (%1$s).</string>
+    <string name="conexiones_aviso">Resultado: %1$s</string>
+    <string name="conexiones_sin_conexiones">Todavía no hay conexiones.</string>
+    <string name="conexiones_metodo">Método: %1$s</string>
+    <string name="conexiones_metodo_xtream">Xtream Codes</string>
+    <string name="conexiones_metodo_m3u">Lista M3U/M3U8</string>
+    <string name="conexiones_estado">Estado: %1$s</string>
+    <string name="conexiones_estado_sin_probar">sin probar</string>
+    <string name="conexiones_estado_correcta">correcta</string>
+    <string name="conexiones_estado_error">con error</string>
+    <string name="conexiones_estado_actualizando">actualizando</string>
+    <string name="conexiones_activa">Activa</string>
+    <string name="conexiones_inactiva">Inactiva</string>
+    <string name="conexiones_ultimo_resultado">Último resultado: %1$s</string>
+    <string name="conexiones_ultima_lista">Lista actualizada: %1$s</string>
+    <string name="conexiones_ultima_guia">Guía actualizada: %1$s</string>
+    <string name="conexiones_nunca">nunca</string>
+    <string name="conexiones_guia_estado">Guía: %1$s</string>
+    <string name="conexiones_guia_error">Error de guía: %1$s</string>
+    <string name="conexiones_probando">Probando…</string>
+    <string name="conexiones_probar">Probar</string>
+    <string name="conexiones_editar">Editar</string>
+    <string name="conexiones_activar">Activar</string>
+    <string name="conexiones_desactivar">Desactivar</string>
+    <string name="conexiones_actualizar_lista">Actualizar lista</string>
+    <string name="conexiones_actualizar_guia">Actualizar guía</string>
+    <string name="conexiones_eliminar">Eliminar</string>
+    <string name="conexiones_formulario_nueva">Nueva conexión</string>
+    <string name="conexiones_formulario_editar">Editar conexión</string>
+    <string name="conexiones_cancelar">Cancelar</string>
+    <string name="conexiones_guardar">Guardar</string>
+    <string name="conexiones_campo_nombre">Nombre</string>
+    <string name="conexiones_campo_servidor">Servidor</string>
+    <string name="conexiones_campo_puerto">Puerto (opcional)</string>
+    <string name="conexiones_campo_usuario">Usuario</string>
+    <string name="conexiones_campo_contrasena">Contraseña</string>
+    <string name="conexiones_campo_contrasena_conservar">Contraseña (vacía = conservar)</string>
+    <string name="conexiones_campo_url_lista">URL de la lista</string>
+    <string name="conexiones_campo_url_lista_conservar">URL de la lista (vacía = conservar)</string>
+    <string name="conexiones_campo_guia">URL de guía EPG (opcional)</string>
+    <string name="conexiones_campo_automatica">Actualización automática</string>
+    <string name="conexiones_campo_intervalo">Intervalo en horas</string>
+    <string name="conexiones_campo_activa">Conexión activa</string>
+    <string name="conexiones_protocolo_https">HTTPS</string>
+    <string name="conexiones_protocolo_http">HTTP</string>
+    <string name="conexiones_formato_m3u8">M3U8</string>
+    <string name="conexiones_formato_ts">TS</string>
+    <string name="conexiones_guia_actual">Guía actual: %1$s</string>
+    <string name="conexiones_lista_actual">Lista actual: %1$s</string>
+    <string name="conexiones_eliminar_titulo">Eliminar conexión</string>
+    <string name="conexiones_eliminar_mensaje">Se eliminará «%1$s» junto con sus credenciales guardadas. El catálogo importado y los favoritos se conservan.</string>
+    <string name="conexiones_eliminar_confirmar">Eliminar</string>
+
+    <!-- Administración de guías EPG (S7, H-06) -->
+    <string name="guias_titulo">Guías EPG</string>
+    <string name="guias_volver">Volver</string>
+    <string name="guias_nueva">Nueva guía</string>
+    <string name="guias_cargando">Cargando guías…</string>
+    <string name="guias_error">No se pudo completar la operación (%1$s).</string>
+    <string name="guias_aviso">Resultado: %1$s</string>
+    <string name="guias_sin_guias">Todavía no hay guías.</string>
+    <string name="guias_estado">Estado: %1$s</string>
+    <string name="guias_origen">Origen: %1$s</string>
+    <string name="guias_ultima">Última actualización: %1$s</string>
+    <string name="guias_nunca">nunca</string>
+    <string name="guias_asociacion">Conexión: %1$s</string>
+    <string name="guias_sin_conexion">Sin conexión</string>
+    <string name="guias_ultimo_error">Último error: %1$s</string>
+    <string name="guias_intentos">Intentos fallidos: %1$d</string>
+    <string name="guias_reintento_agotado">Reintento automático agotado: use «Actualizar ahora».</string>
+    <string name="guias_activa">Activa</string>
+    <string name="guias_actualizar">Actualizar ahora</string>
+    <string name="guias_editar">Editar</string>
+    <string name="guias_eliminar">Eliminar</string>
+    <string name="guias_formulario_nueva">Nueva guía</string>
+    <string name="guias_formulario_editar">Editar guía</string>
+    <string name="guias_campo_nombre">Nombre</string>
+    <string name="guias_campo_url">URL XMLTV</string>
+    <string name="guias_campo_url_conservar">URL XMLTV (vacía = conservar)</string>
+    <string name="guias_campo_conexion">Conexión asociada</string>
+    <string name="guias_campo_activa">Guía activa</string>
+    <string name="guias_campo_automatica">Actualización automática</string>
+    <string name="guias_campo_intervalo">Intervalo en horas (vacío = 24)</string>
+    <string name="guias_guardar">Guardar</string>
+    <string name="guias_cancelar">Cancelar</string>
+    <string name="guias_eliminar_titulo">Eliminar guía</string>
+    <string name="guias_eliminar_mensaje">Se eliminará «%1$s» y su programación publicada.</string>
+    <string name="guias_eliminar_confirmar">Eliminar</string>
+
+    <!-- Guía EPG: administración, progreso y metadatos (S11) -->
+    <string name="guia_administrar">Administrar guías</string>
+    <string name="guia_categoria">Categoría: %1$s</string>
+    <string name="guia_episodio">Episodio: %1$s</string>
+    <string name="guia_idioma">Idioma: %1$s</string>
+    <string name="guia_progreso">Progreso: %1$d%%</string>
+    <string name="guia_fuente_estado">Fuente: %1$s · última actualización: %2$s</string>
+    <string name="guia_fuente_error">Error de la fuente: %1$s</string>
+    <string name="guia_nunca">nunca</string>
 </resources>

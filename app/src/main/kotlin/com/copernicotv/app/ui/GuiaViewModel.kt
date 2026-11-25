@@ -14,6 +14,8 @@ import com.copernicotv.app.data.db.dao.FuenteGuiaDao
 import com.copernicotv.core.epg.EstadoAsociacion
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +31,10 @@ import javax.inject.Inject
 data class FuenteGuiaOpcion(
     val id: Long,
     val nombre: String,
+    /** Estado de la última actualización: sin actualizar, correcta o con error. */
+    val estado: String,
+    val ultimaActualizacionEn: Instant?,
+    val ultimoErrorCodigo: String?,
 )
 
 /** Estado de la pantalla de Guía (E5-T5). */
@@ -39,6 +45,8 @@ data class GuiaUiState(
     val canales: List<CanalGuiaFila> = emptyList(),
     val pendientes: List<AsociacionVista> = emptyList(),
     val canalesCatalogo: List<CanalOpcion> = emptyList(),
+    /** El selector acotado tiene más resultados que los mostrados (H-05). */
+    val hayMasCanales: Boolean = false,
     val canalSeleccionado: CanalGuia? = null,
     val detalle: ProgramaGuia? = null,
     val error: String? = null,
@@ -146,7 +154,15 @@ class GuiaViewModel
                 _estado.update { it.copy(cargando = true, error = null) }
                 try {
                     val fuentes =
-                        fuenteGuiaDao.todas().map { FuenteGuiaOpcion(it.id, it.nombre) }
+                        fuenteGuiaDao.todas().map {
+                            FuenteGuiaOpcion(
+                                id = it.id,
+                                nombre = it.nombre,
+                                estado = it.estado.orEmpty(),
+                                ultimaActualizacionEn = it.ultimaActualizacionEn,
+                                ultimoErrorCodigo = it.ultimoErrorCodigo,
+                            )
+                        }
                     val seleccionada =
                         _estado.value.fuenteSeleccionadaId
                             ?.takeIf { id -> fuentes.any { it.id == id } }
@@ -167,7 +183,6 @@ class GuiaViewModel
                         } else {
                             emptyList()
                         }
-                    val catalogo = asociaciones.canalesCatalogo()
                     _estado.update {
                         it.copy(
                             cargando = false,
@@ -175,7 +190,6 @@ class GuiaViewModel
                             fuenteSeleccionadaId = seleccionada,
                             canales = canales,
                             pendientes = pendientes,
-                            canalesCatalogo = catalogo,
                             error = null,
                         )
                     }
@@ -187,8 +201,36 @@ class GuiaViewModel
             }
         }
 
+        /**
+         * Búsqueda incremental del selector de Asociación (H-05, S14).
+         *
+         * Cancela la consulta anterior antes de lanzar la siguiente: una
+         * escritura rápida nunca deja resultados viejos compitiendo con los
+         * nuevos. El retardo agrupa pulsaciones y evita una consulta por tecla.
+         */
+        fun buscarCanales(consulta: String) {
+            busqueda?.cancel()
+            busqueda =
+                viewModelScope.launch {
+                    delay(RETARDO_BUSQUEDA_MS)
+                    try {
+                        val pagina = asociaciones.canalesCatalogo(consulta)
+                        _estado.update {
+                            it.copy(canalesCatalogo = pagina.opciones, hayMasCanales = pagina.hayMas)
+                        }
+                    } catch (cancelacion: CancellationException) {
+                        throw cancelacion
+                    } catch (_: Exception) {
+                        _estado.update { it.copy(canalesCatalogo = emptyList(), hayMasCanales = false) }
+                    }
+                }
+        }
+
+        private var busqueda: Job? = null
+
         private companion object {
             const val VENTANA_HORAS = 24L
+            const val RETARDO_BUSQUEDA_MS = 250L
             const val ERROR_CARGA = "guia_carga_fallida"
             const val ERROR_ASOCIACION = "guia_asociacion_fallida"
         }

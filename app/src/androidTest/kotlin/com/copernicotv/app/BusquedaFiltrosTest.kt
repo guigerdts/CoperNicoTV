@@ -66,7 +66,7 @@ class BusquedaFiltrosTest {
         composeRule.onNodeWithTag(TAG_BUSCAR).performTextInput(TEXTO)
         esperarTexto(indice = 0, texto = TEXTO)
 
-        composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performClick()
+        composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performScrollTo().performClick()
         esperarTexto(indice = 0, texto = TEXTO)
         composeRule.onNodeWithTag(PREFIJO_TAG_GRUPO + grupoUno).performScrollTo().performClick()
         esperarTexto(indice = 0, texto = TEXTO)

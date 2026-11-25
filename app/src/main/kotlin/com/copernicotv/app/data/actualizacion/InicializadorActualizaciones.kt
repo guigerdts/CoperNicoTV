@@ -24,6 +24,7 @@ class InicializadorActualizaciones
     @Inject
     constructor(
         private val programador: ProgramadorActualizaciones,
+        private val programadorGuias: ProgramadorGuias,
     ) {
         private val iniciado = AtomicBoolean(false)
 
@@ -39,6 +40,15 @@ class InicializadorActualizaciones
                     throw cancelacion
                 } catch (fallo: Exception) {
                     Log.e(TAG, "No se pudo reconciliar la Actualización automática", fallo)
+                }
+            }
+            alcance.launch {
+                try {
+                    programadorGuias.reconciliar()
+                } catch (cancelacion: CancellationException) {
+                    throw cancelacion
+                } catch (fallo: Exception) {
+                    Log.e(TAG, "No se pudo reconciliar la actualización de guías", fallo)
                 }
             }
         }

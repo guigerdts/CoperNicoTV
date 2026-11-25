@@ -7,6 +7,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -188,6 +190,9 @@ const val TAG_RENOMBRAR_LISTA = "renombrar-lista"
 
 /** Etiqueta del botón para eliminar la Lista activa. */
 const val TAG_ELIMINAR_LISTA = "eliminar-lista"
+
+/** Aviso de que los controles del catálogo siguen teniendo contenido por debajo. */
+const val TAG_MAS_CONTROLES = "mas-controles"
 
 /** Etiqueta del botón para crear un Canal. */
 const val TAG_NUEVO_CANAL = "nuevo-canal"
@@ -416,7 +421,6 @@ fun CatalogoScreen(
     // E7-T3: la rama de layout sigue los breakpoints de ancho de Material en
     // vez de comparar ancho y alto de la pantalla.
     val horizontal = anchoVentana != WindowWidthSizeClass.Compact
-    val configuracion = LocalConfiguration.current
 
     Surface(
         modifier =
@@ -471,34 +475,28 @@ fun CatalogoScreen(
                 )
             }
         } else {
-            // En pantallas bajas los controles no deben dejar sin altura a los
-            // resultados: se acotan y pasan a hacer scroll, y la lista conserva
-            // un mínimo visible para seguir siendo usable. El tope descuenta
-            // solo las barras del sistema: el padding raíz tampoco consume el
-            // teclado, y descontarlo aquí colapsaría la columna de controles
-            // y superpondría los chips con la lista (observado en CI).
-            val densidad = LocalDensity.current
-            val insetsVerticales =
-                with(densidad) {
-                    (
-                        WindowInsets.systemBars.getTop(densidad) +
-                            WindowInsets.systemBars.getBottom(densidad)
-                    ).toDp()
-                }
+            // En pantallas bajas los controles se acotan y hacen scroll; el tope
+            // descuenta solo las barras del sistema (el padding raíz no consume
+            // el teclado, y descontarlo colapsaría los controles sobre la lista).
             val altoMaximoControles =
-                (
-                    configuracion.screenHeightDp.dp - insetsVerticales - 48.dp -
-                        ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp
-                ).coerceAtLeast(0.dp)
+                with(LocalDensity.current) {
+                    val insets =
+                        (WindowInsets.systemBars.getTop(this) + WindowInsets.systemBars.getBottom(this)).toDp()
+                    (
+                        LocalConfiguration.current.screenHeightDp.dp - insets - 48.dp -
+                            ALTO_MINIMO_RESULTADOS_DP.dp - 12.dp
+                    ).coerceAtLeast(0.dp)
+                }
             Column(
                 modifier = Modifier.fillMaxSize().padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                val desplazamientoControles = rememberScrollState()
                 Column(
                     modifier =
                         Modifier
                             .heightIn(max = altoMaximoControles)
-                            .verticalScroll(rememberScrollState()),
+                            .verticalScroll(desplazamientoControles),
                 ) {
                     Controles(
                         estado = estado,
@@ -514,6 +512,7 @@ fun CatalogoScreen(
                         onDialogo = { dialogo = it },
                     )
                 }
+                IndicadorDesplazamiento(desplazamientoControles)
                 Resultados(
                     modo = criterios.modo,
                     resultados = resultados,
@@ -580,16 +579,21 @@ private fun hayFiltrosActivos(criterios: CriteriosBusqueda): Boolean =
         criterios.mostrarOcultos
 
 /** Fila de accesos del catálogo y del toggle de tema (S43, E7-T4). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FilaControles(
     acciones: CatalogoAcciones,
     tema: TemaUi,
     onDialogo: (DialogoCatalogo) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+    // H-02/H-03: con `font_scale` 2.0 una fila con scroll horizontal dejaba
+    // `Ajustes` fuera de la pantalla y sin indicador. Un FlowRow envuelve los
+    // accesos en varias líneas: todo queda visible y alcanzable por D-pad a
+    // cualquier escala, sin depender de un gesto de desplazamiento.
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         TextButton(
             onClick = { onDialogo(DialogoCatalogo.Colecciones) },
@@ -1085,6 +1089,7 @@ private fun DialogoCatalogoActivo(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SelectorLista(
     listas: List<ListaResumen>,
@@ -1095,10 +1100,12 @@ private fun SelectorLista(
     onEliminar: () -> Unit,
 ) {
     var expandido by remember { mutableStateOf(false) }
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        verticalAlignment = Alignment.CenterVertically,
+    // H-02: el selector de lista se cortaba en ambos extremos a escala 2.0.
+    // FlowRow envuelve el nombre de la lista y sus acciones sin recortar nada.
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box {
             TextButton(
@@ -1194,6 +1201,7 @@ private fun textoModo(modo: ModoOrden): Int =
         ModoOrden.RECIENTES -> R.string.catalogo_modo_recientes
     }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FiltrosYOrden(
     criterios: CriteriosBusqueda,
@@ -1205,10 +1213,12 @@ private fun FiltrosYOrden(
     onModo: (ModoOrden) -> Unit,
     onDireccion: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+    // H-02: `Mostrar ocultos` quedaba cortado en el borde derecho a escala 2.0.
+    // FlowRow reparte los filtros en varias líneas y ninguno se recorta.
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         FilterChip(
             selected = criterios.grupoId == null && !criterios.soloFavoritos,
@@ -1444,6 +1454,7 @@ private fun CanalFila(
 }
 
 @Suppress("LongMethod", "LongParameterList")
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DialogoColecciones(
     colecciones: List<ColeccionResumen>,
@@ -1472,9 +1483,10 @@ private fun DialogoColecciones(
                         .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     TextButton(
                         onClick = { mostrarNueva = true },
@@ -1649,6 +1661,7 @@ private fun DialogoAgregarAColeccion(
 }
 
 @Suppress("LongMethod", "LongParameterList")
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DialogoPerfiles(
     perfiles: List<PerfilResumen>,
@@ -1677,9 +1690,10 @@ private fun DialogoPerfiles(
                         .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     TextButton(
                         onClick = { mostrarNuevo = true },

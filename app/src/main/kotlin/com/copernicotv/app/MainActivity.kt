@@ -28,11 +28,15 @@ import com.copernicotv.app.ui.CatalogoAcciones
 import com.copernicotv.app.ui.CatalogoScreen
 import com.copernicotv.app.ui.CatalogoViewModel
 import com.copernicotv.app.ui.ColeccionesUiState
+import com.copernicotv.app.ui.ConexionesScreen
+import com.copernicotv.app.ui.ConexionesViewModel
 import com.copernicotv.app.ui.CoperNicoTheme
 import com.copernicotv.app.ui.FuentesScreen
 import com.copernicotv.app.ui.FuentesViewModel
 import com.copernicotv.app.ui.GuiaScreen
 import com.copernicotv.app.ui.GuiaViewModel
+import com.copernicotv.app.ui.GuiasAdministracionScreen
+import com.copernicotv.app.ui.GuiasAdministracionViewModel
 import com.copernicotv.app.ui.PerfilesUiState
 import com.copernicotv.app.ui.ReproductorScreen
 import com.copernicotv.app.ui.recordarEsTv
@@ -42,7 +46,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Pantallas de la actividad única. */
-private enum class Pantalla { CATALOGO, FUENTES, GUIA, AJUSTES, REPRODUCTOR }
+private enum class Pantalla { CATALOGO, FUENTES, CONEXIONES, GUIA, GUIAS, AJUSTES, REPRODUCTOR }
 
 /** Única actividad del canario de E1-C. */
 @AndroidEntryPoint
@@ -102,7 +106,28 @@ class MainActivity : ComponentActivity() {
                         FuentesScreen(
                             estado = fuentesEstado,
                             onActualizar = fuentesViewModel::actualizar,
+                            onAbrirConexiones = { pantalla = Pantalla.CONEXIONES },
                             onVolver = { pantalla = Pantalla.CATALOGO },
+                        )
+                    }
+                    Pantalla.CONEXIONES -> {
+                        val conexionesViewModel: ConexionesViewModel = hiltViewModel()
+                        val conexionesEstado by conexionesViewModel.estado.collectAsStateWithLifecycle()
+                        ConexionesScreen(
+                            estado = conexionesEstado,
+                            onVolver = { pantalla = Pantalla.FUENTES },
+                            onCrearXtream = conexionesViewModel::crearXtream,
+                            onEditarXtream = conexionesViewModel::editarXtream,
+                            onCrearM3U = conexionesViewModel::crearM3U,
+                            onEditarM3U = conexionesViewModel::editarM3U,
+                            onEliminar = conexionesViewModel::eliminar,
+                            onActivar = conexionesViewModel::activar,
+                            onDesactivar = conexionesViewModel::desactivar,
+                            onProbar = conexionesViewModel::probar,
+                            onActualizarLista = conexionesViewModel::actualizarLista,
+                            onActualizarGuia = conexionesViewModel::actualizarGuia,
+                            onCargarDetalle = conexionesViewModel::cargarDetalle,
+                            onLimpiarDetalle = conexionesViewModel::limpiarDetalle,
                         )
                     }
                     Pantalla.GUIA -> {
@@ -122,9 +147,25 @@ class MainActivity : ComponentActivity() {
                                 onConfirmarAsociacion = guiaViewModel::confirmarAsociacion,
                                 onEditarAsociacion = guiaViewModel::editarAsociacion,
                                 onRevocarAsociacion = guiaViewModel::revocarAsociacion,
+                                onReintentar = guiaViewModel::recargar,
+                                onBuscarCanales = guiaViewModel::buscarCanales,
+                                onAbrirAdministracion = { pantalla = Pantalla.GUIAS },
                                 onVolver = { pantalla = Pantalla.CATALOGO },
                             )
                         }
+                    }
+                    Pantalla.GUIAS -> {
+                        val guiasViewModel: GuiasAdministracionViewModel = hiltViewModel()
+                        val guiasEstado by guiasViewModel.estado.collectAsStateWithLifecycle()
+                        GuiasAdministracionScreen(
+                            estado = guiasEstado,
+                            onVolver = { pantalla = Pantalla.GUIA },
+                            onCrear = guiasViewModel::crear,
+                            onEditar = guiasViewModel::editar,
+                            onEliminar = guiasViewModel::eliminar,
+                            onCambiarActiva = guiasViewModel::cambiarActiva,
+                            onActualizarAhora = guiasViewModel::actualizarAhora,
+                        )
                     }
                     Pantalla.AJUSTES -> {
                         val ajustesViewModel: AjustesViewModel = hiltViewModel()

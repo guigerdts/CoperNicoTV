@@ -6,6 +6,7 @@ import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.IndiceHmacRepositorio
+import com.copernicotv.app.data.SondaConexion
 import com.copernicotv.app.data.TiemposHttp
 import com.copernicotv.app.data.VerificacionCleartext
 import com.copernicotv.app.data.cache.AlmacenCache
@@ -37,6 +38,7 @@ import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.politicaCleartextPermitida
+import com.copernicotv.core.epg.PoliticaReintentoGuia
 import com.copernicotv.core.identity.CaseFolder
 import com.copernicotv.core.identity.CaseFolderCompleto
 import dagger.Module
@@ -50,6 +52,7 @@ import javax.inject.Singleton
 /** Grafo de la aplicación: base Room v1, DAOs y claves de Keystore. */
 @Module
 @InstallIn(SingletonComponent::class)
+@Suppress("TooManyFunctions")
 object AppModule {
     private const val DIRECTORIO_CACHE = "cache-transporte"
 
@@ -60,7 +63,12 @@ object AppModule {
     ): AppDatabase =
         Room
             .databaseBuilder(contexto, AppDatabase::class.java, AppDatabase.NOMBRE)
-            .addMigrations(Migraciones.MIGRACION_1_2, Migraciones.MIGRACION_2_3, Migraciones.MIGRACION_3_4)
+            .addMigrations(
+                Migraciones.MIGRACION_1_2,
+                Migraciones.MIGRACION_2_3,
+                Migraciones.MIGRACION_3_4,
+                Migraciones.MIGRACION_4_5,
+            )
             .addCallback(SembrarEstadoIndiceHmac.callback())
             .build()
 
@@ -142,6 +150,20 @@ object AppModule {
     @Provides
     @Singleton
     fun verificaCleartext(): VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida)
+
+    /** S7: reintento controlado de las guías EPG. */
+    @Provides
+    @Singleton
+    fun politicaReintentoGuia(): PoliticaReintentoGuia = PoliticaReintentoGuia.PREDETERMINADA
+
+    /**
+     * S4: prueba de conexión. Se provee aquí porque sus dos dependencias tienen
+     * valores por defecto y un constructor `@Inject` con todos los parámetros
+     * por defecto choca con el constructor sin argumentos que genera Kotlin.
+     */
+    @Provides
+    @Singleton
+    fun sondaConexion(verificaCleartext: VerificacionCleartext): SondaConexion = SondaConexion(verificaCleartext = verificaCleartext)
 
     @Provides
     @Singleton

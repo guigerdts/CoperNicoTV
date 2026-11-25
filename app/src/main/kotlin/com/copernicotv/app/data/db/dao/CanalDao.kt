@@ -10,6 +10,12 @@ import com.copernicotv.app.data.db.entities.CanalEntity
 import kotlinx.coroutines.flow.Flow
 import java.time.Instant
 
+/** Proyección mínima del selector de Asociación (H-05). */
+data class CanalOpcionProyeccion(
+    val id: Long,
+    val nombre: String?,
+)
+
 @Suppress("TooManyFunctions")
 @Dao
 interface CanalDao {
@@ -78,9 +84,33 @@ interface CanalDao {
     @Query("SELECT * FROM Canal WHERE tvgId IS NOT NULL AND tvgId != '' ORDER BY id")
     suspend fun todosConTvgId(): List<CanalEntity>
 
-    /** Catálogo completo para resolver una Asociación a otro Canal. */
+    /**
+     * Catálogo completo. **No usar en UI** (H-05): materializa todas las filas
+     * y todas las columnas. Queda solo para pruebas instrumentadas y
+     * diagnósticos; el selector de Asociación usa [opcionesDeAsociacion].
+     */
     @Query("SELECT * FROM Canal ORDER BY nombre, id")
     suspend fun todos(): List<CanalEntity>
+
+    /**
+     * Opciones del selector de Asociación: solo `id` y `nombre`, con búsqueda
+     * incremental y un tope de filas (H-05, S14).
+     *
+     * El llamador pide `limite + 1` para saber si hay más resultados sin
+     * ejecutar un `COUNT(*)` adicional.
+     */
+    @Query(
+        """
+        SELECT id, nombre FROM Canal
+        WHERE (:consulta = '' OR nombre LIKE '%' || :consulta || '%')
+        ORDER BY nombre COLLATE NOCASE, id
+        LIMIT :limite
+        """,
+    )
+    suspend fun opcionesDeAsociacion(
+        consulta: String,
+        limite: Int,
+    ): List<CanalOpcionProyeccion>
 
     @Query("SELECT * FROM Canal WHERE fuenteId = :fuenteId AND claveUnicidad = :clave LIMIT 1")
     suspend fun porClaveUnicidad(

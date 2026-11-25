@@ -4,6 +4,7 @@ import com.copernicotv.app.data.actualizacion.CausasActualizacion
 import com.copernicotv.app.data.actualizacion.CoordinadorActualizacion
 import com.copernicotv.app.data.actualizacion.EstadoSolicitud
 import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
+import com.copernicotv.app.data.actualizacion.ProgramadorGuias
 import com.copernicotv.app.data.actualizacion.ResultadoEjecucion
 import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.di.ModuloProgramador
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +37,25 @@ object ModuloProgramadorFalso {
     @Provides
     @Singleton
     fun programador(implementacion: ProgramadorFalso): ProgramadorActualizaciones = implementacion
+
+    /**
+     * Planificador de guías de prueba.
+     *
+     * No encola trabajo real: las pruebas instrumentadas no deben descargar EPG
+     * ni depender de WorkManager. El estado "en curso" siempre está vacío.
+     */
+    @Provides
+    @Singleton
+    fun programadorGuias(): ProgramadorGuias = ProgramadorGuiasFalso
+}
+
+/** Planificador de guías inerte para las pruebas instrumentadas. */
+private object ProgramadorGuiasFalso : ProgramadorGuias {
+    override suspend fun reconciliar() = Unit
+
+    override suspend fun solicitar(fuenteGuiaId: Long) = Unit
+
+    override fun observarEnCurso(): Flow<Set<Long>> = flowOf(emptySet())
 }
 
 /** Planificador síncrono: publica el estado y ejecuta el coordinador en el acto. */

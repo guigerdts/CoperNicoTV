@@ -18,11 +18,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +42,8 @@ import com.copernicotv.app.data.CanalGuia
 import com.copernicotv.app.data.CanalGuiaFila
 import com.copernicotv.app.data.CanalOpcion
 import com.copernicotv.app.data.ProgramaGuia
+import kotlinx.coroutines.delay
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -47,11 +52,17 @@ import java.time.format.FormatStyle
 /** Etiqueta del botón que vuelve al catálogo. */
 const val TAG_VOLVER_GUIA = "volver-guia"
 
+/** Etiqueta del botón que abre la administración de guías (S7, H-06). */
+const val TAG_ADMINISTRAR_GUIAS = "administrar-guias"
+
 /** Etiqueta del indicador de carga de la guía. */
 const val TAG_GUIA_CARGANDO = "guia-cargando"
 
 /** Etiqueta del error de carga de la guía. */
 const val TAG_ERROR_GUIA = "error-guia"
+
+/** Etiqueta del botón que reintenta la carga de la guía (H-05). */
+const val TAG_REINTENTAR_GUIA = "reintentar-guia"
 
 /** Etiqueta del estado sin fuentes de guía. */
 const val TAG_SIN_FUENTES_GUIA = "sin-fuentes-guia"
@@ -74,11 +85,26 @@ const val TAG_DETALLE_GUIA = "detalle-guia"
 /** Etiqueta del diálogo de edición de Asociación. */
 const val TAG_EDITAR_ASOCIACION = "editar-asociacion"
 
+/** Etiqueta del campo de búsqueda del selector de Asociación (H-05). */
+const val TAG_BUSCAR_CANAL_ASOCIACION = "buscar-canal-asociacion"
+
 /** Etiqueta de una Asociación pendiente. */
 const val TAG_ASOCIACION_PENDIENTE = "asociacion-pendiente"
 
 /** Etiqueta de una fila de Canal concreta. */
 fun tagCanalGuia(canalId: Long): String = "$TAG_CANAL_GUIA-$canalId"
+
+/** Etiqueta de la barra de progreso del programa actual de un Canal. */
+const val TAG_PROGRESO_GUIA = "progreso-guia"
+
+/** Etiqueta del estado de la fuente de guía seleccionada. */
+const val TAG_ESTADO_FUENTE_GUIA = "estado-fuente-guia"
+
+/** Etiqueta de la barra de progreso de un Canal concreto. */
+fun tagProgresoGuia(canalId: Long): String = "$TAG_PROGRESO_GUIA-$canalId"
+
+/** Cadencia del reloj que avanza la barra de progreso. */
+private const val INTERVALO_RELOJ_MS = 30_000L
 
 /** Etiqueta de un Programa concreto. */
 fun tagProgramaGuia(programaId: Long): String = "$TAG_PROGRAMA_GUIA-$programaId"
@@ -93,7 +119,11 @@ fun tagAsociacionPendiente(id: Long): String = "$TAG_ASOCIACION_PENDIENTE-$id"
  * temporal paginada (S26). El detalle presenta título, inicio, fin y
  * descripción en hora local (S28). Las Asociaciones pendientes se resuelven sin
  * reasignar programas automáticamente (S27d/S27e).
+ *
+ * Cada parámetro es un evento distinto del contrato de la UI (H-05 añadió la
+ * búsqueda acotada y el reintento); no son configuración agrupable.
  */
+@Suppress("LongParameterList")
 @Composable
 fun GuiaScreen(
     estado: GuiaUiState,
@@ -106,9 +136,21 @@ fun GuiaScreen(
     onConfirmarAsociacion: (Long) -> Unit,
     onEditarAsociacion: (Long, Long) -> Unit,
     onRevocarAsociacion: (Long) -> Unit,
+    onReintentar: () -> Unit,
+    onBuscarCanales: (String) -> Unit,
+    onAbrirAdministracion: () -> Unit,
     onVolver: () -> Unit,
 ) {
     var editarId by remember { mutableStateOf<Long?>(null) }
+    // Reloj de la vista: la barra de progreso del programa actual avanza sin
+    // depender de que llegue una emisión nueva de la guía.
+    var ahora by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(INTERVALO_RELOJ_MS)
+            ahora = Instant.now()
+        }
+    }
     Surface(
         modifier =
             Modifier
@@ -118,9 +160,12 @@ fun GuiaScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            CabeceraGuia(onVolver = onVolver)
+            CabeceraGuia(
+                onVolver = onVolver,
+                onAbrirAdministracion = onAbrirAdministracion,
+            )
             SelectorFuentes(estado = estado, onSeleccionarFuente = onSeleccionarFuente)
-            MensajesGuia(estado = estado)
+            MensajesGuia(estado = estado, onReintentar = onReintentar)
             if (estado.pendientes.isNotEmpty()) {
                 SeccionPendientes(
                     pendientes = estado.pendientes,
@@ -131,7 +176,11 @@ fun GuiaScreen(
             }
             val seleccionado = estado.canalSeleccionado
             if (seleccionado == null) {
-                ListaCanales(canales = estado.canales, onAbrirCanal = onAbrirCanal)
+                ListaCanales(
+                    canales = estado.canales,
+                    ahora = ahora,
+                    onAbrirCanal = onAbrirCanal,
+                )
             } else {
                 VistaCanal(
                     canal = seleccionado,
@@ -148,6 +197,8 @@ fun GuiaScreen(
     editarId?.let { id ->
         DialogoEditarAsociacion(
             canales = estado.canalesCatalogo,
+            hayMas = estado.hayMasCanales,
+            onBuscar = onBuscarCanales,
             onElegir = { canalId ->
                 onEditarAsociacion(id, canalId)
                 editarId = null
@@ -158,7 +209,10 @@ fun GuiaScreen(
 }
 
 @Composable
-private fun CabeceraGuia(onVolver: () -> Unit) {
+private fun CabeceraGuia(
+    onVolver: () -> Unit,
+    onAbrirAdministracion: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -168,6 +222,12 @@ private fun CabeceraGuia(onVolver: () -> Unit) {
             modifier = Modifier.testTag(TAG_VOLVER_GUIA),
         ) {
             Text(stringResource(R.string.guia_volver))
+        }
+        Button(
+            onClick = onAbrirAdministracion,
+            modifier = Modifier.testTag(TAG_ADMINISTRAR_GUIAS),
+        ) {
+            Text(stringResource(R.string.guia_administrar))
         }
         Text(
             text = stringResource(R.string.guia_titulo),
@@ -194,29 +254,70 @@ private fun SelectorFuentes(
             )
         }
     }
+    // Estado de la fuente seleccionada: última actualización y último error, sin
+    // mezclarlo con el estado de carga de la pantalla.
+    estado.fuentes.firstOrNull { it.id == estado.fuenteSeleccionadaId }?.let { fuente ->
+        Text(
+            text =
+                stringResource(
+                    R.string.guia_fuente_estado,
+                    fuente.estado,
+                    fuente.ultimaActualizacionEn?.let(::fechaLocal) ?: stringResource(R.string.guia_nunca),
+                ),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.testTag(TAG_ESTADO_FUENTE_GUIA),
+        )
+        fuente.ultimoErrorCodigo?.let { codigo ->
+            Text(
+                text = stringResource(R.string.guia_fuente_error, codigo),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
 }
 
+/**
+ * Estado único de la pantalla (H-05).
+ *
+ * Un error y un estado vacío nunca conviven: cuando hay [GuiaUiState.error] se
+ * muestra la causa y un reintento, y los mensajes de «sin fuentes» o «sin
+ * canales» se omiten. Antes los dos aparecían juntos y el usuario no sabía si
+ * la guía estaba vacía o si había fallado.
+ */
 @Composable
-private fun MensajesGuia(estado: GuiaUiState) {
+private fun MensajesGuia(
+    estado: GuiaUiState,
+    onReintentar: () -> Unit,
+) {
     if (estado.cargando) {
         Text(
             text = stringResource(R.string.guia_cargando),
             modifier = Modifier.testTag(TAG_GUIA_CARGANDO),
         )
+        return
     }
-    estado.error?.let { codigo ->
+    val error = estado.error
+    if (error != null) {
         Text(
-            text = stringResource(R.string.guia_error, codigo),
+            text = stringResource(R.string.guia_error, error),
             modifier = Modifier.testTag(TAG_ERROR_GUIA),
         )
+        Button(
+            onClick = onReintentar,
+            modifier = Modifier.testTag(TAG_REINTENTAR_GUIA),
+        ) {
+            Text(stringResource(R.string.guia_reintentar))
+        }
+        return
     }
-    if (!estado.cargando && estado.fuentes.isEmpty()) {
+    if (estado.fuentes.isEmpty()) {
         Text(
             text = stringResource(R.string.guia_sin_fuentes),
             modifier = Modifier.testTag(TAG_SIN_FUENTES_GUIA),
         )
+        return
     }
-    if (!estado.cargando && estado.fuentes.isNotEmpty() && estado.canales.isEmpty()) {
+    if (estado.canales.isEmpty()) {
         Text(
             text = stringResource(R.string.guia_sin_canales),
             modifier = Modifier.testTag(TAG_SIN_GUIA),
@@ -248,6 +349,7 @@ private fun SeccionPendientes(
 @Composable
 private fun ColumnScope.ListaCanales(
     canales: List<CanalGuiaFila>,
+    ahora: Instant,
     onAbrirCanal: (CanalGuia) -> Unit,
 ) {
     LazyColumn(
@@ -256,7 +358,11 @@ private fun ColumnScope.ListaCanales(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(canales, key = { it.canal.canalId }) { fila ->
-            FilaCanal(fila = fila, onAbrir = { onAbrirCanal(fila.canal) })
+            FilaCanal(
+                fila = fila,
+                ahora = ahora,
+                onAbrir = { onAbrirCanal(fila.canal) },
+            )
         }
     }
 }
@@ -309,6 +415,7 @@ private fun ColumnScope.VistaCanal(
 @Composable
 private fun FilaCanal(
     fila: CanalGuiaFila,
+    ahora: Instant,
     onAbrir: () -> Unit,
 ) {
     Column(
@@ -327,6 +434,23 @@ private fun FilaCanal(
         Text(
             text = stringResource(R.string.guia_ahora, fila.actual?.titulo ?: stringResource(R.string.guia_sin_programa)),
         )
+        fila.actual?.let { programa ->
+            programa.categoria?.takeIf { it.isNotBlank() }?.let { categoria ->
+                Text(
+                    text = stringResource(R.string.guia_categoria, categoria),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            val fraccion = fraccionTranscurrida(programa.inicio, programa.fin, ahora)
+            LinearProgressIndicator(
+                progress = { fraccion },
+                modifier = Modifier.fillMaxWidth().testTag(tagProgresoGuia(fila.canal.canalId)),
+            )
+            Text(
+                text = stringResource(R.string.guia_progreso, (fraccion * 100).toInt()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         Text(
             text = stringResource(R.string.guia_siguiente, fila.siguiente?.titulo ?: stringResource(R.string.guia_sin_programa)),
         )
@@ -347,7 +471,22 @@ private fun FilaPrograma(
                 .testTag(tagProgramaGuia(programa.id)),
     ) {
         Text(text = programa.titulo, style = MaterialTheme.typography.titleSmall)
+        programa.subtitulo?.takeIf { it.isNotBlank() }?.let { subtitulo ->
+            Text(text = subtitulo, style = MaterialTheme.typography.bodySmall)
+        }
         Text(text = rangoLocal(programa.inicio, programa.fin))
+        programa.categoria?.takeIf { it.isNotBlank() }?.let { categoria ->
+            Text(
+                text = stringResource(R.string.guia_categoria, categoria),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        programa.episodeNum?.takeIf { it.isNotBlank() }?.let { episodio ->
+            Text(
+                text = stringResource(R.string.guia_episodio, episodio),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         programa.descripcion?.takeIf { it.isNotBlank() }?.let { descripcion ->
             Text(text = descripcion, style = MaterialTheme.typography.bodySmall)
         }
@@ -392,8 +531,20 @@ private fun DialogoDetalle(
         title = { Text(programa.titulo) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                programa.subtitulo?.takeIf { it.isNotBlank() }?.let { subtitulo ->
+                    Text(text = subtitulo, style = MaterialTheme.typography.bodyMedium)
+                }
                 Text(stringResource(R.string.guia_detalle_inicio, fechaLocal(programa.inicio)))
                 Text(stringResource(R.string.guia_detalle_fin, fechaLocal(programa.fin)))
+                programa.categoria?.takeIf { it.isNotBlank() }?.let { categoria ->
+                    Text(stringResource(R.string.guia_categoria, categoria))
+                }
+                programa.episodeNum?.takeIf { it.isNotBlank() }?.let { episodio ->
+                    Text(stringResource(R.string.guia_episodio, episodio))
+                }
+                programa.idioma?.takeIf { it.isNotBlank() }?.let { idioma ->
+                    Text(stringResource(R.string.guia_idioma, idioma))
+                }
                 Text(stringResource(R.string.guia_detalle_descripcion))
                 Text(
                     text =
@@ -409,21 +560,51 @@ private fun DialogoDetalle(
     )
 }
 
+/**
+ * Selector de Canal para editar una Asociación (H-05, S14).
+ *
+ * La lista nunca es el catálogo completo: se consulta acotada y filtrada por la
+ * búsqueda, con 250 ms de agrupación y cancelación de la consulta anterior en el
+ * ViewModel. [hayMas] avisa que conviene seguir escribiendo en vez de desplazar.
+ */
 @Composable
 private fun DialogoEditarAsociacion(
     canales: List<CanalOpcion>,
+    hayMas: Boolean,
+    onBuscar: (String) -> Unit,
     onElegir: (Long) -> Unit,
     onCancelar: () -> Unit,
 ) {
+    var consulta by remember { mutableStateOf("") }
+    // Primera consulta al abrir: el diálogo nunca arranca vacío a la espera de
+    // que el usuario escriba.
+    LaunchedEffect(Unit) { onBuscar("") }
     AlertDialog(
         onDismissRequest = onCancelar,
         modifier = Modifier.testTag(TAG_EDITAR_ASOCIACION),
         title = { Text(stringResource(R.string.guia_editar_titulo)) },
         text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
-                items(canales, key = { it.id }) { canal ->
-                    TextButton(onClick = { onElegir(canal.id) }) {
-                        Text(canal.nombre ?: stringResource(R.string.guia_canal_sin_nombre))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = consulta,
+                    onValueChange = { texto ->
+                        consulta = texto
+                        onBuscar(texto)
+                    },
+                    modifier = Modifier.fillMaxWidth().testTag(TAG_BUSCAR_CANAL_ASOCIACION),
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.guia_editar_buscar)) },
+                )
+                LazyColumn(modifier = Modifier.heightIn(max = 320.dp)) {
+                    items(canales, key = { it.id }) { canal ->
+                        TextButton(onClick = { onElegir(canal.id) }) {
+                            Text(canal.nombre ?: stringResource(R.string.guia_canal_sin_nombre))
+                        }
+                    }
+                    if (hayMas) {
+                        item(key = TAG_EDITAR_ASOCIACION + "-mas") {
+                            Text(stringResource(R.string.guia_editar_hay_mas))
+                        }
                     }
                 }
             }
@@ -439,6 +620,18 @@ private fun rangoLocal(
     inicio: Instant,
     fin: Instant,
 ): String = "${horaLocal(inicio)}–${horaLocal(fin)}"
+
+/** Fracción transcurrida del programa actual, acotada al rango [0, 1]. */
+private fun fraccionTranscurrida(
+    inicio: Instant,
+    fin: Instant,
+    ahora: Instant,
+): Float {
+    val total = Duration.between(inicio, fin).toMillis()
+    if (total <= 0L) return 0f
+    val transcurrido = Duration.between(inicio, ahora).toMillis()
+    return (transcurrido.toDouble() / total).coerceIn(0.0, 1.0).toFloat()
+}
 
 private fun horaLocal(instante: Instant): String =
     DateTimeFormatter

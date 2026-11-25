@@ -256,6 +256,11 @@ class ParserXmltv(
         val finTexto = parser.getAttributeValue(null, "stop")
         var titulo: String? = null
         var descripcion: String? = null
+        var subtitulo: String? = null
+        var categoria: String? = null
+        var episodeNum: String? = null
+        var episodeNumOnscreen: String? = null
+        var idioma: String? = null
         var profundidad = 1
         while (profundidad > 0) {
             if (cancelacion()) return ResultadoElemento.Cancelado
@@ -265,14 +270,38 @@ class ParserXmltv(
                     when (parser.name) {
                         "title" -> {
                             if (titulo == null) {
+                                if (idioma == null) idioma = parser.getAttributeValue(null, "lang")
                                 titulo = parser.nextText()
                                 profundidad--
                             }
                         }
                         "desc" -> {
                             if (descripcion == null) {
+                                if (idioma == null) idioma = parser.getAttributeValue(null, "lang")
                                 descripcion = parser.nextText()
                                 profundidad--
+                            }
+                        }
+                        "sub-title" -> {
+                            if (subtitulo == null) {
+                                subtitulo = parser.nextText()
+                                profundidad--
+                            }
+                        }
+                        "category" -> {
+                            if (categoria == null) {
+                                categoria = parser.nextText()
+                                profundidad--
+                            }
+                        }
+                        "episode-num" -> {
+                            val sistema = parser.getAttributeValue(null, "system")
+                            val valor = parser.nextText()
+                            profundidad--
+                            if (sistema.equals("onscreen", ignoreCase = true)) {
+                                if (episodeNumOnscreen == null) episodeNumOnscreen = valor
+                            } else if (episodeNum == null) {
+                                episodeNum = valor
                             }
                         }
                     }
@@ -324,6 +353,13 @@ class ParserXmltv(
                 inicio = inicio,
                 fin = fin,
                 descripcion = descripcionLimpia,
+                subtitulo = subtitulo?.trim()?.takeIf { it.isNotEmpty() },
+                categoria = categoria?.trim()?.takeIf { it.isNotEmpty() },
+                episodeNum =
+                    (episodeNumOnscreen ?: episodeNum)
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() },
+                idioma = idioma?.trim()?.takeIf { it.isNotEmpty() },
             ),
         )
         return ResultadoElemento.Consumido

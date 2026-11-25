@@ -43,6 +43,27 @@ interface ListaDao {
         actualizadoEn: Instant,
     ): Int
 
+    /**
+     * Reemplaza la ubicación de una Lista existente sin tocar su identidad.
+     *
+     * Es la edición de una conexión (S5): cambia la URL, nunca la Lista, así que
+     * favoritos, historial, ocultos y asociaciones siguen apuntando a los mismos
+     * canales de la misma fuente.
+     */
+    @Query(
+        """
+        UPDATE Lista SET ubicacionCifrada = :ubicacionCifrada, ubicacionHmac = :ubicacionHmac,
+            esquema = :esquema, actualizadoEn = :actualizadoEn WHERE id = :id
+        """,
+    )
+    suspend fun actualizarUbicacion(
+        id: Long,
+        ubicacionCifrada: ByteArray,
+        ubicacionHmac: ByteArray,
+        esquema: String,
+        actualizadoEn: Instant,
+    ): Int
+
     @Query("DELETE FROM Lista WHERE id = :id")
     suspend fun eliminar(id: Long): Int
 

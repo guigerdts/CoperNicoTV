@@ -3,6 +3,8 @@ package com.copernicotv.app.di
 import android.content.Context
 import androidx.work.WorkManager
 import com.copernicotv.app.data.actualizacion.ProgramadorActualizaciones
+import com.copernicotv.app.data.actualizacion.ProgramadorGuias
+import com.copernicotv.app.data.actualizacion.ProgramadorGuiasWorkManager
 import com.copernicotv.app.data.actualizacion.ProgramadorWorkManager
 import dagger.Module
 import dagger.Provides
@@ -39,4 +41,15 @@ object ModuloProgramador {
     @Provides
     @Singleton
     fun programador(implementacion: ProgramadorWorkManager): ProgramadorActualizaciones = implementacion
+
+    /**
+     * Planificador de guías EPG.
+     *
+     * Se expone como [ProgramadorGuias] para que las pruebas instrumentadas
+     * sustituyan este módulo completo sin arrastrar el binding de
+     * `WorkManager`, que no puede inicializarse bajo `HiltTestApplication`.
+     */
+    @Provides
+    @Singleton
+    fun programadorGuias(implementacion: ProgramadorGuiasWorkManager): ProgramadorGuias = implementacion
 }

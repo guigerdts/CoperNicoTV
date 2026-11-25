@@ -10,6 +10,7 @@ import com.copernicotv.app.data.db.dao.CacheXmltvDao
 import com.copernicotv.app.data.db.dao.CanalDao
 import com.copernicotv.app.data.db.dao.ColeccionCanalDao
 import com.copernicotv.app.data.db.dao.ColeccionDao
+import com.copernicotv.app.data.db.dao.ConexionDao
 import com.copernicotv.app.data.db.dao.DetalleAusenciaDao
 import com.copernicotv.app.data.db.dao.DiagnosticoDao
 import com.copernicotv.app.data.db.dao.EstadoActualizacionDao
@@ -38,6 +39,7 @@ import com.copernicotv.app.data.db.entities.CacheXmltvEntity
 import com.copernicotv.app.data.db.entities.CanalEntity
 import com.copernicotv.app.data.db.entities.ColeccionCanalEntity
 import com.copernicotv.app.data.db.entities.ColeccionEntity
+import com.copernicotv.app.data.db.entities.ConexionEntity
 import com.copernicotv.app.data.db.entities.DetalleAusenciaEntity
 import com.copernicotv.app.data.db.entities.EstadoActualizacionEntity
 import com.copernicotv.app.data.db.entities.EstadoIndiceHmacEntity
@@ -60,17 +62,19 @@ import com.copernicotv.app.data.db.entities.ProgramaEntity
 import com.copernicotv.app.data.db.entities.SesionDiagnosticoEntity
 
 /**
- * Room v3. Contiene las 26 tablas de §6.3.1 más las dos del diagnóstico
- * persistente de reproducción (E7-T10, S6a): `SesionDiagnostico` y
- * `EventoDiagnostico`. La migración 1→2 solo crea tablas nuevas; la 2→3
- * añade a `SesionDiagnostico` las columnas de la pista de video detectada
- * (E7-T10 T7).
+ * Room v5. Contiene las 28 tablas de §6.3.1 y del diagnóstico persistente de
+ * reproducción, más `Conexion` (gestión de conexiones IPTV).
  *
- * `exportSchema` deja el JSON versionado en `app/schemas` para que las pruebas
- * de esquema y las migraciones futuras tengan una referencia real.
+ * Cambios de la v5, todos aditivos:
+ * - Tabla `Conexion`: perfiles Xtream Codes y M3U/M3U8 con secretos cifrados.
+ * - `FuenteGuia`: origen, estado, conexión administradora, última actualización
+ *   y último error.
+ * - `Programa`: subtítulo, categoría, `episode-num` e idioma.
+ *
+ * Ninguna fila existente se altera ni se pierde.
  */
 @Database(
-    version = 4,
+    version = 5,
     exportSchema = true,
     entities = [
         FuenteEntity::class,
@@ -101,6 +105,7 @@ import com.copernicotv.app.data.db.entities.SesionDiagnosticoEntity
         HmacPendienteEntity::class,
         SesionDiagnosticoEntity::class,
         EventoDiagnosticoEntity::class,
+        ConexionEntity::class,
     ],
 )
 @TypeConverters(Converters::class)
@@ -158,6 +163,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun perfilDao(): PerfilDao
 
     abstract fun indicadoresFuenteDao(): IndicadoresFuenteDao
+
+    abstract fun conexionDao(): ConexionDao
 
     companion object {
         const val NOMBRE = "copernicotv.db"

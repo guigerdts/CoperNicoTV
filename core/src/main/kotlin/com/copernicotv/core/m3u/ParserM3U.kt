@@ -101,8 +101,20 @@ data class ResultadoParserM3U(
     val lineasLeidas: Long = 0,
     /** Bloques `#EXTINF` encontrados, incluidos los sin URL o de línea excedida (S28). */
     val extinfEncontrados: Long = 0,
+    /**
+     * URLs de guía declaradas en la cabecera (`url-tvg`, `x-tvg-url`,
+     * `tvg-url`), en orden de aparición y sin duplicados.
+     *
+     * La lista puede venir vacía: su ausencia no es un error y la aplicación no
+     * debe asumir que existe una guía embebida.
+     */
+    val urlsGuia: List<String> = emptyList(),
 ) {
     fun diagnostico(codigo: CodigoM3U): DiagnosticoM3U? = diagnosticos.firstOrNull { it.codigo == codigo }
+
+    /** Primera guía declarada por la lista, o `null` si no declara ninguna. */
+    val urlGuia: String?
+        get() = urlsGuia.firstOrNull()
 
     val errores: List<DiagnosticoM3U>
         get() = diagnosticos.filter { it.severidad == SeveridadM3U.ERROR }

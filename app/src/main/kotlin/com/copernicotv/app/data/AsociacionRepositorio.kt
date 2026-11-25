@@ -20,6 +20,12 @@ data class CanalOpcion(
     val nombre: String?,
 )
 
+/** Página acotada de opciones de Canal para el selector (H-05). */
+data class PaginaCanales(
+    val opciones: List<CanalOpcion>,
+    val hayMas: Boolean,
+)
+
 /** Asociación con el nombre del Canal para la pantalla de resolución. */
 data class AsociacionVista(
     val id: Long,
@@ -61,8 +67,24 @@ class AsociacionRepositorio
                 fila.aVista(db.canalDao().porId(fila.canalId)?.nombre)
             }
 
-        /** Catálogo de Canales para editar el destino de una Asociación. */
-        suspend fun canalesCatalogo(): List<CanalOpcion> = db.canalDao().todos().map { CanalOpcion(it.id, it.nombre) }
+        /**
+         * Opciones del selector de destino de una Asociación.
+         *
+         * H-05: consulta acotada y con solo `id`/`nombre`; nunca materializa el
+         * catálogo completo. [hayMas] permite ofrecer «seguir escribiendo» en
+         * lugar de una lista sin fin.
+         */
+        suspend fun canalesCatalogo(
+            consulta: String = "",
+            limite: Int = LIMITE_CATALOGO,
+        ): PaginaCanales {
+            val tope = limite.coerceIn(1, LIMITE_CATALOGO)
+            val filas = db.canalDao().opcionesDeAsociacion(consulta.trim(), tope + 1)
+            return PaginaCanales(
+                opciones = filas.take(tope).map { CanalOpcion(it.id, it.nombre) },
+                hayMas = filas.size > tope,
+            )
+        }
 
         suspend fun confirmar(id: Long): AsociacionVista? =
             mutar(id) { existente, ahora ->
@@ -111,6 +133,11 @@ class AsociacionRepositorio
                         requiereClaveHmac = false,
                     ),
             )
+        }
+
+        private companion object {
+            /** Tope de filas del selector; suficiente para buscar y elegir. */
+            const val LIMITE_CATALOGO = 50
         }
 
         private fun AsociacionEntity.aModelo(): AsociacionActual =

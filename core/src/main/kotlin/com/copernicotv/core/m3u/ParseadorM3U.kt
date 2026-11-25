@@ -17,6 +17,7 @@ internal class ParseadorM3U(
 ) {
     private val diagnosticos = AgregadorDiagnosticos(limites.maxMuestrasUbicacion)
     private val entradas = ArrayList<EntradaM3U>()
+    private val urlsGuia = LinkedHashSet<String>()
     private var pendiente: Pendiente? = null
     private var descartada = false
     private var cabeceraEvaluada = false
@@ -38,6 +39,7 @@ internal class ParseadorM3U(
             diagnosticos = diagnosticos.resultado(),
             lineasLeidas = numeroLinea,
             extinfEncontrados = extinfEncontrados,
+            urlsGuia = urlsGuia.toList(),
         )
     }
 
@@ -60,6 +62,7 @@ internal class ParseadorM3U(
 
     private fun procesarTexto(texto: String) {
         if (texto.isBlank()) return
+        capturarGuiaDeCabecera(texto)
         evaluarCabecera(texto)
         if (esExtinf(texto)) {
             abrirEntrada(texto)
@@ -71,6 +74,29 @@ internal class ParseadorM3U(
             return
         }
         cerrarConUrl(texto)
+    }
+
+    /**
+     * Captura las guías declaradas en la cabecera `#EXTM3U`.
+     *
+     * Claves reconocidas: `url-tvg`, `x-tvg-url` y `tvg-url` (las tres
+     * variantes en uso). Un valor puede traer varias URLs separadas por coma.
+     * Su ausencia no genera diagnóstico: la guía es opcional y la aplicación no
+     * debe asumir que la lista trae una.
+     */
+    private fun capturarGuiaDeCabecera(texto: String) {
+        if (!texto.startsWith(CABECERA, ignoreCase = true)) return
+        val cursor = CursorExtinf(texto.substring(CABECERA.length))
+        while (cursor.puedeLeerPar()) {
+            val par = cursor.leerPar()
+            if (par != null && par.clave.lowercase(Locale.ROOT) in CLAVES_GUIA) {
+                par.valor
+                    .split(',')
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .forEach { urlsGuia.add(it) }
+            }
+        }
     }
 
     private fun evaluarCabecera(texto: String) {
@@ -153,6 +179,7 @@ internal class ParseadorM3U(
         const val CABECERA = "#EXTM3U"
         const val EXTINF = "#EXTINF"
         const val EXTGRP = "#EXTGRP"
+        val CLAVES_GUIA = setOf("url-tvg", "x-tvg-url", "tvg-url")
     }
 }
 

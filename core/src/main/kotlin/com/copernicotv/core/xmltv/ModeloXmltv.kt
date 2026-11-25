@@ -22,6 +22,17 @@ data class ProgramaXmltv(
     val inicio: Instant,
     val fin: Instant,
     val descripcion: String?,
+    /** `<sub-title>`: segunda línea del título, sin el título principal. */
+    val subtitulo: String? = null,
+    /** Primera `<category>` declarada. */
+    val categoria: String? = null,
+    /**
+     * `<episode-num>` en su forma más legible disponible: `onscreen` si el
+     * documento la declara, o el primer valor crudo si solo hay `xmltv_ns`.
+     */
+    val episodeNum: String? = null,
+    /** Idioma del programa: atributo `lang` del título, o del `desc` si falta. */
+    val idioma: String? = null,
 )
 
 /** Errores recuperables de un elemento XMLTV. */

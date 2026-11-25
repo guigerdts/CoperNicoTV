@@ -155,6 +155,15 @@ object AppModule {
     @Singleton
     fun politicaReintentoGuia(): PoliticaReintentoGuia = PoliticaReintentoGuia.PREDETERMINADA
 
+    /**
+     * S4: prueba de conexión. Se provee aquí porque sus dos dependencias tienen
+     * valores por defecto y un constructor `@Inject` con todos los parámetros
+     * por defecto choca con el constructor sin argumentos que genera Kotlin.
+     */
+    @Provides
+    @Singleton
+    fun sondaConexion(verificaCleartext: VerificacionCleartext): SondaConexion = SondaConexion(verificaCleartext = verificaCleartext)
+
     @Provides
     @Singleton
     fun repositorioCache(

@@ -12,8 +12,6 @@ import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.URL
 import java.net.UnknownHostException
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /** Códigos estables de la prueba de conexión; nunca incluyen datos del servidor. */
 object CodigosSonda {
@@ -49,10 +47,12 @@ data class ResultadoSonda(
  * `HttpURLConnection` aceptaría cualquier destino. Del cuerpo solo lee una
  * muestra acotada: alcanza para reconocer la cabecera `#EXTM3U` de una lista o
  * el `"auth":0` de `player_api.php` sin descargar el catálogo completo.
+ *
+ * La instancia la provee `AppModule`: con todos los parámetros por defecto,
+ * Kotlin genera además un constructor sin argumentos y Hilt rechaza dos
+ * constructores inyectables en el mismo tipo.
  */
-@Singleton
 class SondaConexion
-    @Inject
     constructor(
         private val tiempos: TiemposHttp = TiemposHttp(),
         private val verificaCleartext: VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida),

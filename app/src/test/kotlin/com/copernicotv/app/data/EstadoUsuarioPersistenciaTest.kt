@@ -397,7 +397,7 @@ class EstadoUsuarioPersistenciaTest {
             ocultaciones.mostrarGrupo(grupoId)
 
             assertEquals(antes, esquema())
-            assertEquals(4, db.openHelper.readableDatabase.version)
+            assertEquals(5, db.openHelper.readableDatabase.version)
         }
     }
 

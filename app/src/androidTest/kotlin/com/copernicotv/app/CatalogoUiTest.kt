@@ -138,7 +138,7 @@ class CatalogoUiTest {
             runBlocking { db.favoritoDao().existe(canalIds[0]) > 0 }
         }
 
-        composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performClick()
+        composeRule.onNodeWithTag(TAG_FILTRO_FAVORITOS).performScrollTo().performClick()
         esperarTagAusente(PREFIJO_TAG_CANAL + 1, descripcion = "el filtro Favoritos descarta el canal 1")
         // Paging invalida y vuelve a emitir al aplicar el filtro: comprobar la
         // presencia sin esperar puede caer en la emisión vacía intermedia.
@@ -151,11 +151,11 @@ class CatalogoUiTest {
             runBlocking { db.ocultacionCanalDao().existe(canalIds[0]) > 0 }
         }
 
-        composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performClick()
+        composeRule.onNodeWithTag(TAG_FILTRO_TODOS).performScrollTo().performClick()
         esperarHasta(descripcion = "el filtro Todos deja de mostrar el canal 0 oculto") {
             composeRule.onAllNodesWithText("Canal A").fetchSemanticsNodes().isEmpty()
         }
-        composeRule.onNodeWithTag(TAG_FILTRO_OCULTOS).performClick()
+        composeRule.onNodeWithTag(TAG_FILTRO_OCULTOS).performScrollTo().performClick()
         // Paging conserva la emisión anterior mientras aplica «mostrar ocultos»:
         // esperar el canal 0 no garantiza que ya sea el canal oculto. La insignia
         // «Oculto» es la señal de que la nueva emisión llegó.
@@ -183,7 +183,7 @@ class CatalogoUiTest {
             composeRule.onAllNodesWithText("Lista: Lista UI").fetchSemanticsNodes().isNotEmpty()
         }
 
-        composeRule.onNodeWithTag(TAG_NUEVO_CANAL).performClick()
+        composeRule.onNodeWithTag(TAG_NUEVO_CANAL).performScrollTo().performClick()
         esperarTag(TAG_DIALOGO_URL)
         composeRule.onNodeWithTag(TAG_DIALOGO_NOMBRE).performTextInput("Canal UI")
         composeRule.onNodeWithTag(TAG_DIALOGO_URL).performTextInput("https://example.com/ui.m3u8")

@@ -48,6 +48,51 @@ interface FuenteGuiaDao {
         ahora: Instant,
     ): Int
 
+    /** Guía administrada por una conexión (`conexionId`), si existe. */
+    @Query("SELECT * FROM FuenteGuia WHERE conexionId = :conexionId ORDER BY id LIMIT 1")
+    suspend fun porConexion(conexionId: Long): FuenteGuiaEntity?
+
+    /**
+     * Guía que la propia conexión creó (`origen` `xtream` o `m3u`).
+     *
+     * Una guía `manual` puede estar vinculada a la misma conexión; no se toca
+     * al editar el perfil porque la administra el usuario por separado.
+     */
+    @Query(
+        "SELECT * FROM FuenteGuia WHERE conexionId = :conexionId AND origen IN ('xtream', 'm3u') " +
+            "ORDER BY id LIMIT 1",
+    )
+    suspend fun porConexionAdministrada(conexionId: Long): FuenteGuiaEntity?
+
+    /**
+     * Reescribe la URL de una guía administrada por una conexión.
+     *
+     * El estado vuelve a `sin_actualizar`: la URL cambió, así que la guía
+     * publicada ya no corresponde a la fuente y la próxima ejecución debe
+     * intentarlo de nuevo antes de declararla vigente.
+     */
+    @Query(
+        """
+        UPDATE FuenteGuia SET urlCifrada = :urlCifrada, urlHmac = :urlHmac, origen = :origen,
+            estado = 'sin_actualizar', ultimoErrorCodigo = NULL, ultimoErrorMensaje = NULL,
+            actualizadoEn = :ahora WHERE id = :id
+        """,
+    )
+    suspend fun actualizarUrlDesdeConexion(
+        id: Long,
+        urlCifrada: ByteArray?,
+        urlHmac: ByteArray?,
+        origen: String,
+        ahora: Instant,
+    ): Int
+
+    /** Desvincula las guías de una conexión sin borrarlas. */
+    @Query("UPDATE FuenteGuia SET conexionId = NULL, actualizadoEn = :ahora WHERE conexionId = :conexionId")
+    suspend fun desvincularConexion(
+        conexionId: Long,
+        ahora: Instant,
+    ): Int
+
     @Query("DELETE FROM FuenteGuia WHERE id = :id")
     suspend fun eliminar(id: Long): Int
 

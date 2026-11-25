@@ -48,6 +48,8 @@ object Migraciones {
                         "`actualizacionAutomatica` INTEGER NOT NULL, " +
                         "`intervaloHoras` INTEGER NOT NULL, " +
                         "`estado` TEXT NOT NULL, " +
+                        "`fuenteId` INTEGER, " +
+                        "`listaId` INTEGER, " +
                         "`ultimoMensaje` TEXT, " +
                         "`ultimoCodigo` TEXT, " +
                         "`listaActualizadaEn` INTEGER, " +

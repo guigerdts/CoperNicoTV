@@ -48,6 +48,15 @@ data class ConexionEntity(
     val intervaloHoras: Long,
     /** Código de `EstadoConexion`; nunca texto libre traducido. */
     val estado: String,
+    /**
+     * Fuente y Lista que materializan esta conexión en el catálogo existente.
+     *
+     * Nulas mientras la conexión nunca se activó. La Lista se reutiliza en cada
+     * edición para conservar favoritos, historial, ocultos y asociaciones: una
+     * actualización nunca crea una Lista nueva (S5).
+     */
+    val fuenteId: Long? = null,
+    val listaId: Long? = null,
     val ultimoMensaje: String? = null,
     val ultimoCodigo: String? = null,
     val listaActualizadaEn: Instant? = null,

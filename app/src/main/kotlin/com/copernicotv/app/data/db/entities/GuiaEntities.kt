@@ -6,7 +6,10 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 
-@Entity(tableName = "FuenteGuia")
+@Entity(
+    tableName = "FuenteGuia",
+    indices = [Index("conexionId")],
+)
 data class FuenteGuiaEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val nombre: String,

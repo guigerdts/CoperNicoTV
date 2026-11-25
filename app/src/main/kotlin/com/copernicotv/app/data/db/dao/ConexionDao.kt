@@ -29,6 +29,7 @@ data class ConexionResumen(
  * sobres cifrados ni obligan a descifrar para pintar la pantalla.
  */
 @Dao
+@Suppress("TooManyFunctions")
 interface ConexionDao {
     @Insert
     suspend fun insertar(fila: ConexionEntity): Long
@@ -38,6 +39,18 @@ interface ConexionDao {
 
     @Query("SELECT * FROM Conexion WHERE nombre = :nombre LIMIT 1")
     suspend fun porNombre(nombre: String): ConexionEntity?
+
+    @Query("SELECT * FROM Conexion WHERE fuenteId = :fuenteId LIMIT 1")
+    suspend fun porFuente(fuenteId: Long): ConexionEntity?
+
+    /**
+     * Fuentes que declararon no actualizarse automáticamente.
+     *
+     * El programador las excluye y cancela su trabajo periódico; el intervalo
+     * global no las reactiva, porque la decisión es del perfil y no del ritmo.
+     */
+    @Query("SELECT fuenteId FROM Conexion WHERE actualizacionAutomatica = 0 AND fuenteId IS NOT NULL")
+    suspend fun fuentesSinActualizacionAutomatica(): List<Long>
 
     @Query(
         """
@@ -167,6 +180,35 @@ interface ConexionDao {
     @Query("UPDATE Conexion SET activa = 0, actualizadoEn = :ahora WHERE id != :id")
     suspend fun desactivarTodasExcepto(
         id: Long,
+        ahora: Instant,
+    ): Int
+
+    @Query("UPDATE Conexion SET activa = 1, actualizadoEn = :ahora WHERE id = :id")
+    suspend fun marcarActiva(
+        id: Long,
+        ahora: Instant,
+    ): Int
+
+    @Query("UPDATE Conexion SET activa = 0, actualizadoEn = :ahora WHERE id = :id")
+    suspend fun marcarInactiva(
+        id: Long,
+        ahora: Instant,
+    ): Int
+
+    /**
+     * Vincula la conexión con la Fuente y la Lista que la materializan.
+     *
+     * Se fija después de insertarlas porque la conexión necesita el `id` de
+     * ambas, y ambas necesitan el `id` de la conexión solo para la guía. La
+     * Lista se conserva en cada edición (S5).
+     */
+    @Query(
+        "UPDATE Conexion SET fuenteId = :fuenteId, listaId = :listaId, actualizadoEn = :ahora WHERE id = :id",
+    )
+    suspend fun fijarCatalogo(
+        id: Long,
+        fuenteId: Long,
+        listaId: Long,
         ahora: Instant,
     ): Int
 

@@ -318,6 +318,9 @@ internal val ESQUEMA_NORMATIVO_V1: Map<String, TablaNormativa> =
                         texto("ultimo_error_codigo", nula = true),
                         texto("ultimo_error_mensaje", nula = true),
                         entero("intentos_fallidos", nula = true),
+                        entero("activa", nula = true),
+                        entero("actualizacion_automatica", nula = true),
+                        entero("intervalo_horas", nula = true),
                     ),
             ),
         "GeneracionGuia" to

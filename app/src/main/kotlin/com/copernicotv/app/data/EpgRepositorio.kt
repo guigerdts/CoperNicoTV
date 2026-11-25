@@ -393,6 +393,10 @@ class EpgRepositorio
                 inicio = inicio,
                 fin = fin,
                 descripcion = descripcion,
+                subtitulo = subtitulo,
+                categoria = categoria,
+                episodeNum = episodeNum,
+                idioma = idioma,
             )
 
         private fun AsociacionEntity.aModelo(): AsociacionActual =

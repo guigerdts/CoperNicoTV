@@ -20,8 +20,9 @@ object Migraciones {
      *   (`passwordCifrada`, URL de lista y de guía) son BLOB cifrados con
      *   Android Keystore; ninguna columna guarda texto plano.
      * - `FuenteGuia`: origen, estado, conexión administradora, última
-     *   actualización y último error. Todas las columnas nuevas son nulables
-     *   para que las filas existentes sobrevivan sin valor por defecto.
+     *   actualización, último error, activación, actualización automática e
+     *   intervalo propio. Todas las columnas nuevas son nulables para que las
+     *   filas existentes sobrevivan sin valor por defecto.
      * - `Programa`: subtítulo, categoría, `episode-num` e idioma.
      *
      * Es una migración aditiva: no se recrean tablas ni se tocan filas.
@@ -67,6 +68,9 @@ object Migraciones {
                 db.execSQL("ALTER TABLE `FuenteGuia` ADD COLUMN `ultimoErrorCodigo` TEXT")
                 db.execSQL("ALTER TABLE `FuenteGuia` ADD COLUMN `ultimoErrorMensaje` TEXT")
                 db.execSQL("ALTER TABLE `FuenteGuia` ADD COLUMN `intentosFallidos` INTEGER")
+                db.execSQL("ALTER TABLE `FuenteGuia` ADD COLUMN `activa` INTEGER")
+                db.execSQL("ALTER TABLE `FuenteGuia` ADD COLUMN `actualizacionAutomatica` INTEGER")
+                db.execSQL("ALTER TABLE `FuenteGuia` ADD COLUMN `intervaloHoras` INTEGER")
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_FuenteGuia_conexionId` " +
                         "ON `FuenteGuia` (`conexionId`)",

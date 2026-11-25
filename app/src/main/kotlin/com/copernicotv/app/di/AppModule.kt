@@ -37,6 +37,7 @@ import com.copernicotv.app.data.db.dao.OcultacionGrupoDao
 import com.copernicotv.app.data.db.dao.PerfilDao
 import com.copernicotv.app.data.db.dao.ReconstruccionHmacDao
 import com.copernicotv.app.data.politicaCleartextPermitida
+import com.copernicotv.core.epg.PoliticaReintentoGuia
 import com.copernicotv.core.identity.CaseFolder
 import com.copernicotv.core.identity.CaseFolderCompleto
 import dagger.Module
@@ -50,6 +51,7 @@ import javax.inject.Singleton
 /** Grafo de la aplicación: base Room v1, DAOs y claves de Keystore. */
 @Module
 @InstallIn(SingletonComponent::class)
+@Suppress("TooManyFunctions")
 object AppModule {
     private const val DIRECTORIO_CACHE = "cache-transporte"
 
@@ -147,6 +149,11 @@ object AppModule {
     @Provides
     @Singleton
     fun verificaCleartext(): VerificacionCleartext = VerificacionCleartext(::politicaCleartextPermitida)
+
+    /** S7: reintento controlado de las guías EPG. */
+    @Provides
+    @Singleton
+    fun politicaReintentoGuia(): PoliticaReintentoGuia = PoliticaReintentoGuia.PREDETERMINADA
 
     @Provides
     @Singleton

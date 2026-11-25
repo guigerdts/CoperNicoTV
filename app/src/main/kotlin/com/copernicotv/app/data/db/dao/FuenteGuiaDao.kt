@@ -4,13 +4,38 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import com.copernicotv.app.data.db.entities.FuenteGuiaEntity
+import kotlinx.coroutines.flow.Flow
 import java.time.Instant
+
+/**
+ * Vista administrativa de una guía: sin BLOB de URL ni secretos.
+ *
+ * Los campos nulos del esquema se normalizan aquí (activa, automática,
+ * intervalo, intentos) para que la interfaz no repita la interpretación.
+ */
+data class FuenteGuiaResumen(
+    val id: Long,
+    val nombre: String,
+    val origen: String?,
+    val estado: String?,
+    val conexionId: Long?,
+    val ultimaActualizacionEn: Instant?,
+    val ultimoErrorCodigo: String?,
+    val ultimoErrorMensaje: String?,
+    val intentosFallidos: Long?,
+    val activa: Boolean?,
+    val actualizacionAutomatica: Boolean?,
+    val intervaloHoras: Long?,
+    val generacionPublicadaId: Long?,
+    val urlPresente: Boolean,
+)
 
 /**
  * Fuentes de guía EPG.
  *
  * La tabla existía desde el esquema v1 sin DAO. Se añade el mínimo que la
- * fusión de Canales necesita para satisfacer la FK de `Asociacion`.
+ * fusión de Canales necesita para satisfacer la FK de `Asociacion`, más la
+ * administración de guías de S7.
  */
 @Dao
 interface FuenteGuiaDao {
@@ -98,4 +123,108 @@ interface FuenteGuiaDao {
 
     @Query("SELECT COUNT(*) FROM FuenteGuia")
     suspend fun contar(): Int
+
+    /** Guías visibles para administración, sin BLOB ni secretos. */
+    @Query(
+        """
+        SELECT id, nombre, origen, estado, conexionId, ultimaActualizacionEn,
+            ultimoErrorCodigo, ultimoErrorMensaje, intentosFallidos, activa,
+            actualizacionAutomatica, intervaloHoras, generacionPublicadaId,
+            urlCifrada IS NOT NULL AS urlPresente
+        FROM FuenteGuia
+        ORDER BY nombre COLLATE NOCASE, id
+        """,
+    )
+    fun observarResumenes(): Flow<List<FuenteGuiaResumen>>
+
+    /** Guías activas; `activa` nulo equivale a activa. */
+    @Query("SELECT * FROM FuenteGuia WHERE COALESCE(activa, 1) = 1 ORDER BY id")
+    suspend fun activas(): List<FuenteGuiaEntity>
+
+    /** Guías activas con actualización automática y URL disponible. */
+    @Query(
+        """
+        SELECT * FROM FuenteGuia
+        WHERE COALESCE(activa, 1) = 1
+            AND COALESCE(actualizacionAutomatica, 0) = 1
+            AND urlCifrada IS NOT NULL
+        ORDER BY id
+        """,
+    )
+    suspend fun automaticas(): List<FuenteGuiaEntity>
+
+    /**
+     * Registra el desenlace de una actualización.
+     *
+     * `intentosFallidos` es la fuente de verdad del reintento controlado: el
+     * éxito lo vuelve a cero y el fallo lo incrementa.
+     */
+    @Query(
+        """
+        UPDATE FuenteGuia SET estado = :estado, ultimaActualizacionEn = :ultimaActualizacionEn,
+            ultimoErrorCodigo = :codigo, ultimoErrorMensaje = :mensaje,
+            intentosFallidos = :intentos, actualizadoEn = :ahora
+        WHERE id = :id
+        """,
+    )
+    suspend fun fijarEstado(
+        id: Long,
+        estado: String,
+        ultimaActualizacionEn: Instant?,
+        codigo: String?,
+        mensaje: String?,
+        intentos: Long,
+        ahora: Instant,
+    ): Int
+
+    @Query("UPDATE FuenteGuia SET activa = :activa, actualizadoEn = :ahora WHERE id = :id")
+    suspend fun cambiarActiva(
+        id: Long,
+        activa: Boolean,
+        ahora: Instant,
+    ): Int
+
+    /** Vincula o desvincula la guía de una conexión sin tocar su URL. */
+    @Query("UPDATE FuenteGuia SET conexionId = :conexionId, actualizadoEn = :ahora WHERE id = :id")
+    suspend fun cambiarConexion(
+        id: Long,
+        conexionId: Long?,
+        ahora: Instant,
+    ): Int
+
+    @Query(
+        """
+        UPDATE FuenteGuia SET nombre = :nombre, actualizacionAutomatica = :automatica,
+            intervaloHoras = :intervaloHoras, actualizadoEn = :ahora
+        WHERE id = :id
+        """,
+    )
+    suspend fun actualizarConfiguracion(
+        id: Long,
+        nombre: String,
+        automatica: Boolean,
+        intervaloHoras: Long?,
+        ahora: Instant,
+    ): Int
+
+    /**
+     * Reescribe la URL de una guía editada a mano.
+     *
+     * Como en la edición desde una conexión, el estado vuelve a
+     * `sin_actualizar`: la guía publicada ya no corresponde a la fuente.
+     */
+    @Query(
+        """
+        UPDATE FuenteGuia SET urlCifrada = :urlCifrada, urlHmac = :urlHmac,
+            estado = 'sin_actualizar', ultimoErrorCodigo = NULL, ultimoErrorMensaje = NULL,
+            intentosFallidos = 0, actualizadoEn = :ahora
+        WHERE id = :id
+        """,
+    )
+    suspend fun actualizarUrl(
+        id: Long,
+        urlCifrada: ByteArray,
+        urlHmac: ByteArray,
+        ahora: Instant,
+    ): Int
 }

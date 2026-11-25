@@ -23,6 +23,14 @@ data class ProgramaGuia(
     val inicio: Instant,
     val fin: Instant,
     val descripcion: String?,
+    /** `<sub-title>`: segunda línea del título (S11). */
+    val subtitulo: String? = null,
+    /** Primera `<category>` declarada (S11). */
+    val categoria: String? = null,
+    /** `<episode-num>` legible, si el documento lo declara. */
+    val episodeNum: String? = null,
+    /** Idioma declarado por el título o la descripción. */
+    val idioma: String? = null,
 )
 
 /** Canal con una Asociación confirmada y generación publicada. */
@@ -176,6 +184,10 @@ class GuiaRepositorio
                 inicio = inicio,
                 fin = fin,
                 descripcion = descripcion,
+                subtitulo = subtitulo,
+                categoria = categoria,
+                episodeNum = episodeNum,
+                idioma = idioma,
             )
 
         private companion object {

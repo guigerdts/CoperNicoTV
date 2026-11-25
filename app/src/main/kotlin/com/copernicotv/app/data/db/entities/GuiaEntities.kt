@@ -34,6 +34,12 @@ data class FuenteGuiaEntity(
     val ultimoErrorMensaje: String? = null,
     /** Reintentos fallidos consecutivos; nulo equivale a 0. */
     val intentosFallidos: Long? = null,
+    /** Guía activa para actualizaciones; nulo equivale a activa. */
+    val activa: Boolean? = true,
+    /** Actualización automática configurable; nulo equivale a desactivada. */
+    val actualizacionAutomatica: Boolean? = false,
+    /** Intervalo propio en horas; nulo usa el intervalo global de guías. */
+    val intervaloHoras: Long? = null,
 ) {
     companion object {
         const val ORIGEN_MANUAL: String = "manual"

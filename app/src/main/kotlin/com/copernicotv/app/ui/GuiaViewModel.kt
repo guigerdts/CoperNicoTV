@@ -31,6 +31,10 @@ import javax.inject.Inject
 data class FuenteGuiaOpcion(
     val id: Long,
     val nombre: String,
+    /** Estado de la última actualización: sin actualizar, correcta o con error. */
+    val estado: String,
+    val ultimaActualizacionEn: Instant?,
+    val ultimoErrorCodigo: String?,
 )
 
 /** Estado de la pantalla de Guía (E5-T5). */
@@ -150,7 +154,15 @@ class GuiaViewModel
                 _estado.update { it.copy(cargando = true, error = null) }
                 try {
                     val fuentes =
-                        fuenteGuiaDao.todas().map { FuenteGuiaOpcion(it.id, it.nombre) }
+                        fuenteGuiaDao.todas().map {
+                            FuenteGuiaOpcion(
+                                id = it.id,
+                                nombre = it.nombre,
+                                estado = it.estado.orEmpty(),
+                                ultimaActualizacionEn = it.ultimaActualizacionEn,
+                                ultimoErrorCodigo = it.ultimoErrorCodigo,
+                            )
+                        }
                     val seleccionada =
                         _estado.value.fuenteSeleccionadaId
                             ?.takeIf { id -> fuentes.any { it.id == id } }

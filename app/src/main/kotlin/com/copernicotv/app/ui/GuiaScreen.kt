@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -41,6 +42,8 @@ import com.copernicotv.app.data.CanalGuia
 import com.copernicotv.app.data.CanalGuiaFila
 import com.copernicotv.app.data.CanalOpcion
 import com.copernicotv.app.data.ProgramaGuia
+import kotlinx.coroutines.delay
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -48,6 +51,9 @@ import java.time.format.FormatStyle
 
 /** Etiqueta del botón que vuelve al catálogo. */
 const val TAG_VOLVER_GUIA = "volver-guia"
+
+/** Etiqueta del botón que abre la administración de guías (S7, H-06). */
+const val TAG_ADMINISTRAR_GUIAS = "administrar-guias"
 
 /** Etiqueta del indicador de carga de la guía. */
 const val TAG_GUIA_CARGANDO = "guia-cargando"
@@ -88,6 +94,18 @@ const val TAG_ASOCIACION_PENDIENTE = "asociacion-pendiente"
 /** Etiqueta de una fila de Canal concreta. */
 fun tagCanalGuia(canalId: Long): String = "$TAG_CANAL_GUIA-$canalId"
 
+/** Etiqueta de la barra de progreso del programa actual de un Canal. */
+const val TAG_PROGRESO_GUIA = "progreso-guia"
+
+/** Etiqueta del estado de la fuente de guía seleccionada. */
+const val TAG_ESTADO_FUENTE_GUIA = "estado-fuente-guia"
+
+/** Etiqueta de la barra de progreso de un Canal concreto. */
+fun tagProgresoGuia(canalId: Long): String = "$TAG_PROGRESO_GUIA-$canalId"
+
+/** Cadencia del reloj que avanza la barra de progreso. */
+private const val INTERVALO_RELOJ_MS = 30_000L
+
 /** Etiqueta de un Programa concreto. */
 fun tagProgramaGuia(programaId: Long): String = "$TAG_PROGRAMA_GUIA-$programaId"
 
@@ -120,9 +138,19 @@ fun GuiaScreen(
     onRevocarAsociacion: (Long) -> Unit,
     onReintentar: () -> Unit,
     onBuscarCanales: (String) -> Unit,
+    onAbrirAdministracion: () -> Unit,
     onVolver: () -> Unit,
 ) {
     var editarId by remember { mutableStateOf<Long?>(null) }
+    // Reloj de la vista: la barra de progreso del programa actual avanza sin
+    // depender de que llegue una emisión nueva de la guía.
+    var ahora by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(INTERVALO_RELOJ_MS)
+            ahora = Instant.now()
+        }
+    }
     Surface(
         modifier =
             Modifier
@@ -132,7 +160,10 @@ fun GuiaScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            CabeceraGuia(onVolver = onVolver)
+            CabeceraGuia(
+                onVolver = onVolver,
+                onAbrirAdministracion = onAbrirAdministracion,
+            )
             SelectorFuentes(estado = estado, onSeleccionarFuente = onSeleccionarFuente)
             MensajesGuia(estado = estado, onReintentar = onReintentar)
             if (estado.pendientes.isNotEmpty()) {
@@ -145,7 +176,11 @@ fun GuiaScreen(
             }
             val seleccionado = estado.canalSeleccionado
             if (seleccionado == null) {
-                ListaCanales(canales = estado.canales, onAbrirCanal = onAbrirCanal)
+                ListaCanales(
+                    canales = estado.canales,
+                    ahora = ahora,
+                    onAbrirCanal = onAbrirCanal,
+                )
             } else {
                 VistaCanal(
                     canal = seleccionado,
@@ -174,7 +209,10 @@ fun GuiaScreen(
 }
 
 @Composable
-private fun CabeceraGuia(onVolver: () -> Unit) {
+private fun CabeceraGuia(
+    onVolver: () -> Unit,
+    onAbrirAdministracion: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -184,6 +222,12 @@ private fun CabeceraGuia(onVolver: () -> Unit) {
             modifier = Modifier.testTag(TAG_VOLVER_GUIA),
         ) {
             Text(stringResource(R.string.guia_volver))
+        }
+        Button(
+            onClick = onAbrirAdministracion,
+            modifier = Modifier.testTag(TAG_ADMINISTRAR_GUIAS),
+        ) {
+            Text(stringResource(R.string.guia_administrar))
         }
         Text(
             text = stringResource(R.string.guia_titulo),
@@ -207,6 +251,26 @@ private fun SelectorFuentes(
                 selected = fuente.id == estado.fuenteSeleccionadaId,
                 onClick = { onSeleccionarFuente(fuente.id) },
                 label = { Text(fuente.nombre) },
+            )
+        }
+    }
+    // Estado de la fuente seleccionada: última actualización y último error, sin
+    // mezclarlo con el estado de carga de la pantalla.
+    estado.fuentes.firstOrNull { it.id == estado.fuenteSeleccionadaId }?.let { fuente ->
+        Text(
+            text =
+                stringResource(
+                    R.string.guia_fuente_estado,
+                    fuente.estado,
+                    fuente.ultimaActualizacionEn?.let(::fechaLocal) ?: stringResource(R.string.guia_nunca),
+                ),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.testTag(TAG_ESTADO_FUENTE_GUIA),
+        )
+        fuente.ultimoErrorCodigo?.let { codigo ->
+            Text(
+                text = stringResource(R.string.guia_fuente_error, codigo),
+                style = MaterialTheme.typography.bodySmall,
             )
         }
     }
@@ -286,6 +350,7 @@ private fun SeccionPendientes(
 @Composable
 private fun ColumnScope.ListaCanales(
     canales: List<CanalGuiaFila>,
+    ahora: Instant,
     onAbrirCanal: (CanalGuia) -> Unit,
 ) {
     LazyColumn(
@@ -294,7 +359,11 @@ private fun ColumnScope.ListaCanales(
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(canales, key = { it.canal.canalId }) { fila ->
-            FilaCanal(fila = fila, onAbrir = { onAbrirCanal(fila.canal) })
+            FilaCanal(
+                fila = fila,
+                ahora = ahora,
+                onAbrir = { onAbrirCanal(fila.canal) },
+            )
         }
     }
 }
@@ -347,6 +416,7 @@ private fun ColumnScope.VistaCanal(
 @Composable
 private fun FilaCanal(
     fila: CanalGuiaFila,
+    ahora: Instant,
     onAbrir: () -> Unit,
 ) {
     Column(
@@ -365,6 +435,23 @@ private fun FilaCanal(
         Text(
             text = stringResource(R.string.guia_ahora, fila.actual?.titulo ?: stringResource(R.string.guia_sin_programa)),
         )
+        fila.actual?.let { programa ->
+            programa.categoria?.takeIf { it.isNotBlank() }?.let { categoria ->
+                Text(
+                    text = stringResource(R.string.guia_categoria, categoria),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            val fraccion = fraccionTranscurrida(programa.inicio, programa.fin, ahora)
+            LinearProgressIndicator(
+                progress = { fraccion },
+                modifier = Modifier.fillMaxWidth().testTag(tagProgresoGuia(fila.canal.canalId)),
+            )
+            Text(
+                text = stringResource(R.string.guia_progreso, (fraccion * 100).toInt()),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         Text(
             text = stringResource(R.string.guia_siguiente, fila.siguiente?.titulo ?: stringResource(R.string.guia_sin_programa)),
         )
@@ -385,7 +472,22 @@ private fun FilaPrograma(
                 .testTag(tagProgramaGuia(programa.id)),
     ) {
         Text(text = programa.titulo, style = MaterialTheme.typography.titleSmall)
+        programa.subtitulo?.takeIf { it.isNotBlank() }?.let { subtitulo ->
+            Text(text = subtitulo, style = MaterialTheme.typography.bodySmall)
+        }
         Text(text = rangoLocal(programa.inicio, programa.fin))
+        programa.categoria?.takeIf { it.isNotBlank() }?.let { categoria ->
+            Text(
+                text = stringResource(R.string.guia_categoria, categoria),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        programa.episodeNum?.takeIf { it.isNotBlank() }?.let { episodio ->
+            Text(
+                text = stringResource(R.string.guia_episodio, episodio),
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         programa.descripcion?.takeIf { it.isNotBlank() }?.let { descripcion ->
             Text(text = descripcion, style = MaterialTheme.typography.bodySmall)
         }
@@ -430,8 +532,20 @@ private fun DialogoDetalle(
         title = { Text(programa.titulo) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                programa.subtitulo?.takeIf { it.isNotBlank() }?.let { subtitulo ->
+                    Text(text = subtitulo, style = MaterialTheme.typography.bodyMedium)
+                }
                 Text(stringResource(R.string.guia_detalle_inicio, fechaLocal(programa.inicio)))
                 Text(stringResource(R.string.guia_detalle_fin, fechaLocal(programa.fin)))
+                programa.categoria?.takeIf { it.isNotBlank() }?.let { categoria ->
+                    Text(stringResource(R.string.guia_categoria, categoria))
+                }
+                programa.episodeNum?.takeIf { it.isNotBlank() }?.let { episodio ->
+                    Text(stringResource(R.string.guia_episodio, episodio))
+                }
+                programa.idioma?.takeIf { it.isNotBlank() }?.let { idioma ->
+                    Text(stringResource(R.string.guia_idioma, idioma))
+                }
                 Text(stringResource(R.string.guia_detalle_descripcion))
                 Text(
                     text =
@@ -507,6 +621,18 @@ private fun rangoLocal(
     inicio: Instant,
     fin: Instant,
 ): String = "${horaLocal(inicio)}–${horaLocal(fin)}"
+
+/** Fracción transcurrida del programa actual, acotada al rango [0, 1]. */
+private fun fraccionTranscurrida(
+    inicio: Instant,
+    fin: Instant,
+    ahora: Instant,
+): Float {
+    val total = Duration.between(inicio, fin).toMillis()
+    if (total <= 0L) return 0f
+    val transcurrido = Duration.between(inicio, ahora).toMillis()
+    return (transcurrido.toDouble() / total).coerceIn(0.0, 1.0).toFloat()
+}
 
 private fun horaLocal(instante: Instant): String =
     DateTimeFormatter

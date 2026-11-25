@@ -107,13 +107,13 @@ se compila y prueba en CI, nunca en Termux).
 | T2 | S3 | inline | implementado | `ParserM3U.urlGuia`, `ParserM3UGuiaTest` |
 | T3 | S8 | inline | implementado | `ProgramaXmltv` enriquecido, `ParserXmltvEnriquecidoTest` |
 | T4 | S10 | inline | implementado | `core/epg/PropuestaAsociacion.kt`, `PropuestaAsociacionTest` |
-| T5 | S7, S9 | inline | pendiente | Room 4→5 |
-| T6 | S4, S5, S6 | inline | pendiente | repositorio de conexiones |
-| T7 | S7 | inline | pendiente | CRUD FuenteGuia + worker EPG |
-| T8 | S13 | inline | pendiente | Coordinador/Worker actualización |
-| T9 | S14 | inline | pendiente | selector paginado |
-| T10 | S12 | inline | pendiente | historial Media3 |
-| T11 | S11, S15 | inline | pendiente | UI conexiones + EPG + escalas |
+| T5 | S7, S9 | inline | implementado | `4d3ea4e`: Room 4→5, `EsquemaRoomTest`, `MigracionDiagnosticoTest` |
+| T6 | S4, S5, S6 | inline | implementado | `29abd4c3`: `ConexionRepositorio`, 9 pruebas |
+| T7 | S7 | inline | implementado | `8248dca`: `AdministracionGuiaRepositorio`, `ProgramadorGuias`, dos workers, `PoliticaReintentoGuia` |
+| T8 | S13 | inline | implementado | `82fa1c0`: `DecisionEjecucion.SIN_TRABAJO`, progreso y cancelación |
+| T9 | S14 | inline | implementado | `f9874af`: `CanalDao.opcionesDeAsociacion`, selector paginado |
+| T10 | S12 | inline | implementado | `597e528`: `player/RegistroHistorial`, `ReproductorViewModel`, 7 pruebas |
+| T11 | S11, S15 | inline | implementado | `ConexionesScreen`/`ViewModel`, `GuiasAdministracionScreen`/`ViewModel`, `GuiaScreen` con progreso y categoría, `IndicadorDesplazamiento` (H-02/H-03) |
 | T12 | S18, S19 | inline | pendiente | docs, gates, PR |
 
 ## Log
@@ -184,3 +184,62 @@ físicas y el archivo de referencia de cuentas, que no se tocan.
 - `ParserM3U` no expone `url-tvg`; `ProgramaXmltv` no tiene subtítulo,
   categoría, episode-num ni idioma.
 - `FechaXmltv` ya respeta offsets y asume UTC sin offset: no requiere cambio.
+
+### L4 — T1–T4 (commit `3099007`)
+
+Conexiones Xtream con solo rutas estándar del proveedor, `url-tvg` en el parser
+M3U, `ProgramaXmltv` enriquecido y propuestas de asociación con puntuación. El
+gate `./gradlew ktlintCheck detekt :core:test` quedó verde.
+
+### L5 — T5 y T6 (commits `4d3ea4e`, `29abd4c3`)
+
+Esquema v5 aditivo con `Conexion` y la guía completa. La conexión se materializa
+sobre el catálogo existente y la edición reutiliza la misma `Lista`, así que
+favoritos, historial, ocultos y asociaciones sobreviven (S5). Los secretos van
+cifrados con AES-GCM y AAD por columna, con HMAC de URL para comparar sin
+descifrar; una prueba cruda verifica que la contraseña y la URL no quedan en
+texto plano. `FuenteGuia` gana `origen`, `estado`, `conexionId`, última
+actualización, último error e intentos.
+
+### L6 — T8 y T9 (commits `82fa1c0`, `f9874af`)
+
+H-04: `DecisionEjecucion.SIN_TRABAJO` publica `resultado=sin_trabajo` en vez de
+presentar como éxito una ejecución coalescida; hay progreso por Lista y
+`ensureActive()` entre Listas y lotes. H-05: el selector de asociación consulta
+solo los campos necesarios, pagina de 50 con debounce de 250 ms y cancela la
+búsqueda anterior.
+
+### L7 — T7 (commit `8248dca`)
+
+H-06 cerrado: `AdministracionGuiaRepositorio` da alta, edición, baja, activación
+y vinculación de `FuenteGuia`, y `EpgRepositorio` ya persiste subtítulo,
+categoría, `episode-num` e idioma (antes se parseaban y se descartaban). La
+actualización descarga a un temporal, detecta gzip por sus dos primeros bytes y
+nunca materializa el documento. `ProgramadorGuias` mantiene una pasada
+automática cada 6 h que respeta el intervalo por guía y
+`PoliticaReintentoGuia` (15 min, 1 h, 6 h, 24 h y después reintento manual).
+Un fallo no toca `generacionPublicadaId`: la última guía válida sigue publicada.
+
+### L8 — T10 (commit `597e528`)
+
+H-01: `RegistroHistorial` es una clase pura que consume solo el primer
+`EstadoReproductor.REPRODUCIENDO` de cada sesión; `ReproductorViewModel` la
+reinicia al abrir sesión e inyecta `HistorialRepositorio`, de modo que el
+Historial real se registra una vez por reproducción y no por recomposición.
+Siete pruebas cubren el marcado por sesión y el reinicio.
+
+### L9 — T11 (UI de conexiones, guías y escalas)
+
+H-06 gana su ruta de alta en producción: `GuiasAdministracionScreen` crea,
+edita, elimina, activa y actualiza guías con URL propia o asociada a una
+conexión, mostrando estado, última actualización, último error y reintentos.
+`ConexionesScreen` administra los métodos Xtream y M3U (crear, editar sin
+revelar secretos, eliminar con confirmación, activar, probar, actualizar lista y
+guía). Ambas pantallas se alcanzan desde Fuentes y Guía y solo consumen los
+repositorios y programadores existentes. `GuiaScreen` suma progreso del programa
+actual, categoría, episodios y estado de la fuente. H-02/H-03: los bloques de
+controles del catálogo y de las tarjetas usan `FlowRow`, y
+`IndicadorDesplazamiento` avisa cuando queda contenido desplazable, para que a
+`font_scale` 2.0 ni «Ajustes» ni «Mostrar ocultos» queden fuera del área visible
+sin señal.
+

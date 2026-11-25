@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.media3.exoplayer.ExoPlayer
 import com.copernicotv.app.data.BusquedaCatalogoRepositorio
 import com.copernicotv.app.data.DiagnosticoRepositorio
+import com.copernicotv.app.data.HistorialRepositorio
 import com.copernicotv.app.data.PreferenciasReproduccion
 import com.copernicotv.app.data.RepositorioPreferenciasPista
 import com.copernicotv.app.data.RepositorioPreferenciasReproduccion
@@ -25,6 +26,7 @@ import com.copernicotv.app.player.PistaDisponible
 import com.copernicotv.app.player.PoliticaReintentos
 import com.copernicotv.app.player.PreferenciaPista
 import com.copernicotv.app.player.PreferenciasPista
+import com.copernicotv.app.player.RegistroHistorial
 import com.copernicotv.app.player.SesionMedia3
 import com.copernicotv.app.player.canalVecino
 import com.copernicotv.app.player.construirDiagnostico
@@ -96,6 +98,7 @@ class ReproductorViewModel
         private val fabricaConectividad: FabricaConectividad,
         private val configuracionImagen: ConfiguracionImagen,
         private val registroDiagnosticos: DiagnosticoRepositorio,
+        private val historial: HistorialRepositorio,
     ) : ViewModel() {
         private val _estado = MutableStateFlow<ReproductorUiState>(ReproductorUiState.Cargando)
         val estado: StateFlow<ReproductorUiState> = _estado.asStateFlow()
@@ -152,6 +155,12 @@ class ReproductorViewModel
 
         private var sesion: SesionMedia3? = null
         private var canalCargado: Long? = null
+
+        /**
+         * Marca de entrada en el Historial de la sesión vigente (H-01). Vive en
+         * el ViewModel, así que las recomposiciones de la pantalla no la tocan.
+         */
+        private val registroHistorial = RegistroHistorial()
         private var carga: Job? = null
         private var recolector: Job? = null
         private var recolectorPistas: Job? = null
@@ -199,7 +208,12 @@ class ReproductorViewModel
                             _modoAspecto.value = reproduccion.modoAspecto
                             _controlesSecundariosVisibles.value = reproduccion.controlesSecundariosVisibles
                             val nueva =
-                                abrirSesion(resultado.stream.url, resultado.stream.protocolo, preferenciasActuales)
+                                abrirSesion(
+                                    resultado.stream.url,
+                                    resultado.stream.protocolo,
+                                    preferenciasActuales,
+                                    canalId = resultado.stream.canalId,
+                                )
                             // El volumen vigente sobrevive al zapeo: la sesión
                             // nueva hereda el nivel actual (E6-T6).
                             nueva.fijarVolumen(_volumen.value)
@@ -395,7 +409,7 @@ class ReproductorViewModel
             cerrarSesion(conservarDiagnostico = true)
             canalCargado = null
             _estado.value = ReproductorUiState.Cargando
-            abrirSesion(url, protocolo, preferencias, posicionInicialMs = posicionMs)
+            abrirSesion(url, protocolo, preferencias, posicionInicialMs = posicionMs, canalId = canalIdReconstruido)
             // La sesión reconstruida tiene su propia fila de diagnóstico.
             registroDiagnosticos.abrir(canalIdReconstruido, nombreReconstruido, url)
         }
@@ -416,7 +430,11 @@ class ReproductorViewModel
             protocolo: ProtocoloStream,
             preferencias: PreferenciasPista,
             posicionInicialMs: Long = 0L,
+            canalId: Long? = null,
         ): SesionMedia3 {
+            // Cada sesión nueva vuelve a ganarse su entrada en el Historial:
+            // una reconstrucción también es una reproducción real (H-01).
+            registroHistorial.reiniciar()
             val nueva =
                 SesionMedia3(
                     contexto,
@@ -439,6 +457,12 @@ class ReproductorViewModel
                         _sesionEstado.value = estadoSesion
                         estadoSesion.codigoError?.let { ultimoError = it }
                         actualizarDiagnostico(estadoSesion, _estadoPistas.value)
+                        if (registroHistorial.alReproducir(estadoSesion.estado)) {
+                            // H-01: el Historial se escribe con el primer
+                            // REPRODUCIENDO real (READY y `isPlaying`), no al
+                            // abrir la sesión ni al recomponer la pantalla.
+                            canalId?.let { id -> viewModelScope.launch { runCatching { historial.registrar(id) } } }
+                        }
                         if (estadoSesion.estado == EstadoReproductor.TERMINADO) {
                             // Fin de stream: la fila se cierra aunque la
                             // sesión siga viva hasta el zapeo siguiente.

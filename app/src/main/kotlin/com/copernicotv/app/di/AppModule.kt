@@ -6,6 +6,7 @@ import com.copernicotv.app.crypto.ClavesApp
 import com.copernicotv.app.crypto.ClavesDatos
 import com.copernicotv.app.crypto.ClavesKeystore
 import com.copernicotv.app.data.IndiceHmacRepositorio
+import com.copernicotv.app.data.SondaConexion
 import com.copernicotv.app.data.TiemposHttp
 import com.copernicotv.app.data.VerificacionCleartext
 import com.copernicotv.app.data.cache.AlmacenCache

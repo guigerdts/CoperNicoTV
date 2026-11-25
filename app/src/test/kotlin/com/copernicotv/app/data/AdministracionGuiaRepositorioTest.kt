@@ -344,6 +344,8 @@ class AdministracionGuiaRepositorioTest {
         override suspend fun actuales(): LimitesRetencion = LimitesRetencion.GLOBAL
 
         override suspend fun guardar(limites: LimitesRetencion) = Unit
+
+        override suspend fun restablecer() = Unit
     }
 
     private companion object {

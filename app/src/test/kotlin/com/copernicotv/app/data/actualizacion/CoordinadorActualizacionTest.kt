@@ -8,6 +8,7 @@ import com.copernicotv.app.data.db.AppDatabase
 import com.copernicotv.app.data.db.entities.FuenteEntity
 import com.copernicotv.app.data.db.entities.ListaEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After

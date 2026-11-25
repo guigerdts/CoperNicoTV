@@ -113,8 +113,8 @@ se compila y prueba en CI, nunca en Termux).
 | T8 | S13 | inline | implementado | `82fa1c0`: `DecisionEjecucion.SIN_TRABAJO`, progreso y cancelación |
 | T9 | S14 | inline | implementado | `f9874af`: `CanalDao.opcionesDeAsociacion`, selector paginado |
 | T10 | S12 | inline | implementado | `597e528`: `player/RegistroHistorial`, `ReproductorViewModel`, 7 pruebas |
-| T11 | S11, S15 | inline | implementado | `ConexionesScreen`/`ViewModel`, `GuiasAdministracionScreen`/`ViewModel`, `GuiaScreen` con progreso y categoría, `IndicadorDesplazamiento` (H-02/H-03) |
-| T12 | S18, S19 | inline | pendiente | docs, gates, PR |
+| T11 | S11, S15 | inline | implementado | `21a16b4`: `ConexionesScreen`/`ViewModel`, `GuiasAdministracionScreen`/`ViewModel`, `GuiaScreen` con progreso y categoría, `IndicadorDesplazamiento` (H-02/H-03) |
+| T12 | S18, S19 | inline | implementado | `docs/iptv-profesional.md`, `docs/adr/0010-conexiones-y-guia-administrada.md`, README, F-17..F-20, L24 de OTA |
 
 ## Log
 
@@ -243,3 +243,16 @@ controles del catálogo y de las tarjetas usan `FlowRow`, y
 `font_scale` 2.0 ni «Ajustes» ni «Mostrar ocultos» queden fuera del área visible
 sin señal.
 
+### L10 — T12 (documentación y cierre)
+
+`docs/iptv-profesional.md` consolida los métodos Xtream y M3U, la administración
+de conexiones, el tratamiento de credenciales, el flujo EPG/XMLTV, la asociación,
+la UI y H-01..H-06 con causa raíz, corrección, pruebas y evidencia. El ADR-0010
+fija la decisión de materializar las conexiones sobre el catálogo existente y de
+administrar la guía con una sola programación periódica. El README refleja las
+funcionalidades ya implementadas y `docs/evidence/validaciones-fisicas.md` suma
+F-17..F-20 como **pendientes**: no hay verificación física de conexiones, EPG de
+punta a punta, escalas de fuente ni catálogo grande, y esta entrega no la
+declara. `odd/tasks/ota-actualizaciones.md` (L24) registra que `beta.4` es solo
+candidata: sin autorización no hay tag ni release, y F-14/F-15/F-16 siguen
+abiertas.

@@ -95,7 +95,7 @@ internal object DatosActualizacion {
 
     /** Lee el avance publicado; `null` si la ejecución no lo informó. */
     fun progreso(datos: Data): Pair<Int, Int>? {
-        val claves = datos.keySet()
+        val claves = datos.keyValueMap
         if (CLAVE_PROGRESO_HECHOS !in claves || CLAVE_PROGRESO_TOTAL !in claves) return null
         return datos.getInt(CLAVE_PROGRESO_HECHOS, 0) to datos.getInt(CLAVE_PROGRESO_TOTAL, 0)
     }

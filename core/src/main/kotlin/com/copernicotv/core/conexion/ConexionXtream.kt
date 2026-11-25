@@ -72,6 +72,8 @@ enum class CodigoErrorConexion(val codigo: String) {
     FORMATO_NO_SOPORTADO("conexion_formato_no_soportado"),
     GUIA_NO_HTTP("conexion_guia_no_http"),
     LISTA_NO_HTTP("conexion_lista_no_http"),
+    LISTA_VACIA("conexion_lista_vacia"),
+    INTERVALO_FUERA_DE_RANGO("conexion_intervalo_fuera_de_rango"),
 }
 
 /** Error de validación: código estable y mensaje ya redactado. */

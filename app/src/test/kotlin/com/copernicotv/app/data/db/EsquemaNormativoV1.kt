@@ -309,6 +309,15 @@ internal val ESQUEMA_NORMATIVO_V1: Map<String, TablaNormativa> =
                         entero("usar_retencion_global", nula = false),
                         entero("creado_en"),
                         entero("actualizado_en"),
+                        // Esquema v5 (gestión EPG completa): columnas aditivas y
+                        // nulables para que las filas v4 sobrevivan sin defaults.
+                        texto("origen", nula = true),
+                        texto("estado", nula = true),
+                        entero("conexion_id", nula = true),
+                        entero("ultima_actualizacion_en", nula = true),
+                        texto("ultimo_error_codigo", nula = true),
+                        texto("ultimo_error_mensaje", nula = true),
+                        entero("intentos_fallidos", nula = true),
                     ),
             ),
         "GeneracionGuia" to
@@ -336,6 +345,11 @@ internal val ESQUEMA_NORMATIVO_V1: Map<String, TablaNormativa> =
                         entero("inicio"),
                         entero("fin"),
                         texto("descripcion"),
+                        // Esquema v5: campos extendidos de <programme>.
+                        texto("subtitulo", nula = true),
+                        texto("categoria", nula = true),
+                        texto("episode_num", nula = true),
+                        texto("idioma", nula = true),
                     ),
                 fks =
                     listOf(

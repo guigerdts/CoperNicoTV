@@ -20,7 +20,23 @@ data class FuenteGuiaEntity(
     val usarRetencionGlobal: Boolean,
     val creadoEn: Instant,
     val actualizadoEn: Instant,
-)
+    /** `manual`, `m3u` o `xtream`: cómo se obtuvo la URL. Nulo equivale a manual. */
+    val origen: String? = ORIGEN_MANUAL,
+    /** Código estable del estado de la última actualización. Nulo equivale a sin actualizar. */
+    val estado: String? = ESTADO_SIN_ACTUALIZAR,
+    /** Conexión que administra esta guía; `null` si se dio de alta sola. */
+    val conexionId: Long? = null,
+    val ultimaActualizacionEn: Instant? = null,
+    val ultimoErrorCodigo: String? = null,
+    val ultimoErrorMensaje: String? = null,
+    /** Reintentos fallidos consecutivos; nulo equivale a 0. */
+    val intentosFallidos: Long? = null,
+) {
+    companion object {
+        const val ORIGEN_MANUAL: String = "manual"
+        const val ESTADO_SIN_ACTUALIZAR: String = "sin_actualizar"
+    }
+}
 
 @Entity(
     tableName = "GeneracionGuia",
@@ -73,6 +89,14 @@ data class ProgramaEntity(
     val inicio: Instant,
     val fin: Instant,
     val descripcion: String? = null,
+    /** `<sub-title>` del XMLTV: segunda línea del título (esquema v5). */
+    val subtitulo: String? = null,
+    /** Primera `<category>` declarada (esquema v5). */
+    val categoria: String? = null,
+    /** `<episode-num>` preferido: `onscreen` si existe (esquema v5). */
+    val episodeNum: String? = null,
+    /** Idioma declarado por el título o la descripción (esquema v5). */
+    val idioma: String? = null,
 )
 
 @Entity(

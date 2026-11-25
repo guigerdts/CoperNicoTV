@@ -12,8 +12,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Verifica que el esquema v2 contiene exactamente las 26 tablas de §6.3.1
- * más las 2 del diagnóstico persistente de reproducción (E7-T10, S6a).
+ * Verifica que el esquema v5 contiene exactamente las 26 tablas de §6.3.1,
+ * las 2 del diagnóstico persistente de reproducción (E7-T10, S6a) y la tabla
+ * `Conexion` de la gestión de conexiones IPTV.
  *
  * No se apoya en el JSON exportado: consulta `sqlite_master` de una base real
  * creada por Room, que es la fuente de verdad del esquema efectivo.
@@ -39,7 +40,7 @@ class EsquemaRoomTest {
     }
 
     @Test
-    fun `el esquema v4 tiene exactamente las 28 tablas normativas`() {
+    fun `el esquema v5 tiene exactamente las 29 tablas normativas`() {
         val tablas = mutableSetOf<String>()
         db.openHelper.readableDatabase
             .query("SELECT name FROM sqlite_master WHERE type = 'table'")
@@ -53,8 +54,8 @@ class EsquemaRoomTest {
     }
 
     @Test
-    fun `la version de esquema es 4`() {
-        assertEquals(4, db.openHelper.readableDatabase.version)
+    fun `la version de esquema es 5`() {
+        assertEquals(5, db.openHelper.readableDatabase.version)
     }
 
     private companion object {
@@ -70,6 +71,7 @@ class EsquemaRoomTest {
                 "Canal",
                 "Coleccion",
                 "ColeccionCanal",
+                "Conexion",
                 "DetalleAusencia",
                 "EstadoActualizacion",
                 "EstadoIndiceHmac",

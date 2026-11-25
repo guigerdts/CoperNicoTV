@@ -60,7 +60,12 @@ object AppModule {
     ): AppDatabase =
         Room
             .databaseBuilder(contexto, AppDatabase::class.java, AppDatabase.NOMBRE)
-            .addMigrations(Migraciones.MIGRACION_1_2, Migraciones.MIGRACION_2_3, Migraciones.MIGRACION_3_4)
+            .addMigrations(
+                Migraciones.MIGRACION_1_2,
+                Migraciones.MIGRACION_2_3,
+                Migraciones.MIGRACION_3_4,
+                Migraciones.MIGRACION_4_5,
+            )
             .addCallback(SembrarEstadoIndiceHmac.callback())
             .build()
 
